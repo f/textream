@@ -209,6 +209,42 @@ class SpeechRecognizer {
         beginRecognition()
     }
 
+    /// Pause speech recognition for gesture rewind without changing isListening state.
+    func pauseForRewind() {
+        cleanupRecognition()
+    }
+
+    /// Move recognizedCharCount backward by N words. Used during gesture rewind.
+    func rewindByWords(_ count: Int) {
+        let chars = Array(sourceText)
+        guard !chars.isEmpty else { return }
+        var remaining = count
+        var offset = min(recognizedCharCount, chars.count)
+
+        while remaining > 0 && offset > 0 {
+            // Skip any spaces at current position
+            while offset > 0 && chars[offset - 1] == " " {
+                offset -= 1
+            }
+            // Skip to start of current word
+            while offset > 0 && chars[offset - 1] != " " {
+                offset -= 1
+            }
+            remaining -= 1
+        }
+
+        recognizedCharCount = max(0, offset)
+        matchStartOffset = recognizedCharCount
+    }
+
+    /// Resume speech recognition after gesture rewind from current position.
+    func resumeAfterRewind() {
+        matchStartOffset = recognizedCharCount
+        retryCount = 0
+        isListening = true
+        beginRecognition()
+    }
+
     private func cleanupRecognition() {
         // Cancel any pending restart to prevent overlapping beginRecognition calls
         pendingRestart?.cancel()

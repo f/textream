@@ -9,6 +9,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import CoreImage.CIFilterBuiltins
 
+
 struct ContentView: View {
     @ObservedObject private var service = TextreamService.shared
     @State private var isRunning = false
@@ -219,63 +220,6 @@ Happy presenting! [wave]
                     )
                 )
 
-                // Bottom bar
-                VStack {
-                    Spacer()
-                    ZStack {
-                        // Waveform pill centered to full width
-                        if isRecording {
-                            waveformPill
-                                .transition(.scale(scale: 0.8).combined(with: .opacity))
-                        }
-
-                        // Buttons pinned right
-                        HStack(spacing: 10) {
-                            Spacer()
-
-                            Button {
-                                if isRecording {
-                                    stopRecording()
-                                } else {
-                                    startRecording()
-                                }
-                            } label: {
-                                Image(systemName: isRecording ? "pause.fill" : "mic.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(isRecording ? Color.orange : Color.red)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(isRunning)
-                            .opacity(isRunning ? 0.4 : 1)
-
-                            Button {
-                                if isRunning {
-                                    stop()
-                                } else {
-                                    run()
-                                }
-                            } label: {
-                                Image(systemName: isRunning ? "stop.fill" : "play.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(isRunning ? Color.red : Color.accentColor)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled((!isRunning && !hasAnyContent) || isRecording)
-                            .opacity((!hasAnyContent && !isRunning) || isRecording ? 0.4 : 1)
-                        }
-                    }
-                    .padding(20)
-                }
-                .animation(.easeInOut(duration: 0.25), value: isRecording)
-
                 // Drop zone overlay — sits on top so TextEditor doesn't steal the drop
                 if isDroppingPresentation {
                 VStack(spacing: 8) {
@@ -328,6 +272,64 @@ Happy presenting! [wave]
                     return true
                 }
                 .allowsHitTesting(isDroppingPresentation)
+            }
+            .overlay(alignment: .bottom) {
+                ZStack {
+                    // Waveform pill centered to full width
+                    if isRecording {
+                        waveformPill
+                            .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    }
+
+                    // Buttons pinned right
+                    HStack(spacing: 10) {
+                        Spacer()
+
+                        Button {
+                            if isRecording {
+                                stopRecording()
+                            } else {
+                                startRecording()
+                            }
+                        } label: {
+                            Image(systemName: isRecording ? "pause.fill" : "mic.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(isRecording ? Color.orange : Color.red)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .keyboardShortcut("r", modifiers: .command)
+                        .help(isRecording ? "Stop Recording (\u{2318}R)" : "Record (\u{2318}R)")
+                        .disabled(isRunning)
+                        .opacity(isRunning ? 0.4 : 1)
+
+                        Button {
+                            if isRunning {
+                                stop()
+                            } else {
+                                run()
+                            }
+                        } label: {
+                            Image(systemName: isRunning ? "stop.fill" : "text.viewfinder")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(isRunning ? Color.red : Color.accentColor)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .keyboardShortcut(.return, modifiers: .command)
+                        .help(isRunning ? "Stop (Esc)" : "Start Teleprompter (\u{2318}\u{23CE})")
+                        .disabled((!isRunning && !hasAnyContent) || isRecording)
+                        .opacity((!hasAnyContent && !isRunning) || isRecording ? 0.4 : 1)
+                    }
+                }
+                .padding(20)
+                .animation(.easeInOut(duration: 0.25), value: isRecording)
             }
         }
     }
@@ -425,63 +427,46 @@ Happy presenting! [wave]
         .frame(minWidth: 360, minHeight: 240)
         .background(.ultraThinMaterial)
         .toolbar {
-            ToolbarItem(placement: .automatic) {
-                HStack(spacing: 8) {
-                    Button {
-                        service.openFile()
-                    } label: {
-                        HStack(spacing: 4) {
-                            if service.currentFileURL != nil && service.pages != service.savedPages {
-                                Circle()
-                                    .fill(.orange)
-                                    .frame(width: 6, height: 6)
-                            }
-                            Text(service.currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(.tertiary)
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 4) {
+                    if service.currentFileURL != nil && service.pages != service.savedPages {
+                        Circle()
+                            .fill(.orange)
+                            .frame(width: 6, height: 6)
                     }
-                    .buttonStyle(.plain)
-
-                    // Add page button in toolbar
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            service.pages.append("")
-                            service.currentPageIndex = service.pages.count - 1
-                        }
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .semibold))
-                            Text("Page")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        showSettings = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: NotchSettings.shared.listeningMode.icon)
-                                .font(.system(size: 10))
-                            Text(NotchSettings.shared.listeningMode == .wordTracking
-                                 ? languageLabel
-                                 : NotchSettings.shared.listeningMode.label)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+                    TextField("Untitled", text: $service.documentTitle, onCommit: {
+                        renameFile(to: service.documentTitle)
+                    })
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 200)
                 }
-                .padding(.horizontal, 8)
+                .onAppear {
+                    service.documentTitle = service.currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled"
+                }
+                .onChange(of: service.currentFileURL) { _, url in
+                    service.documentTitle = url?.deletingPathExtension().lastPathComponent ?? "Untitled"
+                }
             }
+        }
+        .onKeyPress(.escape) {
+            if isRunning {
+                stop()
+                return .handled
+            }
+            return .ignored
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(settings: NotchSettings.shared)
+        }
+        .onChange(of: showSettings) { _, isOpen in
+            DispatchQueue.main.async {
+                if let window = NSApplication.shared.mainWindow {
+                    window.level = isOpen ? NSWindow.Level(Int(CGShieldingWindowLevel()) + 2) : .normal
+                }
+            }
         }
         .sheet(isPresented: $showAbout) {
             AboutView()
@@ -590,6 +575,23 @@ Happy presenting! [wave]
     }
 
     // MARK: - Actions
+
+    private func renameFile(to newName: String) {
+        guard let url = service.currentFileURL else { return }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            service.documentTitle = url.deletingPathExtension().lastPathComponent
+            return
+        }
+        let newURL = url.deletingLastPathComponent().appendingPathComponent(trimmed).appendingPathExtension(url.pathExtension)
+        guard newURL != url else { return }
+        do {
+            try FileManager.default.moveItem(at: url, to: newURL)
+            service.currentFileURL = newURL
+        } catch {
+            service.documentTitle = url.deletingPathExtension().lastPathComponent
+        }
+    }
 
     private func removePage(at index: Int) {
         guard service.pages.count > 1 else { return }

@@ -23,7 +23,7 @@ class NotchPreviewController {
     func show(settings: NotchSettings) {
         // If panel already exists, just re-show it
         if let panel {
-            panel.orderFront(nil)
+            panel.orderFrontRegardless()
             return
         }
 
@@ -32,10 +32,10 @@ class NotchPreviewController {
         let visibleFrame = screen.visibleFrame
         let menuBarHeight = screenFrame.maxY - visibleFrame.maxY
 
-        let maxWidth = NotchSettings.maxWidth
-        let maxHeight = menuBarHeight + NotchSettings.maxHeight + 40
+        let previewWidth = screenFrame.width * 0.8
+        let maxHeight = menuBarHeight + screenFrame.height * 0.5 + 40
 
-        let xPosition = screenFrame.midX - maxWidth / 2
+        let xPosition = screenFrame.midX - previewWidth / 2
         let yPosition = screenFrame.maxY - maxHeight
 
         let content = NotchPreviewContent(settings: settings, menuBarHeight: menuBarHeight)
@@ -43,7 +43,7 @@ class NotchPreviewController {
         self.hostingView = hostingView
 
         let panel = NSPanel(
-            contentRect: NSRect(x: xPosition, y: yPosition, width: maxWidth, height: maxHeight),
+            contentRect: NSRect(x: xPosition, y: yPosition, width: previewWidth, height: maxHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -53,8 +53,9 @@ class NotchPreviewController {
         panel.hasShadow = false
         panel.level = .statusBar
         panel.ignoresMouseEvents = true
+        panel.hidesOnDeactivate = false
         panel.contentView = hostingView
-        panel.orderFront(nil)
+        panel.orderFrontRegardless()
         self.panel = panel
     }
 
@@ -105,13 +106,13 @@ class NotchPreviewController {
     private func cursorFrame(for panel: NSPanel, settings: NotchSettings) -> NSRect {
         let mouse = NSEvent.mouseLocation
         let cursorOffset: CGFloat = 8
-        let maxWidth = panel.frame.width
-        let notchWidth = settings.notchWidth
+        let screenWidth = NSScreen.main?.frame.width ?? 1440
+        let notchWidth = screenWidth * settings.windowWidthPercent
         let panelHeight = panel.frame.height
 
-        let panelX = mouse.x + cursorOffset - (maxWidth - notchWidth) / 2
+        let panelX = mouse.x + cursorOffset
         let panelY = mouse.y + 60 - panelHeight
-        return NSRect(x: panelX, y: panelY, width: maxWidth, height: panelHeight)
+        return NSRect(x: panelX, y: panelY, width: notchWidth, height: panelHeight)
     }
 
     private func startCursorTracking() {
@@ -153,8 +154,10 @@ struct NotchPreviewContent: View {
     var body: some View {
         GeometryReader { geo in
             let topPadding = menuBarHeight * (1 - offsetPhase) + 14 * offsetPhase
-            let contentHeight = topPadding + settings.textAreaHeight
-            let currentWidth = settings.notchWidth
+            let screenHeight = NSScreen.main?.frame.height ?? 900
+            let contentHeight = topPadding + screenHeight * settings.windowHeightPercent
+            let screenWidth = NSScreen.main?.frame.width ?? 1440
+            let currentWidth = min(screenWidth * settings.windowWidthPercent, geo.size.width)
             let yOffset = 60 * offsetPhase
 
             ZStack(alignment: .top) {
@@ -214,8 +217,8 @@ struct NotchPreviewContent: View {
             .frame(width: currentWidth, height: contentHeight, alignment: .top)
             .offset(y: yOffset)
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
-            .animation(.easeInOut(duration: 0.15), value: settings.notchWidth)
-            .animation(.easeInOut(duration: 0.15), value: settings.textAreaHeight)
+            .animation(.easeInOut(duration: 0.15), value: settings.windowWidthPercent)
+            .animation(.easeInOut(duration: 0.15), value: settings.windowHeightPercent)
         }
         .onChange(of: settings.overlayMode) { _, mode in
             if mode == .floating {
@@ -305,7 +308,7 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("Settings")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
@@ -314,24 +317,23 @@ struct SettingsView: View {
                     .padding(.bottom, 6)
 
                 ForEach(SettingsTab.allCases) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        HStack(spacing: 7) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 12, weight: .medium))
-                                .frame(width: 16)
-                            Text(tab.label)
-                                .font(.system(size: 13, weight: .regular))
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
-                        .foregroundStyle(selectedTab == tab ? Color.accentColor : .primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    HStack(spacing: 7) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(width: 16)
+                        Text(tab.label)
+                            .font(.system(size: 13, weight: .regular))
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
+                    .foregroundStyle(selectedTab == tab ? Color.accentColor : .primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedTab = tab
+                    }
                 }
 
                 Spacer()
@@ -383,8 +385,7 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(width: 500)
-        .frame(minHeight: 280, maxHeight: 500)
+        .frame(width: 500, height: 500)
         .background(.ultraThinMaterial)
         .alert("Reset All Settings?", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -396,50 +397,22 @@ struct SettingsView: View {
         } message: {
             Text("This will restore all settings to their defaults.")
         }
-        .onAppear {
-            if settings.overlayMode != .fullscreen {
+        .onChange(of: selectedTab) { _, tab in
+            if tab == .teleprompter && settings.overlayMode != .fullscreen {
                 previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
+            } else {
+                previewController.hide()
+            }
+        }
+        .onChange(of: settings.overlayMode) { _, mode in
+            if selectedTab == .teleprompter && mode != .fullscreen {
+                previewController.show(settings: settings)
+            } else {
+                previewController.hide()
             }
         }
         .onDisappear {
             previewController.dismiss()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            previewController.hide()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            if settings.overlayMode != .fullscreen {
-                previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
-            }
-        }
-        .onChange(of: settings.followCursorWhenUndocked) { _, follow in
-            if follow && settings.overlayMode == .floating {
-                previewController.animateToCursor(settings: settings)
-            } else {
-                previewController.animateFromCursor()
-            }
-        }
-        .onChange(of: settings.overlayMode) { _, mode in
-            if mode == .fullscreen {
-                previewController.hide()
-            } else {
-                previewController.show(settings: settings)
-                if mode == .floating && settings.followCursorWhenUndocked {
-                    previewController.animateToCursor(settings: settings)
-                } else if previewController.isAtCursor {
-                    previewController.animateFromCursor()
-                }
-            }
         }
     }
 
@@ -482,39 +455,29 @@ struct SettingsView: View {
                     }
                 }
 
-                // Text Size
-                Text("Size")
-                    .font(.system(size: 13, weight: .medium))
-
-                HStack(spacing: 8) {
-                    ForEach(FontSizePreset.allCases) { preset in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.fontSizePreset = preset
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text("Ag")
-                                    .font(Font(settings.fontFamilyPreset.font(size: preset.pointSize * 0.7)))
-                                    .foregroundStyle(settings.fontSizePreset == preset ? Color.accentColor : .primary)
-                                Text(preset.label)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(settings.fontSizePreset == preset ? Color.accentColor : .secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.fontSizePreset == preset ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.fontSizePreset == preset ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
+                // Font Size
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Font Size")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(Int(settings.fontSize))pt")
+                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                            .foregroundStyle(.tertiary)
                     }
+                    Slider(
+                        value: $settings.fontSize,
+                        in: 14...100,
+                        step: 8
+                    )
                 }
+
+                Text("Ag")
+                    .font(Font(settings.fontFamilyPreset.font(size: min(settings.fontSize, 48))))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
 
                 Divider()
 
@@ -620,47 +583,6 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
 
-                Divider()
-
-                // Dimensions
-                Text("Dimensions")
-                    .font(.system(size: 13, weight: .medium))
-
-                VStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Width")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(Int(settings.notchWidth))px")
-                                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Slider(
-                            value: $settings.notchWidth,
-                            in: NotchSettings.minWidth...NotchSettings.maxWidth,
-                            step: 10
-                        )
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Height")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(Int(settings.textAreaHeight))px")
-                                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Slider(
-                            value: $settings.textAreaHeight,
-                            in: NotchSettings.minHeight...NotchSettings.maxHeight,
-                            step: 10
-                        )
-                    }
-                }
             }
             .padding(16)
         }
@@ -771,7 +693,7 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
-                if settings.overlayMode == .pinned {
+                if settings.overlayMode == .floating {
                     Divider()
 
                     Text("Display")
@@ -796,9 +718,7 @@ struct SettingsView: View {
                             onRefresh: { refreshOverlayScreens() }
                         )
                     }
-                }
 
-                if settings.overlayMode == .floating {
                     Divider()
 
                     Toggle(isOn: $settings.followCursorWhenUndocked) {
@@ -867,9 +787,64 @@ struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.primary.opacity(0.04))
                     )
+
+                    Toggle(isOn: $settings.fullscreenTopAnchor) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Lock Text to Top")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Anchor the current line near the top of the screen instead of the center.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
                 }
 
-                Divider()
+                if settings.overlayMode != .fullscreen {
+                    Divider()
+
+                    // Dimensions
+                    Text("Dimensions")
+                        .font(.system(size: 13, weight: .medium))
+
+                    VStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Width")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(settings.windowWidthPercent * 100))%")
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Slider(
+                                value: $settings.windowWidthPercent,
+                                in: 0.2...0.8,
+                                step: 0.05
+                            )
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Height")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(settings.windowHeightPercent * 100))%")
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Slider(
+                                value: $settings.windowHeightPercent,
+                                in: 0.05...0.5,
+                                step: 0.05
+                            )
+                        }
+                    }
+
+                    Divider()
+                }
 
                 // Options
                 Toggle(isOn: $settings.showElapsedTime) {
@@ -983,6 +958,17 @@ struct SettingsView: View {
                     onRefresh: { refreshScreens() },
                     emptyMessage: "No external displays detected. Connect a display or enable Sidecar."
                 )
+
+                Toggle(isOn: $settings.fullscreenTopAnchor) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Lock Text to Top")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Anchor the current line near the top of the screen instead of the center.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
             }
             Spacer()
         }
@@ -1049,6 +1035,18 @@ struct SettingsView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.accentColor.opacity(0.08))
                 )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Remote Text Size")
+                        .font(.system(size: 13, weight: .medium))
+                    Picker("", selection: $settings.browserFontSizePreset) {
+                        ForEach(BrowserFontSizePreset.allCases) { preset in
+                            Text(preset.label).tag(preset)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
 
                 DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
                     VStack(alignment: .leading, spacing: 10) {
@@ -1316,9 +1314,9 @@ struct SettingsView: View {
     // MARK: - Helpers
 
     private func resetAllSettings() {
-        settings.notchWidth = NotchSettings.defaultWidth
-        settings.textAreaHeight = NotchSettings.defaultHeight
-        settings.fontSizePreset = .lg
+        settings.windowWidthPercent = NotchSettings.defaultWindowWidthPercent
+        settings.windowHeightPercent = NotchSettings.defaultWindowHeightPercent
+        settings.fontSize = NotchSettings.defaultFontSize
         settings.fontFamilyPreset = .sans
         settings.fontColorPreset = .white
         settings.cueColorPreset = .white
@@ -1330,6 +1328,7 @@ struct SettingsView: View {
         settings.glassOpacity = 0.15
         settings.followCursorWhenUndocked = false
         settings.fullscreenScreenID = 0
+        settings.fullscreenTopAnchor = false
         settings.externalDisplayMode = .off
         settings.externalScreenID = 0
         settings.mirrorAxis = .horizontal
@@ -1341,6 +1340,7 @@ struct SettingsView: View {
         settings.autoNextPageDelay = 3
         settings.browserServerEnabled = false
         settings.browserServerPort = 7373
+        settings.browserFontSizePreset = .lg
         settings.directorModeEnabled = false
         settings.directorServerPort = 7575
     }
