@@ -1,0 +1,82 @@
+name: Test Layers
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  unit:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Run unit tests
+        run: ./scripts/test-unit.sh
+
+      - name: Upload unit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-artifacts
+          path: |
+            .build/tests/logs
+            .build/tests/results
+
+  integration:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Run integration tests
+        run: ./scripts/test-integration.sh
+
+      - name: Upload integration artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-artifacts
+          path: |
+            .build/tests/logs
+            .build/tests/results
+
+  ui:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Run UI tests
+        env:
+          UI_TEST_TIMEOUT_SECONDS: 240
+        run: ./scripts/test-ui.sh
+
+      - name: Upload UI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-artifacts
+          path: |
+            .build/tests/logs
+            .build/tests/results

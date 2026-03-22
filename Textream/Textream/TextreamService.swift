@@ -12,10 +12,10 @@ import UniformTypeIdentifiers
 
 class TextreamService: NSObject, ObservableObject {
     static let shared = TextreamService()
-    let overlayController = NotchOverlayController()
-    let externalDisplayController = ExternalDisplayController()
-    let browserServer = BrowserServer()
-    let directorServer = DirectorServer()
+    lazy var overlayController = NotchOverlayController()
+    lazy var externalDisplayController = ExternalDisplayController()
+    lazy var browserServer = BrowserServer()
+    lazy var directorServer = DirectorServer()
     var onOverlayDismissed: (() -> Void)?
     var launchedExternally = false
     @Published var directorIsReading = false
@@ -23,6 +23,11 @@ class TextreamService: NSObject, ObservableObject {
     @Published var pages: [String] = [""]
     @Published var currentPageIndex: Int = 0
     @Published var readPages: Set<Int> = []
+
+    override init() {
+        UITestRuntimeSupport.configureIfNeeded()
+        super.init()
+    }
 
     var hasNextPage: Bool {
         for i in (currentPageIndex + 1)..<pages.count {
@@ -53,21 +58,15 @@ class TextreamService: NSObject, ObservableObject {
         updatePageInfo()
 
         // Also show on external display if configured (same parsing as overlay)
-        let words = splitTextIntoWords(trimmed)
-        let totalCharCount = words.joined(separator: " ").count
         externalDisplayController.show(
             speechRecognizer: overlayController.speechRecognizer,
-            words: words,
-            totalCharCount: totalCharCount,
-            hasNextPage: hasNextPage
+            content: overlayController.overlayContent
         )
 
         if browserServer.isRunning {
             browserServer.showContent(
                 speechRecognizer: overlayController.speechRecognizer,
-                words: words,
-                totalCharCount: totalCharCount,
-                hasNextPage: hasNextPage
+                content: overlayController.overlayContent
             )
         }
     }
@@ -112,13 +111,8 @@ class TextreamService: NSObject, ObservableObject {
         overlayController.updateContent(text: trimmed, hasNextPage: hasNextPage)
         updatePageInfo()
 
-        // Also update external display content in-place
-        let words = splitTextIntoWords(trimmed)
-        externalDisplayController.overlayContent.words = words
-        externalDisplayController.overlayContent.totalCharCount = words.joined(separator: " ").count
-        externalDisplayController.overlayContent.hasNextPage = hasNextPage
-
         if browserServer.isRunning {
+            let words = splitTextIntoWords(trimmed)
             browserServer.updateContent(
                 words: words,
                 totalCharCount: words.joined(separator: " ").count,
@@ -153,6 +147,7 @@ class TextreamService: NSObject, ObservableObject {
     }
 
     func hideMainWindow() {
+        guard !AppRuntime.isRunningUITests else { return }
         DispatchQueue.main.async {
             for window in NSApp.windows where !(window is NSPanel) {
                 window.makeFirstResponder(nil)
@@ -366,27 +361,20 @@ class TextreamService: NSObject, ObservableObject {
         }
 
         // Feed director server with speech recognizer
-        let words = splitTextIntoWords(trimmed)
-        let totalCharCount = words.joined(separator: " ").count
         directorServer.showContent(
             speechRecognizer: overlayController.speechRecognizer,
-            words: words,
-            totalCharCount: totalCharCount
+            content: overlayController.overlayContent
         )
 
         // Also show on external display & browser if configured
         externalDisplayController.show(
             speechRecognizer: overlayController.speechRecognizer,
-            words: words,
-            totalCharCount: totalCharCount,
-            hasNextPage: false
+            content: overlayController.overlayContent
         )
         if browserServer.isRunning {
             browserServer.showContent(
                 speechRecognizer: overlayController.speechRecognizer,
-                words: words,
-                totalCharCount: totalCharCount,
-                hasNextPage: false
+                content: overlayController.overlayContent
             )
         }
     }
@@ -415,9 +403,6 @@ class TextreamService: NSObject, ObservableObject {
         // Update director server
         directorServer.updateContent(words: words, totalCharCount: totalCharCount)
 
-        // Update external display & browser
-        externalDisplayController.overlayContent.words = words
-        externalDisplayController.overlayContent.totalCharCount = totalCharCount
         if browserServer.isRunning {
             browserServer.updateContent(
                 words: words,

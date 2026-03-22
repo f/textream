@@ -8,23 +8,6 @@
 import Foundation
 import Network
 
-// MARK: - Browser State
-
-struct BrowserState: Codable {
-    let words: [String]
-    let highlightedCharCount: Int
-    let totalCharCount: Int
-    let audioLevels: [Double]
-    let isListening: Bool
-    let isDone: Bool
-    let fontColor: String
-    let cueColor: String
-    let hasNextPage: Bool
-    let isActive: Bool
-    let highlightWords: Bool
-    let lastSpokenText: String
-}
-
 // MARK: - Browser Server
 
 class BrowserServer {
@@ -38,6 +21,7 @@ class BrowserServer {
     private var totalCharCount: Int = 0
     private var hasNextPage: Bool = false
     private weak var speechRecognizer: SpeechRecognizer?
+    private weak var overlayContent: OverlayContent?
     private var timerWordProgress: Double = 0
     private var contentActive: Bool = false
 
@@ -70,11 +54,12 @@ class BrowserServer {
 
     // MARK: - Content Management
 
-    func showContent(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int, hasNextPage: Bool) {
+    func showContent(speechRecognizer: SpeechRecognizer, content: OverlayContent) {
         self.speechRecognizer = speechRecognizer
-        self.words = words
-        self.totalCharCount = totalCharCount
-        self.hasNextPage = hasNextPage
+        self.overlayContent = content
+        self.words = content.words
+        self.totalCharCount = content.totalCharCount
+        self.hasNextPage = content.hasNextPage
         self.timerWordProgress = 0
         self.contentActive = true
         startBroadcasting()
@@ -189,7 +174,10 @@ class BrowserServer {
         let mode = NotchSettings.shared.listeningMode
         switch mode {
         case .wordTracking:
-            charCount = speechRecognizer?.recognizedCharCount ?? 0
+            words = overlayContent?.words ?? words
+            totalCharCount = overlayContent?.totalCharCount ?? totalCharCount
+            hasNextPage = overlayContent?.hasNextPage ?? hasNextPage
+            charCount = overlayContent?.highlightedCharCount ?? speechRecognizer?.recognizedCharCount ?? 0
         case .classic:
             timerWordProgress += NotchSettings.shared.scrollSpeed * 0.1
             charCount = charOffsetForWordProgress(timerWordProgress)
@@ -204,6 +192,11 @@ class BrowserServer {
         let isDone = totalCharCount > 0 && effective >= totalCharCount
 
         let highlightWords = mode == .wordTracking
+        let trackingState = overlayContent?.trackingState.rawValue ?? speechRecognizer?.trackingState.rawValue ?? TrackingState.tracking.rawValue
+        let confidenceLevel = overlayContent?.confidenceLevel.rawValue ?? speechRecognizer?.confidenceLevel.rawValue ?? TrackingConfidence.low.rawValue
+        let expectedWord = overlayContent?.expectedWord ?? speechRecognizer?.expectedWord ?? ""
+        let nextCue = overlayContent?.nextCue ?? speechRecognizer?.nextCue ?? ""
+        let manualAsideActive = (overlayContent?.manualAsideMode.isActive ?? speechRecognizer?.manualAsideMode.isActive ?? false)
 
         let state = BrowserState(
             words: words,
@@ -217,7 +210,12 @@ class BrowserServer {
             hasNextPage: hasNextPage,
             isActive: true,
             highlightWords: highlightWords,
-            lastSpokenText: speechRecognizer?.lastSpokenText ?? ""
+            lastSpokenText: speechRecognizer?.lastSpokenText ?? "",
+            trackingState: trackingState,
+            confidenceLevel: confidenceLevel,
+            expectedWord: expectedWord,
+            nextCue: nextCue,
+            manualAsideActive: manualAsideActive
         )
         broadcast(state)
     }
@@ -227,7 +225,12 @@ class BrowserServer {
             words: [], highlightedCharCount: 0, totalCharCount: 0,
             audioLevels: [], isListening: false, isDone: false,
             fontColor: "#ffffff", cueColor: "#ffffff", hasNextPage: false, isActive: false,
-            highlightWords: true, lastSpokenText: ""
+            highlightWords: true, lastSpokenText: "",
+            trackingState: TrackingState.tracking.rawValue,
+            confidenceLevel: TrackingConfidence.low.rawValue,
+            expectedWord: "",
+            nextCue: "",
+            manualAsideActive: false
         )
         broadcast(state)
     }
@@ -418,16 +421,21 @@ class BrowserServer {
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
 
-        // Detect annotation words: [bracket] or emoji-only (no letters/digits)
+        // Detect visually-styled annotation words. Bracket cues still participate
+        // in tracking as long as they contain matchable letters or digits.
         function isAnnotation(w){
           if(w.startsWith('[')&&w.endsWith(']'))return true;
           return!/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(w);
         }
 
+        function trackingTokenCount(w){
+          const m=w.match(/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/g);
+          return m?m.length:0;
+        }
+
         // Count letters+digits in a word
         function letterCount(w){
-          let n=0;for(const ch of w)if(/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(ch))n++;
-          return Math.max(1,n);
+          return Math.max(1,trackingTokenCount(w));
         }
 
         /* ---- connection ---- */
@@ -471,13 +479,14 @@ class BrowserServer {
             c.innerHTML='';
             let cp=0;
             for(let i=0;i<words.length;i++){
-              const wd=words[i],ann=isAnnotation(wd);
+              const wd=words[i],ann=isAnnotation(wd),trackable=trackingTokenCount(wd)>0;
               const sp=document.createElement('span');
               sp.className=ann?'w ann':'w';
               sp.dataset.s=cp;
               sp.dataset.l=wd.length;
               sp.dataset.lc=letterCount(wd);
               sp.dataset.a=ann?'1':'0';
+              sp.dataset.t=trackable?'1':'0';
               sp.textContent=wd+' ';
               c.appendChild(sp);
               cp+=wd.length+1;
@@ -485,13 +494,14 @@ class BrowserServer {
             prevWordKey=wordKey;
           }
 
-          // Find the next-word index (first non-fully-lit non-annotation)
+          // Find the next-word index. Bracket cues remain trackable, while
+          // emoji-only / punctuation-only tokens are skipped.
           let nextIdx=-1;
           if(hlWords){
             const spans=c.children;
             for(let i=0;i<spans.length;i++){
               const d=spans[i].dataset;
-              if(d.a==='1')continue;
+              if(d.t!=='1')continue;
               const charOff=parseInt(d.s),wLen=parseInt(d.l),lc=parseInt(d.lc);
               const litCount=Math.max(0,Math.min(wLen,hcc-charOff));
               if(litCount<lc){nextIdx=i;break}
@@ -504,11 +514,11 @@ class BrowserServer {
           for(let i=0;i<spans.length;i++){
             const sp=spans[i],d=sp.dataset;
             const charOff=parseInt(d.s),wLen=parseInt(d.l),lc=parseInt(d.lc);
-            const ann=d.a==='1';
+            const ann=d.a==='1',trackable=d.t==='1';
             const litCount=Math.max(0,Math.min(wLen,hcc-charOff));
             const isFullyLit=litCount>=lc;
             const charsInto=hcc-charOff;
-            const isCurrent=(i===nextIdx)||(charsInto>=0&&!isFullyLit&&!ann);
+            const isCurrent=trackable&&((i===nextIdx)||(charsInto>=0&&!isFullyLit));
 
             let color,underline=false;
 
@@ -517,7 +527,8 @@ class BrowserServer {
               color=ann?rgba(crgb,0.4):fc;
             } else if(ann){
               // Annotation: cue color with varying opacity
-              color=isFullyLit?rgba(crgb,0.5):rgba(crgb,0.2);
+              color=isFullyLit?rgba(crgb,0.5):(isCurrent?rgba(crgb,0.72):rgba(crgb,0.2));
+              underline=isCurrent;
             } else if(isFullyLit){
               // Already read: dimmed
               color=rgba(rgb,0.3);

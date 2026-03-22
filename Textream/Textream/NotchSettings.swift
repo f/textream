@@ -167,8 +167,8 @@ enum CueBrightness: String, CaseIterable, Identifiable {
 
 // MARK: - Overlay Mode
 
-enum OverlayMode: String, CaseIterable, Identifiable {
-    case pinned, floating, fullscreen
+enum OverlayMode: String, CaseIterable, Identifiable, Codable {
+    case pinned, floating, fullscreen, attached
 
     var id: String { rawValue }
 
@@ -177,14 +177,16 @@ enum OverlayMode: String, CaseIterable, Identifiable {
         case .pinned:     return "Pinned to Notch"
         case .floating:   return "Floating Window"
         case .fullscreen: return "Fullscreen"
+        case .attached:   return "Attached Overlay"
         }
     }
 
     var description: String {
         switch self {
         case .pinned:     return "Anchored below the notch at the top of your screen."
-        case .floating:   return "A draggable window you can place anywhere. Always on top."
+        case .floating:   return "A floating teleprompter you can drag anywhere, or switch into Follow Cursor."
         case .fullscreen: return "Fullscreen teleprompter on the selected display. Press Esc to stop."
+        case .attached:   return "Follows a selected app window corner and falls back to the screen corner if macOS cannot keep a stable anchor."
         }
     }
 
@@ -193,8 +195,118 @@ enum OverlayMode: String, CaseIterable, Identifiable {
         case .pinned:     return "rectangle.topthird.inset.filled"
         case .floating:   return "macwindow.on.rectangle"
         case .fullscreen: return "rectangle.fill"
+        case .attached:   return "uiwindow.split.2x1"
         }
     }
+}
+
+enum ManualAsideHotkey: String, CaseIterable, Identifiable, Codable {
+    case optionDoubleTap
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .optionDoubleTap: return "Option Double-Tap"
+        }
+    }
+}
+
+enum TemporaryIgnoreHotkey: String, CaseIterable, Identifiable, Codable {
+    case fnHold
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .fnHold: return "Hold Fn"
+        }
+    }
+}
+
+enum AttachedFallbackBehavior: String, CaseIterable, Identifiable, Codable {
+    case screenCorner
+    case hideOverlay
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .screenCorner: return "Screen Corner"
+        case .hideOverlay: return "Hide Overlay"
+        }
+    }
+}
+
+enum LayoutPreset: String, CaseIterable, Identifiable, Codable {
+    case custom
+    case interview
+    case liveStream
+    case presentation
+    case dualDisplay
+    case sidecar
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .custom: return "Custom"
+        case .interview: return "Interview"
+        case .liveStream: return "Live Stream"
+        case .presentation: return "Presentation"
+        case .dualDisplay: return "Dual Display"
+        case .sidecar: return "Sidecar iPad"
+        }
+    }
+
+    static var recommendedCases: [LayoutPreset] {
+        [.interview, .liveStream, .presentation]
+    }
+
+    var isLegacyBuiltIn: Bool {
+        switch self {
+        case .dualDisplay, .sidecar:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+enum HUDModule: String, CaseIterable, Identifiable, Codable {
+    case trackingState
+    case expectedWord
+    case nextCue
+    case microphoneStatus
+    case elapsedTime
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .trackingState: return "Tracking State"
+        case .expectedWord: return "Expected Word"
+        case .nextCue: return "Next Cue"
+        case .microphoneStatus: return "Microphone"
+        case .elapsedTime: return "Elapsed Time"
+        }
+    }
+}
+
+struct CustomLayoutPreset: Codable, Identifiable, Hashable {
+    let id: UUID
+    var name: String
+    var overlayMode: OverlayMode
+    var notchWidth: Double
+    var textAreaHeight: Double
+    var floatingGlassEffect: Bool
+    var glassOpacity: Double
+    var showElapsedTime: Bool
+    var persistentHUDEnabled: Bool
+    var hudModules: [HUDModule]
+    var attachedAnchorCorner: AttachedAnchorCorner
+    var attachedMarginX: Double
+    var attachedMarginY: Double
 }
 
 // MARK: - Notch Display Mode
@@ -206,14 +318,14 @@ enum NotchDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .followMouse:  return "Follow Mouse"
+        case .followMouse:  return "Follow Mouse Display"
         case .fixedDisplay: return "Fixed Display"
         }
     }
 
     var description: String {
         switch self {
-        case .followMouse:  return "The notch moves to whichever display your mouse is on."
+        case .followMouse:  return "The pinned notch stays at the top camera area, but it moves to whichever display currently holds your mouse pointer."
         case .fixedDisplay: return "The notch stays on the selected display."
         }
     }
@@ -354,6 +466,34 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(overlayMode.rawValue, forKey: "overlayMode") }
     }
 
+    var strictTrackingEnabled: Bool {
+        didSet { UserDefaults.standard.set(strictTrackingEnabled, forKey: "strictTrackingEnabled") }
+    }
+
+    var legacyTrackingFallbackEnabled: Bool {
+        didSet { UserDefaults.standard.set(legacyTrackingFallbackEnabled, forKey: "legacyTrackingFallbackEnabled") }
+    }
+
+    var manualAsideHotkey: ManualAsideHotkey {
+        didSet { UserDefaults.standard.set(manualAsideHotkey.rawValue, forKey: "manualAsideHotkey") }
+    }
+
+    var temporaryIgnoreHotkey: TemporaryIgnoreHotkey {
+        didSet { UserDefaults.standard.set(temporaryIgnoreHotkey.rawValue, forKey: "temporaryIgnoreHotkey") }
+    }
+
+    var matchWindowSize: Int {
+        didSet { UserDefaults.standard.set(matchWindowSize, forKey: "matchWindowSize") }
+    }
+
+    var advanceThreshold: Double {
+        didSet { UserDefaults.standard.set(advanceThreshold, forKey: "advanceThreshold") }
+    }
+
+    var offScriptFreezeDelay: Double {
+        didSet { UserDefaults.standard.set(offScriptFreezeDelay, forKey: "offScriptFreezeDelay") }
+    }
+
     var notchDisplayMode: NotchDisplayMode {
         didSet { UserDefaults.standard.set(notchDisplayMode.rawValue, forKey: "notchDisplayMode") }
     }
@@ -372,6 +512,42 @@ class NotchSettings {
 
     var followCursorWhenUndocked: Bool {
         didSet { UserDefaults.standard.set(followCursorWhenUndocked, forKey: "followCursorWhenUndocked") }
+    }
+
+    var attachedAnchorCorner: AttachedAnchorCorner {
+        didSet { UserDefaults.standard.set(attachedAnchorCorner.rawValue, forKey: "attachedAnchorCorner") }
+    }
+
+    var attachedMarginX: Double {
+        didSet { UserDefaults.standard.set(attachedMarginX, forKey: "attachedMarginX") }
+    }
+
+    var attachedMarginY: Double {
+        didSet { UserDefaults.standard.set(attachedMarginY, forKey: "attachedMarginY") }
+    }
+
+    var attachedFallbackBehavior: AttachedFallbackBehavior {
+        didSet { UserDefaults.standard.set(attachedFallbackBehavior.rawValue, forKey: "attachedFallbackBehavior") }
+    }
+
+    var attachedTargetWindowID: Int {
+        didSet { UserDefaults.standard.set(attachedTargetWindowID, forKey: "attachedTargetWindowID") }
+    }
+
+    var attachedTargetWindowLabel: String {
+        didSet { UserDefaults.standard.set(attachedTargetWindowLabel, forKey: "attachedTargetWindowLabel") }
+    }
+
+    var attachedHideWhenWindowUnavailable: Bool {
+        didSet { UserDefaults.standard.set(attachedHideWhenWindowUnavailable, forKey: "attachedHideWhenWindowUnavailable") }
+    }
+
+    var hasSeenAttachedOnboarding: Bool {
+        didSet { UserDefaults.standard.set(hasSeenAttachedOnboarding, forKey: "hasSeenAttachedOnboarding") }
+    }
+
+    var hasSeenAccessibilityLaunchGuide: Bool {
+        didSet { UserDefaults.standard.set(hasSeenAccessibilityLaunchGuide, forKey: "hasSeenAccessibilityLaunchGuide") }
     }
 
     var externalDisplayMode: ExternalDisplayMode {
@@ -441,6 +617,34 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(Int(directorServerPort), forKey: "directorServerPort") }
     }
 
+    var activeLayoutPreset: LayoutPreset {
+        didSet { UserDefaults.standard.set(activeLayoutPreset.rawValue, forKey: "activeLayoutPreset") }
+    }
+
+    var customPresets: [CustomLayoutPreset] {
+        didSet { saveCustomPresets() }
+    }
+
+    var persistentHUDEnabled: Bool {
+        didSet { UserDefaults.standard.set(persistentHUDEnabled, forKey: "persistentHUDEnabled") }
+    }
+
+    var hudModules: [HUDModule] {
+        didSet { saveHUDModules() }
+    }
+
+    var qaDebugOverlayEnabled: Bool {
+        didSet { UserDefaults.standard.set(qaDebugOverlayEnabled, forKey: "qaDebugOverlayEnabled") }
+    }
+
+    var trackingDebugLoggingEnabled: Bool {
+        didSet { UserDefaults.standard.set(trackingDebugLoggingEnabled, forKey: "trackingDebugLoggingEnabled") }
+    }
+
+    var anchorDebugLoggingEnabled: Bool {
+        didSet { UserDefaults.standard.set(anchorDebugLoggingEnabled, forKey: "anchorDebugLoggingEnabled") }
+    }
+
     var font: NSFont {
         fontFamilyPreset.font(size: fontSizePreset.pointSize)
     }
@@ -448,6 +652,19 @@ class NotchSettings {
     static let defaultWidth: CGFloat = 340
     static let defaultHeight: CGFloat = 150
     static let defaultLocale: String = Locale.current.identifier
+    static let defaultStrictTrackingEnabled = true
+    static let defaultLegacyTrackingFallbackEnabled = true
+    static let defaultMatchWindowSize = 6
+    static let defaultAdvanceThreshold = 3.4
+    static let defaultOffScriptFreezeDelay = 0.9
+    static let defaultAttachedAnchorCorner: AttachedAnchorCorner = .topRight
+    static let defaultAttachedMarginX = 16.0
+    static let defaultAttachedMarginY = 14.0
+    static let defaultAttachedFallbackBehavior: AttachedFallbackBehavior = .screenCorner
+    static let defaultAttachedHideWhenWindowUnavailable = false
+    static let defaultActiveLayoutPreset: LayoutPreset = .custom
+    static let defaultPersistentHUDEnabled = true
+    static let defaultHUDModules: [HUDModule] = [.trackingState, .expectedWord]
 
     static let minWidth: CGFloat = 310
     static let maxWidth: CGFloat = 500
@@ -466,6 +683,16 @@ class NotchSettings {
         self.cueColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "cueColorPreset") ?? "") ?? .white
         self.cueBrightness = CueBrightness(rawValue: UserDefaults.standard.string(forKey: "cueBrightness") ?? "") ?? .dim
         self.overlayMode = OverlayMode(rawValue: UserDefaults.standard.string(forKey: "overlayMode") ?? "") ?? .pinned
+        self.strictTrackingEnabled = UserDefaults.standard.object(forKey: "strictTrackingEnabled") as? Bool ?? Self.defaultStrictTrackingEnabled
+        self.legacyTrackingFallbackEnabled = UserDefaults.standard.object(forKey: "legacyTrackingFallbackEnabled") as? Bool ?? Self.defaultLegacyTrackingFallbackEnabled
+        self.manualAsideHotkey = ManualAsideHotkey(rawValue: UserDefaults.standard.string(forKey: "manualAsideHotkey") ?? "") ?? .optionDoubleTap
+        self.temporaryIgnoreHotkey = TemporaryIgnoreHotkey(rawValue: UserDefaults.standard.string(forKey: "temporaryIgnoreHotkey") ?? "") ?? .fnHold
+        let savedMatchWindow = UserDefaults.standard.integer(forKey: "matchWindowSize")
+        self.matchWindowSize = savedMatchWindow > 0 ? savedMatchWindow : Self.defaultMatchWindowSize
+        let savedAdvanceThreshold = UserDefaults.standard.double(forKey: "advanceThreshold")
+        self.advanceThreshold = savedAdvanceThreshold > 0 ? savedAdvanceThreshold : Self.defaultAdvanceThreshold
+        let savedFreezeDelay = UserDefaults.standard.double(forKey: "offScriptFreezeDelay")
+        self.offScriptFreezeDelay = savedFreezeDelay > 0 ? savedFreezeDelay : Self.defaultOffScriptFreezeDelay
         self.notchDisplayMode = NotchDisplayMode(rawValue: UserDefaults.standard.string(forKey: "notchDisplayMode") ?? "") ?? .followMouse
         let savedPinnedScreenID = UserDefaults.standard.integer(forKey: "pinnedScreenID")
         self.pinnedScreenID = UInt32(savedPinnedScreenID)
@@ -473,6 +700,17 @@ class NotchSettings {
         let savedOpacity = UserDefaults.standard.double(forKey: "glassOpacity")
         self.glassOpacity = savedOpacity > 0 ? savedOpacity : 0.15
         self.followCursorWhenUndocked = UserDefaults.standard.object(forKey: "followCursorWhenUndocked") as? Bool ?? false
+        self.attachedAnchorCorner = AttachedAnchorCorner(rawValue: UserDefaults.standard.string(forKey: "attachedAnchorCorner") ?? "") ?? Self.defaultAttachedAnchorCorner
+        let savedAttachedMarginX = UserDefaults.standard.double(forKey: "attachedMarginX")
+        self.attachedMarginX = savedAttachedMarginX > 0 ? savedAttachedMarginX : Self.defaultAttachedMarginX
+        let savedAttachedMarginY = UserDefaults.standard.double(forKey: "attachedMarginY")
+        self.attachedMarginY = savedAttachedMarginY > 0 ? savedAttachedMarginY : Self.defaultAttachedMarginY
+        self.attachedFallbackBehavior = AttachedFallbackBehavior(rawValue: UserDefaults.standard.string(forKey: "attachedFallbackBehavior") ?? "") ?? Self.defaultAttachedFallbackBehavior
+        self.attachedTargetWindowID = UserDefaults.standard.integer(forKey: "attachedTargetWindowID")
+        self.attachedTargetWindowLabel = UserDefaults.standard.string(forKey: "attachedTargetWindowLabel") ?? ""
+        self.attachedHideWhenWindowUnavailable = UserDefaults.standard.object(forKey: "attachedHideWhenWindowUnavailable") as? Bool ?? Self.defaultAttachedHideWhenWindowUnavailable
+        self.hasSeenAttachedOnboarding = UserDefaults.standard.object(forKey: "hasSeenAttachedOnboarding") as? Bool ?? false
+        self.hasSeenAccessibilityLaunchGuide = UserDefaults.standard.object(forKey: "hasSeenAccessibilityLaunchGuide") as? Bool ?? false
         self.externalDisplayMode = ExternalDisplayMode(rawValue: UserDefaults.standard.string(forKey: "externalDisplayMode") ?? "") ?? .off
         let savedScreenID = UserDefaults.standard.integer(forKey: "externalScreenID")
         self.externalScreenID = UInt32(savedScreenID)
@@ -494,5 +732,135 @@ class NotchSettings {
         self.directorModeEnabled = UserDefaults.standard.object(forKey: "directorModeEnabled") as? Bool ?? false
         let savedDirectorPort = UserDefaults.standard.integer(forKey: "directorServerPort")
         self.directorServerPort = savedDirectorPort > 0 ? UInt16(savedDirectorPort) : 7575
+        self.activeLayoutPreset = LayoutPreset(rawValue: UserDefaults.standard.string(forKey: "activeLayoutPreset") ?? "") ?? Self.defaultActiveLayoutPreset
+        self.customPresets = Self.loadCustomPresets()
+        self.persistentHUDEnabled = UserDefaults.standard.object(forKey: "persistentHUDEnabled") as? Bool ?? Self.defaultPersistentHUDEnabled
+        self.hudModules = Self.loadHUDModules()
+        self.qaDebugOverlayEnabled = UserDefaults.standard.object(forKey: "qaDebugOverlayEnabled") as? Bool ?? false
+        self.trackingDebugLoggingEnabled = UserDefaults.standard.object(forKey: "trackingDebugLoggingEnabled") as? Bool ?? false
+        self.anchorDebugLoggingEnabled = UserDefaults.standard.object(forKey: "anchorDebugLoggingEnabled") as? Bool ?? false
+    }
+
+    func applyBuiltInPreset(_ preset: LayoutPreset) {
+        switch preset {
+        case .custom:
+            break
+        case .interview:
+            overlayMode = .floating
+            notchWidth = 320
+            textAreaHeight = 140
+            floatingGlassEffect = true
+            glassOpacity = 0.12
+            showElapsedTime = true
+            persistentHUDEnabled = true
+            hudModules = [.trackingState]
+            externalDisplayMode = .off
+        case .liveStream:
+            overlayMode = .attached
+            notchWidth = 350
+            textAreaHeight = 170
+            attachedAnchorCorner = .topRight
+            floatingGlassEffect = true
+            glassOpacity = 0.16
+            showElapsedTime = true
+            persistentHUDEnabled = true
+            hudModules = Self.defaultHUDModules
+        case .presentation:
+            overlayMode = .pinned
+            notchWidth = 430
+            textAreaHeight = 220
+            fontSizePreset = .xl
+            cueBrightness = .bright
+            showElapsedTime = true
+            persistentHUDEnabled = true
+            hudModules = Self.defaultHUDModules
+            externalDisplayMode = .off
+        case .dualDisplay:
+            overlayMode = .floating
+            notchWidth = 360
+            textAreaHeight = 180
+            showElapsedTime = true
+            persistentHUDEnabled = true
+            hudModules = [.trackingState, .expectedWord, .microphoneStatus]
+            externalDisplayMode = .teleprompter
+        case .sidecar:
+            overlayMode = .fullscreen
+            notchWidth = 400
+            textAreaHeight = 220
+            showElapsedTime = true
+            persistentHUDEnabled = true
+            hudModules = [.trackingState, .expectedWord, .nextCue, .elapsedTime]
+            externalDisplayMode = .teleprompter
+        }
+        activeLayoutPreset = preset
+    }
+
+    func applyCustomPreset(_ preset: CustomLayoutPreset) {
+        overlayMode = preset.overlayMode
+        notchWidth = CGFloat(preset.notchWidth)
+        textAreaHeight = CGFloat(preset.textAreaHeight)
+        floatingGlassEffect = preset.floatingGlassEffect
+        glassOpacity = preset.glassOpacity
+        showElapsedTime = preset.showElapsedTime
+        persistentHUDEnabled = preset.persistentHUDEnabled
+        hudModules = preset.hudModules
+        attachedAnchorCorner = preset.attachedAnchorCorner
+        attachedMarginX = preset.attachedMarginX
+        attachedMarginY = preset.attachedMarginY
+        activeLayoutPreset = .custom
+    }
+
+    func saveCurrentAsCustomPreset() {
+        let nextIndex = customPresets.count + 1
+        let preset = CustomLayoutPreset(
+            id: UUID(),
+            name: "Custom \(nextIndex)",
+            overlayMode: overlayMode,
+            notchWidth: Double(notchWidth),
+            textAreaHeight: Double(textAreaHeight),
+            floatingGlassEffect: floatingGlassEffect,
+            glassOpacity: glassOpacity,
+            showElapsedTime: showElapsedTime,
+            persistentHUDEnabled: persistentHUDEnabled,
+            hudModules: hudModules,
+            attachedAnchorCorner: attachedAnchorCorner,
+            attachedMarginX: attachedMarginX,
+            attachedMarginY: attachedMarginY
+        )
+        customPresets.append(preset)
+        activeLayoutPreset = .custom
+    }
+
+    func deleteCustomPreset(_ preset: CustomLayoutPreset) {
+        customPresets.removeAll { $0.id == preset.id }
+    }
+
+    private func saveCustomPresets() {
+        if let data = try? JSONEncoder().encode(customPresets) {
+            UserDefaults.standard.set(data, forKey: "customPresets")
+        }
+    }
+
+    private func saveHUDModules() {
+        if let data = try? JSONEncoder().encode(hudModules) {
+            UserDefaults.standard.set(data, forKey: "hudModules")
+        }
+    }
+
+    private static func loadCustomPresets() -> [CustomLayoutPreset] {
+        guard let data = UserDefaults.standard.data(forKey: "customPresets"),
+              let presets = try? JSONDecoder().decode([CustomLayoutPreset].self, from: data) else {
+            return []
+        }
+        return presets
+    }
+
+    private static func loadHUDModules() -> [HUDModule] {
+        guard let data = UserDefaults.standard.data(forKey: "hudModules"),
+              let modules = try? JSONDecoder().decode([HUDModule].self, from: data),
+              !modules.isEmpty else {
+            return Self.defaultHUDModules
+        }
+        return modules
     }
 }

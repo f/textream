@@ -8,29 +8,6 @@
 import Foundation
 import Network
 
-// MARK: - Director State (App → Web)
-
-struct DirectorState: Codable {
-    let words: [String]
-    let highlightedCharCount: Int
-    let totalCharCount: Int
-    let isActive: Bool
-    let isDone: Bool
-    let isListening: Bool
-    let fontColor: String
-    let cueColor: String
-    let lastSpokenText: String
-    let audioLevels: [Double]
-}
-
-// MARK: - Director Command (Web → App)
-
-struct DirectorCommand: Codable {
-    let type: String          // "setText", "updateText", "stop"
-    let text: String?
-    let readCharCount: Int?
-}
-
 // MARK: - Director Server
 
 class DirectorServer {
@@ -52,6 +29,7 @@ class DirectorServer {
     private var words: [String] = []
     private var totalCharCount: Int = 0
     private weak var speechRecognizer: SpeechRecognizer?
+    private weak var overlayContent: OverlayContent?
     private var contentActive: Bool = false
     private var lastBroadcastState: Data?
 
@@ -91,10 +69,11 @@ class DirectorServer {
 
     // MARK: - Content Management
 
-    func showContent(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int) {
+    func showContent(speechRecognizer: SpeechRecognizer, content: OverlayContent) {
         self.speechRecognizer = speechRecognizer
-        self.words = words
-        self.totalCharCount = totalCharCount
+        self.overlayContent = content
+        self.words = content.words
+        self.totalCharCount = content.totalCharCount
         self.contentActive = true
         startBroadcasting()
     }
@@ -261,9 +240,16 @@ class DirectorServer {
     private func broadcastCurrentState() {
         guard contentActive, !wsConnections.isEmpty else { return }
 
-        let charCount = speechRecognizer?.recognizedCharCount ?? 0
+        words = overlayContent?.words ?? words
+        totalCharCount = overlayContent?.totalCharCount ?? totalCharCount
+        let charCount = overlayContent?.highlightedCharCount ?? speechRecognizer?.recognizedCharCount ?? 0
         let effective = min(charCount, totalCharCount)
         let isDone = totalCharCount > 0 && effective >= totalCharCount
+        let trackingState = overlayContent?.trackingState.rawValue ?? speechRecognizer?.trackingState.rawValue ?? TrackingState.tracking.rawValue
+        let confidenceLevel = overlayContent?.confidenceLevel.rawValue ?? speechRecognizer?.confidenceLevel.rawValue ?? TrackingConfidence.low.rawValue
+        let expectedWord = overlayContent?.expectedWord ?? speechRecognizer?.expectedWord ?? ""
+        let nextCue = overlayContent?.nextCue ?? speechRecognizer?.nextCue ?? ""
+        let manualAsideActive = (overlayContent?.manualAsideMode.isActive ?? speechRecognizer?.manualAsideMode.isActive ?? false)
 
         let state = DirectorState(
             words: words,
@@ -275,7 +261,12 @@ class DirectorServer {
             fontColor: NotchSettings.shared.fontColorPreset.cssColor,
             cueColor: NotchSettings.shared.cueColorPreset.cssColor,
             lastSpokenText: speechRecognizer?.lastSpokenText ?? "",
-            audioLevels: (speechRecognizer?.audioLevels ?? []).map { Double($0) }
+            audioLevels: (speechRecognizer?.audioLevels ?? []).map { Double($0) },
+            trackingState: trackingState,
+            confidenceLevel: confidenceLevel,
+            expectedWord: expectedWord,
+            nextCue: nextCue,
+            manualAsideActive: manualAsideActive
         )
         broadcast(state)
     }
@@ -285,7 +276,12 @@ class DirectorServer {
             words: [], highlightedCharCount: 0, totalCharCount: 0,
             isActive: false, isDone: false, isListening: false,
             fontColor: "#ffffff", cueColor: "#ffffff", lastSpokenText: "",
-            audioLevels: []
+            audioLevels: [],
+            trackingState: TrackingState.tracking.rawValue,
+            confidenceLevel: TrackingConfidence.low.rawValue,
+            expectedWord: "",
+            nextCue: "",
+            manualAsideActive: false
         )
         broadcast(state)
     }

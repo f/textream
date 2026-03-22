@@ -6,20 +6,93 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		193AA8D093CA0AF223F012BA /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 330EE2802733C02CEFDEBCBD /* Cocoa.framework */; };
+		59E4F7480F97E6152D968079 /* NotchOverlayControllerIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C5FF5A5B7BF245EBF86CA6 /* NotchOverlayControllerIntegrationTests.swift */; };
+		5CE514D139209A136A38C519 /* TextreamUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6369791E56E14F28A63DD792 /* TextreamUITests.swift */; };
+		7788060C6EBADA6525D33CF9 /* PerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C2BC8007E9109F12EAB6EF /* PerformanceBaselineTests.swift */; };
+		791D146835435876ED1A1CFB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 330EE2802733C02CEFDEBCBD /* Cocoa.framework */; };
+		E60D6A3C9F3763EC40CB39C8 /* PersistentHUDIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 557CCC16C1763CDB90F8511C /* PersistentHUDIntegrationTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		909757218359211567D50A2C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 446966AC2F37E47300AF141F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 446966B32F37E47300AF141F;
+			remoteInfo = Textream;
+		};
+		E5A37E57CF4D08A3465B2F78 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 446966AC2F37E47300AF141F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 446966B32F37E47300AF141F;
+			remoteInfo = Textream;
+		};
+		FDB4A1C9731B4825B1504058 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 446966AC2F37E47300AF141F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 446966B32F37E47300AF141F;
+			remoteInfo = Textream;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		330EE2802733C02CEFDEBCBD /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		446966B42F37E47300AF141F /* Textream.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Textream.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		557CCC16C1763CDB90F8511C /* PersistentHUDIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PersistentHUDIntegrationTests.swift; sourceTree = "<group>"; };
+		57C5FF5A5B7BF245EBF86CA6 /* NotchOverlayControllerIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotchOverlayControllerIntegrationTests.swift; sourceTree = "<group>"; };
+		6369791E56E14F28A63DD792 /* TextreamUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TextreamUITests.swift; sourceTree = "<group>"; };
+		8725135751CE8E42ED1E541E /* TextreamUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = TextreamUITests.xctest; path = TextreamUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		98C2BC8007E9109F12EAB6EF /* PerformanceBaselineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PerformanceBaselineTests.swift; sourceTree = "<group>"; };
+		E859F8A12E984AAF8BE8E174 /* TextreamTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TextreamTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1FBF3E9809692AFF8FF289A /* TextreamIntegrationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = TextreamIntegrationTests.xctest; path = TextreamIntegrationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		446966B62F37E47300AF141F /* Textream */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Textream;
+			sourceTree = "<group>";
+		};
+		7F08D5A9B1B84F27B45880A3 /* TextreamTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = TextreamTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		446966B12F37E47300AF141F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C6DF0AB2FC9CE20F314E5266 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				791D146835435876ED1A1CFB /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D31417C7A36DB18DB455C981 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				193AA8D093CA0AF223F012BA /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2DB40B4FA1B451F864B042C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,7 +106,11 @@
 			isa = PBXGroup;
 			children = (
 				446966B62F37E47300AF141F /* Textream */,
+				7F08D5A9B1B84F27B45880A3 /* TextreamTests */,
 				446966B52F37E47300AF141F /* Products */,
+				A57778BE8CE3FD7418C75907 /* Frameworks */,
+				D811AAC5ACC72EE11F0366E6 /* TextreamIntegrationTests */,
+				F433B6CD2922B4FB9D875B30 /* TextreamUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -41,13 +118,70 @@
 			isa = PBXGroup;
 			children = (
 				446966B42F37E47300AF141F /* Textream.app */,
+				E859F8A12E984AAF8BE8E174 /* TextreamTests.xctest */,
+				F1FBF3E9809692AFF8FF289A /* TextreamIntegrationTests.xctest */,
+				8725135751CE8E42ED1E541E /* TextreamUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A57778BE8CE3FD7418C75907 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D901717DAC43202FD3CFB40B /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D811AAC5ACC72EE11F0366E6 /* TextreamIntegrationTests */ = {
+			isa = PBXGroup;
+			children = (
+				57C5FF5A5B7BF245EBF86CA6 /* NotchOverlayControllerIntegrationTests.swift */,
+				98C2BC8007E9109F12EAB6EF /* PerformanceBaselineTests.swift */,
+				557CCC16C1763CDB90F8511C /* PersistentHUDIntegrationTests.swift */,
+			);
+			name = TextreamIntegrationTests;
+			path = TextreamIntegrationTests;
+			sourceTree = "<group>";
+		};
+		D901717DAC43202FD3CFB40B /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				330EE2802733C02CEFDEBCBD /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		F433B6CD2922B4FB9D875B30 /* TextreamUITests */ = {
+			isa = PBXGroup;
+			children = (
+				6369791E56E14F28A63DD792 /* TextreamUITests.swift */,
+			);
+			name = TextreamUITests;
+			path = TextreamUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3B6061E419BDD9CA0F58A3A0 /* TextreamUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F1CAEAC402DA53D982ABD953 /* Build configuration list for PBXNativeTarget "TextreamUITests" */;
+			buildPhases = (
+				92243A6809C60089E000F2CD /* Sources */,
+				D31417C7A36DB18DB455C981 /* Frameworks */,
+				29AC92C2E7569B6C05835536 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7431650283B8954563DE6DF3 /* PBXTargetDependency */,
+			);
+			name = TextreamUITests;
+			productName = TextreamUITests;
+			productReference = 8725135751CE8E42ED1E541E /* TextreamUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		446966B32F37E47300AF141F /* Textream */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 446966C12F37E47400AF141F /* Build configuration list for PBXNativeTarget "Textream" */;
@@ -64,11 +198,48 @@
 				446966B62F37E47300AF141F /* Textream */,
 			);
 			name = Textream;
-			packageProductDependencies = (
-			);
 			productName = Textream;
 			productReference = 446966B42F37E47300AF141F /* Textream.app */;
 			productType = "com.apple.product-type.application";
+		};
+		4EAE5F04E9404F4F8C57FA31 /* TextreamTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9BE313AB3C6B46538D56B183 /* Build configuration list for PBXNativeTarget "TextreamTests" */;
+			buildPhases = (
+				C3DA8951C2154A9F8EBA014B /* Sources */,
+				E2DB40B4FA1B451F864B042C /* Frameworks */,
+				DBFF78CECF9C40D1882719D4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				94E768B8868342D1988355F4 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7F08D5A9B1B84F27B45880A3 /* TextreamTests */,
+			);
+			name = TextreamTests;
+			productName = TextreamTests;
+			productReference = E859F8A12E984AAF8BE8E174 /* TextreamTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		CF31437A048FECE799CD7880 /* TextreamIntegrationTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 24C96F1C5ED54C485016F643 /* Build configuration list for PBXNativeTarget "TextreamIntegrationTests" */;
+			buildPhases = (
+				212D09BBB2E355FB4B8A8A68 /* Sources */,
+				C6DF0AB2FC9CE20F314E5266 /* Frameworks */,
+				2AF371BD31FEFD8C99B78105 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4B361F6661455DF6AE8B0194 /* PBXTargetDependency */,
+			);
+			name = TextreamIntegrationTests;
+			productName = TextreamIntegrationTests;
+			productReference = F1FBF3E9809692AFF8FF289A /* TextreamIntegrationTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -82,6 +253,18 @@
 				TargetAttributes = {
 					446966B32F37E47300AF141F = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					3B6061E419BDD9CA0F58A3A0 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 446966B32F37E47300AF141F;
+					};
+					4EAE5F04E9404F4F8C57FA31 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 446966B32F37E47300AF141F;
+					};
+					CF31437A048FECE799CD7880 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 446966B32F37E47300AF141F;
 					};
 				};
 			};
@@ -100,12 +283,36 @@
 			projectRoot = "";
 			targets = (
 				446966B32F37E47300AF141F /* Textream */,
+				4EAE5F04E9404F4F8C57FA31 /* TextreamTests */,
+				CF31437A048FECE799CD7880 /* TextreamIntegrationTests */,
+				3B6061E419BDD9CA0F58A3A0 /* TextreamUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		29AC92C2E7569B6C05835536 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2AF371BD31FEFD8C99B78105 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		446966B22F37E47300AF141F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DBFF78CECF9C40D1882719D4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -115,7 +322,32 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		212D09BBB2E355FB4B8A8A68 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				59E4F7480F97E6152D968079 /* NotchOverlayControllerIntegrationTests.swift in Sources */,
+				7788060C6EBADA6525D33CF9 /* PerformanceBaselineTests.swift in Sources */,
+				E60D6A3C9F3763EC40CB39C8 /* PersistentHUDIntegrationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		446966B02F37E47300AF141F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		92243A6809C60089E000F2CD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5CE514D139209A136A38C519 /* TextreamUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C3DA8951C2154A9F8EBA014B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -124,7 +356,74 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		4B361F6661455DF6AE8B0194 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Textream;
+			target = 446966B32F37E47300AF141F /* Textream */;
+			targetProxy = 909757218359211567D50A2C /* PBXContainerItemProxy */;
+		};
+		7431650283B8954563DE6DF3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Textream;
+			target = 446966B32F37E47300AF141F /* Textream */;
+			targetProxy = E5A37E57CF4D08A3465B2F78 /* PBXContainerItemProxy */;
+		};
+		94E768B8868342D1988355F4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 446966B32F37E47300AF141F /* Textream */;
+			targetProxy = FDB4A1C9731B4825B1504058 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		1D7454A3473C572490FCA17B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_REQUIRED = NO;
+				DEVELOPMENT_TEAM = "";
+				EXECUTABLE_NAME = "$(TARGET_NAME)";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.fka.textreamUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_MODULE_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5;
+				TEST_TARGET_NAME = Textream;
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Release;
+		};
+		3AF0B4C585AC41EE8729D28E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.fka.textreamTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "";
+				TEST_TARGET_NAME = "";
+			};
+			name = Debug;
+		};
 		446966BF2F37E47400AF141F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -254,10 +553,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Textream/Textream.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = RJA7656U34;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -325,9 +627,112 @@
 			};
 			name = Release;
 		};
+		6A7DC0A66E426C4C5A2B3B41 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_REQUIRED = NO;
+				DEVELOPMENT_TEAM = "";
+				EXECUTABLE_NAME = "$(TARGET_NAME)";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.fka.textreamUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_MODULE_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5;
+				TEST_TARGET_NAME = Textream;
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Debug;
+		};
+		CBF3695FC7ED215DB8678EF2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				EXECUTABLE_NAME = "$(TARGET_NAME)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.fka.textreamIntegrationTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_MODULE_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Textream.app/Contents/MacOS/Textream";
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Release;
+		};
+		F686F5D5202C4E3B856D2A8F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.fka.textreamTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "";
+				TEST_TARGET_NAME = "";
+			};
+			name = Release;
+		};
+		FA94F73BE15BC8F1F5963D3E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				DEVELOPMENT_TEAM = "";
+				EXECUTABLE_NAME = "$(TARGET_NAME)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.fka.textreamIntegrationTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_MODULE_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Textream.app/Contents/MacOS/Textream";
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		24C96F1C5ED54C485016F643 /* Build configuration list for PBXNativeTarget "TextreamIntegrationTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CBF3695FC7ED215DB8678EF2 /* Release */,
+				FA94F73BE15BC8F1F5963D3E /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		446966AF2F37E47300AF141F /* Build configuration list for PBXProject "Textream" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -342,6 +747,24 @@
 			buildConfigurations = (
 				446966C22F37E47400AF141F /* Debug */,
 				446966C32F37E47400AF141F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9BE313AB3C6B46538D56B183 /* Build configuration list for PBXNativeTarget "TextreamTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3AF0B4C585AC41EE8729D28E /* Debug */,
+				F686F5D5202C4E3B856D2A8F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F1CAEAC402DA53D982ABD953 /* Build configuration list for PBXNativeTarget "TextreamUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1D7454A3473C572490FCA17B /* Release */,
+				6A7DC0A66E426C4C5A2B3B41 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

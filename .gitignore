@@ -32,3 +32,4 @@ Pods/
 *~
 *.orig
 *.log
+.factory/

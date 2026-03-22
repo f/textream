@@ -48,7 +48,10 @@ struct AudioInputDevice: Identifiable, Hashable {
             )
             var uid: CFString = "" as CFString
             var uidSize = UInt32(MemoryLayout<CFString>.size)
-            guard AudioObjectGetPropertyData(deviceID, &uidAddress, 0, nil, &uidSize, &uid) == noErr else { continue }
+            let uidStatus = withUnsafeMutableBytes(of: &uid) { buffer in
+                AudioObjectGetPropertyData(deviceID, &uidAddress, 0, nil, &uidSize, buffer.baseAddress!)
+            }
+            guard uidStatus == noErr else { continue }
 
             // Get name
             var nameAddress = AudioObjectPropertyAddress(
@@ -58,7 +61,10 @@ struct AudioInputDevice: Identifiable, Hashable {
             )
             var name: CFString = "" as CFString
             var nameSize = UInt32(MemoryLayout<CFString>.size)
-            guard AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &name) == noErr else { continue }
+            let nameStatus = withUnsafeMutableBytes(of: &name) { buffer in
+                AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, buffer.baseAddress!)
+            }
+            guard nameStatus == noErr else { continue }
 
             result.append(AudioInputDevice(id: deviceID, uid: uid as String, name: name as String))
         }
@@ -77,8 +83,20 @@ class SpeechRecognizer {
     var error: String?
     var audioLevels: [CGFloat] = Array(repeating: 0, count: 30)
     var lastSpokenText: String = ""
+    var partialText: String = ""
+    var latestSegments: [SpeechSegmentSnapshot] = []
+    var trackingState: TrackingState = .tracking
+    var expectedWord: String = ""
+    var nextCue: String = ""
+    var confidenceLevel: TrackingConfidence = .low
+    var confidenceScore: Double = 0
+    var statusLine: String = ""
+    var manualAsideMode: ManualAsideMode = .inactive
+    var trackingFreezeReason: String = "None"
+    var trackingDebugSummary: String = "Waiting for speech"
     var shouldDismiss: Bool = false
     var shouldAdvancePage: Bool = false
+    var onTrackingSnapshot: ((TrackingSnapshot, SpeechRecognitionFrame?) -> Void)?
 
     /// True when recent audio levels indicate the user is actively speaking
     var isSpeaking: Bool {
@@ -95,12 +113,22 @@ class SpeechRecognizer {
     private var sourceText: String = ""
     private var normalizedSource: String = ""
     private var matchStartOffset: Int = 0  // char offset to start matching from
+    private var trackingGuard = TrackingGuard()
+    private var latchedAsideEnabled = false
+    private var temporaryIgnoreActive = false
     private var retryCount: Int = 0
     private let maxRetries: Int = 10
     private var configurationChangeObserver: Any?
     private var pendingRestart: DispatchWorkItem?
     private var sessionGeneration: Int = 0
     private var suppressConfigChange: Bool = false
+    private var hasInstalledInputTap = false
+
+    deinit {
+        pendingRestart?.cancel()
+        cleanupRecognition()
+        onTrackingSnapshot = nil
+    }
 
     /// Update the source text while preserving the current recognized char count.
     /// Used by Director Mode to live-edit unread text without resetting read progress.
@@ -111,6 +139,13 @@ class SpeechRecognizer {
         normalizedSource = Self.normalize(collapsed)
         recognizedCharCount = min(preservingCharCount, collapsed.count)
         matchStartOffset = recognizedCharCount
+        partialText = ""
+        latestSegments = []
+        lastSpokenText = ""
+        trackingGuard.updateText(collapsed, preservingCharCount: recognizedCharCount)
+        latchedAsideEnabled = false
+        temporaryIgnoreActive = false
+        publishTrackingSnapshot(trackingGuard.snapshot(), frame: nil)
     }
 
     /// Jump highlight to a specific char offset (e.g. when user taps a word)
@@ -118,6 +153,8 @@ class SpeechRecognizer {
         recognizedCharCount = charOffset
         matchStartOffset = charOffset
         retryCount = 0
+        trackingGuard.jumpTo(charOffset: charOffset)
+        publishTrackingSnapshot(trackingGuard.snapshot(), frame: nil)
         if isListening {
             restartRecognition()
         }
@@ -134,6 +171,12 @@ class SpeechRecognizer {
         normalizedSource = Self.normalize(collapsed)
         recognizedCharCount = 0
         matchStartOffset = 0
+        partialText = ""
+        latestSegments = []
+        trackingGuard.reset(with: collapsed)
+        latchedAsideEnabled = false
+        temporaryIgnoreActive = false
+        publishTrackingSnapshot(trackingGuard.snapshot(), frame: nil)
         retryCount = 0
         error = nil
         sessionGeneration += 1
@@ -209,6 +252,16 @@ class SpeechRecognizer {
         beginRecognition()
     }
 
+    func toggleAsideMode() {
+        latchedAsideEnabled.toggle()
+        publishTrackingSnapshot(refreshManualAsideMode(), frame: nil)
+    }
+
+    func setTemporaryIgnoreActive(_ active: Bool) {
+        temporaryIgnoreActive = active
+        publishTrackingSnapshot(refreshManualAsideMode(), frame: nil)
+    }
+
     private func cleanupRecognition() {
         // Cancel any pending restart to prevent overlapping beginRecognition calls
         pendingRestart?.cancel()
@@ -225,7 +278,11 @@ class SpeechRecognizer {
         if audioEngine.isRunning {
             audioEngine.stop()
         }
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if hasInstalledInputTap {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            hasInstalledInputTap = false
+        }
+        speechRecognizer = nil
     }
 
     /// Coalesces all delayed beginRecognition() calls into a single pending work item.
@@ -249,6 +306,7 @@ class SpeechRecognizer {
         // AVAudioEngine caches the device format internally and reset() alone
         // does not reliably flush it after a mic switch.
         audioEngine = AVAudioEngine()
+        hasInstalledInputTap = false
 
         // Set selected microphone if configured
         let micUID = NotchSettings.shared.selectedMicUID
@@ -312,9 +370,6 @@ class SpeechRecognizer {
             self.restartRecognition()
         }
 
-        // Belt-and-suspenders: ensure no stale tap exists before installing
-        inputNode.removeTap(onBus: 0)
-
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             recognitionRequest.append(buffer)
 
@@ -334,6 +389,7 @@ class SpeechRecognizer {
                 }
             }
         }
+        hasInstalledInputTap = true
 
         let currentGeneration = sessionGeneration
         recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
@@ -345,7 +401,23 @@ class SpeechRecognizer {
                     guard self.sessionGeneration == currentGeneration else { return }
                     self.retryCount = 0 // Reset on success
                     self.lastSpokenText = spoken
-                    self.matchCharacters(spoken: spoken)
+                    self.partialText = spoken
+                    let segments = result.bestTranscription.segments.map {
+                        SpeechSegmentSnapshot(
+                            text: $0.substring,
+                            confidence: Double($0.confidence),
+                            timestamp: $0.timestamp,
+                            duration: $0.duration
+                        )
+                    }
+                    self.latestSegments = segments
+                    let frame = SpeechRecognitionFrame(
+                        partialText: spoken,
+                        segments: segments,
+                        isFinal: result.isFinal,
+                        createdAt: Date()
+                    )
+                    self.consumeRecognitionFrame(frame)
                 }
             }
             if error != nil {
@@ -388,22 +460,59 @@ class SpeechRecognizer {
         scheduleBeginRecognition(after: 0.5)
     }
 
+    private func consumeRecognitionFrame(_ frame: SpeechRecognitionFrame) {
+        let settings = NotchSettings.shared
+        let snapshot = trackingGuard.process(
+            frame: frame,
+            isSpeaking: isSpeaking,
+            strictTrackingEnabled: settings.strictTrackingEnabled,
+            advanceThreshold: settings.advanceThreshold,
+            windowSize: settings.matchWindowSize,
+            offScriptFreezeDelay: settings.offScriptFreezeDelay,
+            useLegacyFallback: settings.legacyTrackingFallbackEnabled
+        ) { [weak self] spoken, startOffset in
+            self?.legacyAdvance(spoken: spoken, startOffset: startOffset) ?? startOffset
+        }
+        matchStartOffset = snapshot.highlightedCharCount
+        publishTrackingSnapshot(snapshot, frame: frame)
+    }
+
+    private func refreshManualAsideMode() -> TrackingSnapshot {
+        let nextMode: ManualAsideMode
+        if temporaryIgnoreActive {
+            nextMode = .hold
+        } else if latchedAsideEnabled {
+            nextMode = .toggled
+        } else {
+            nextMode = .inactive
+        }
+        return trackingGuard.setManualAsideMode(nextMode)
+    }
+
+    private func publishTrackingSnapshot(_ snapshot: TrackingSnapshot, frame: SpeechRecognitionFrame?) {
+        recognizedCharCount = snapshot.highlightedCharCount
+        trackingState = snapshot.trackingState
+        expectedWord = snapshot.expectedWord
+        nextCue = snapshot.nextCue
+        confidenceLevel = snapshot.confidenceLevel
+        confidenceScore = snapshot.confidenceScore
+        manualAsideMode = snapshot.manualAsideMode
+        statusLine = snapshot.statusLine
+        trackingFreezeReason = snapshot.decisionReason.freezeLabel
+        trackingDebugSummary = snapshot.debugSummary
+        QADebugStore.shared.recordTracking(snapshot: snapshot, frame: frame)
+        onTrackingSnapshot?(snapshot, frame)
+    }
+
     // MARK: - Fuzzy character-level matching
 
-    private func matchCharacters(spoken: String) {
-        // Strategy 1: character-level fuzzy match from the start offset
+    private func legacyAdvance(spoken: String, startOffset: Int) -> Int {
+        matchStartOffset = startOffset
+
         let charResult = charLevelMatch(spoken: spoken)
-
-        // Strategy 2: word-level match (handles STT word substitutions)
         let wordResult = wordLevelMatch(spoken: spoken)
-
         let best = max(charResult, wordResult)
-
-        // Only move forward from the match start offset
-        let newCount = matchStartOffset + best
-        if newCount > recognizedCharCount {
-            recognizedCharCount = min(newCount, sourceText.count)
-        }
+        return min(startOffset + best, sourceText.count)
     }
 
     private func charLevelMatch(spoken: String) -> Int {
@@ -476,12 +585,6 @@ class SpeechRecognizer {
         return lastGoodOrigIndex
     }
 
-    private static func isAnnotationWord(_ word: String) -> Bool {
-        if word.hasPrefix("[") && word.hasSuffix("]") { return true }
-        let stripped = word.filter { $0.isLetter || $0.isNumber }
-        return stripped.isEmpty
-    }
-
     private func wordLevelMatch(spoken: String) -> Int {
         let remainingSource = String(sourceText.dropFirst(matchStartOffset))
         let sourceWords = remainingSource.split(separator: " ").map { String($0) }
@@ -492,18 +595,17 @@ class SpeechRecognizer {
         var matchedCharCount = 0
 
         while si < sourceWords.count && ri < spokenWords.count {
-            // Auto-skip annotation words in source (brackets, emoji)
-            if Self.isAnnotationWord(sourceWords[si]) {
+            // Auto-skip punctuation-only / emoji-only tokens, but keep bracket cues
+            // like [wave] matchable in the legacy fallback path.
+            if shouldAutoSkipForTracking(sourceWords[si]) {
                 matchedCharCount += sourceWords[si].count
                 if si < sourceWords.count - 1 { matchedCharCount += 1 }
                 si += 1
                 continue
             }
 
-            let srcWord = sourceWords[si].lowercased()
-                .filter { $0.isLetter || $0.isNumber }
-            let spkWord = spokenWords[ri]
-                .filter { $0.isLetter || $0.isNumber }
+            let srcWord = normalizedTrackingToken(sourceWords[si])
+            let spkWord = normalizedTrackingToken(spokenWords[ri])
 
             if srcWord == spkWord || isFuzzyMatch(srcWord, spkWord) {
                 // Count original chars including trailing punctuation, plus space
@@ -518,7 +620,7 @@ class SpeechRecognizer {
                 var foundSpk = false
                 let maxSpkSkip = min(3, spokenWords.count - ri - 1)
                 for skip in 1...max(1, maxSpkSkip) where skip <= maxSpkSkip {
-                    let nextSpk = spokenWords[ri + skip].filter { $0.isLetter || $0.isNumber }
+                    let nextSpk = normalizedTrackingToken(spokenWords[ri + skip])
                     if srcWord == nextSpk || isFuzzyMatch(srcWord, nextSpk) {
                         ri += skip
                         foundSpk = true
@@ -531,7 +633,7 @@ class SpeechRecognizer {
                 var foundSrc = false
                 let maxSrcSkip = min(3, sourceWords.count - si - 1)
                 for skip in 1...max(1, maxSrcSkip) where skip <= maxSrcSkip {
-                    let nextSrc = sourceWords[si + skip].lowercased().filter { $0.isLetter || $0.isNumber }
+                    let nextSrc = normalizedTrackingToken(sourceWords[si + skip])
                     if nextSrc == spkWord || isFuzzyMatch(nextSrc, spkWord) {
                         // Add all skipped source words' char counts
                         for s in 0..<skip {
@@ -556,8 +658,8 @@ class SpeechRecognizer {
             }
         }
 
-        // Auto-skip trailing annotation words at end of source
-        while si < sourceWords.count && Self.isAnnotationWord(sourceWords[si]) {
+        // Auto-skip trailing punctuation-only / emoji-only tokens at the end.
+        while si < sourceWords.count && shouldAutoSkipForTracking(sourceWords[si]) {
             matchedCharCount += sourceWords[si].count
             if si < sourceWords.count - 1 { matchedCharCount += 1 }
             si += 1

@@ -22,6 +22,9 @@ struct ContentView: View {
     @State private var dropAlertTitle: String = "Import Error"
     @State private var showSettings = false
     @State private var showAbout = false
+    @State private var settingsInitialTab: SettingsTab = .appearance
+    @State private var showAccessibilityLaunchGuide = false
+    @State private var attachedDiagnostics = AttachedDiagnosticsStore.shared
     @FocusState private var isTextFocused: Bool
 
     private let defaultText = """
@@ -185,8 +188,113 @@ Happy presenting! [wave]
         isRecording = false
     }
 
+    private var accessibilityLaunchGuideTitle: String {
+        if NotchSettings.shared.overlayMode == .attached {
+            return "Attached Overlay is using screen-corner fallback"
+        }
+        return "Accessibility unlocks Attached Overlay"
+    }
+
+    private var accessibilityLaunchGuideMessage: String {
+        if NotchSettings.shared.overlayMode == .attached {
+            return "Accessibility is still off, so Textream cannot lock onto other app windows yet. Attached Overlay will stay in the screen corner until you allow access."
+        }
+        return "If you want Textream to follow another app window, grant Accessibility before you use Attached Overlay. Until then, Textream will fall back to the screen corner instead of silently failing."
+    }
+
+    private var accessibilityLaunchGuideCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "hand.raised.square.on.square")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(accessibilityLaunchGuideTitle)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(accessibilityLaunchGuideMessage)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    dismissAccessibilityLaunchGuide()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(Color.primary.opacity(0.05), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 8) {
+                Button("Open System Settings") {
+                    dismissAccessibilityLaunchGuide()
+                    WindowAnchorService.openAccessibilitySettings()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
+                Button("Review Attached Setup") {
+                    dismissAccessibilityLaunchGuide()
+                    settingsInitialTab = .teleprompter
+                    showSettings = true
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+
+                Button("Later") {
+                    dismissAccessibilityLaunchGuide()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium))
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.accentColor.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.accentColor.opacity(0.18), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+    }
+
+    private func dismissAccessibilityLaunchGuide() {
+        NotchSettings.shared.hasSeenAccessibilityLaunchGuide = true
+        showAccessibilityLaunchGuide = false
+    }
+
+    private func refreshAccessibilityLaunchGuide() {
+        guard !AppRuntime.isRunningUITests else {
+            showAccessibilityLaunchGuide = false
+            return
+        }
+
+        let permissionState = attachedDiagnostics.refreshPermissionState()
+        let shouldShowGuide = permissionState == .notGranted &&
+            (!NotchSettings.shared.hasSeenAccessibilityLaunchGuide || NotchSettings.shared.overlayMode == .attached)
+        showAccessibilityLaunchGuide = shouldShowGuide
+    }
+
     private var mainContent: some View {
         VStack(spacing: 0) {
+            if showAccessibilityLaunchGuide {
+                accessibilityLaunchGuideCard
+            }
+
             ZStack {
                 HighlightingTextEditor(
                     text: currentText,
@@ -380,6 +488,7 @@ Happy presenting! [wave]
             Spacer()
 
             Button {
+                settingsInitialTab = .appearance
                 showSettings = true
             } label: {
                 Text("Open Settings")
@@ -462,6 +571,7 @@ Happy presenting! [wave]
                     .buttonStyle(.plain)
 
                     Button {
+                        settingsInitialTab = .appearance
                         showSettings = true
                     } label: {
                         HStack(spacing: 4) {
@@ -480,13 +590,16 @@ Happy presenting! [wave]
                 .padding(.horizontal, 8)
             }
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(settings: NotchSettings.shared)
+        .sheet(isPresented: $showSettings, onDismiss: {
+            refreshAccessibilityLaunchGuide()
+        }) {
+            SettingsView(settings: NotchSettings.shared, initialTab: settingsInitialTab)
         }
         .sheet(isPresented: $showAbout) {
             AboutView()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+            settingsInitialTab = .appearance
             showSettings = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .openAbout)) { _ in
@@ -495,6 +608,7 @@ Happy presenting! [wave]
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Sync button state when app is re-activated (e.g. dock click)
             isRunning = service.overlayController.isShowing
+            refreshAccessibilityLaunchGuide()
         }
         .onAppear {
             // Set default text for the first page if empty
@@ -514,6 +628,7 @@ Happy presenting! [wave]
             } else {
                 isTextFocused = true
             }
+            refreshAccessibilityLaunchGuide()
         }
     }
 

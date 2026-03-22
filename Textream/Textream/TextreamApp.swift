@@ -12,8 +12,18 @@ extension Notification.Name {
     static let openAbout = Notification.Name("openAbout")
 }
 
+enum AppRuntime {
+    static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    static let isRunningUITests =
+        ProcessInfo.processInfo.arguments.contains("-ui-testing") ||
+        ProcessInfo.processInfo.environment["TEXTREAM_UI_TESTING"] == "1"
+    static let isHeadlessTestRuntime = isRunningTests && !isRunningUITests
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
+        guard !AppRuntime.isHeadlessTestRuntime else { return }
+        UITestRuntimeSupport.configureIfNeeded()
         NSWindow.allowsAutomaticWindowTabbing = false
         let launchedByURL: Bool
         if let event = NSAppleEventManager.shared().currentAppleEvent {
@@ -28,32 +38,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !AppRuntime.isHeadlessTestRuntime else { return }
         NSApp.servicesProvider = TextreamService.shared
-        NSUpdateDynamicServices()
+        if !AppRuntime.isRunningUITests {
+            NSUpdateDynamicServices()
+        }
+        AttachedDiagnosticsStore.shared.refreshPermissionState()
+        AttachedDiagnosticsStore.shared.markInactive(
+            message: "Attached mode inactive",
+            targetWindowID: NotchSettings.shared.attachedTargetWindowID,
+            targetWindowLabel: NotchSettings.shared.attachedTargetWindowLabel
+        )
 
         if TextreamService.shared.launchedExternally {
             TextreamService.shared.hideMainWindow()
         }
 
-        // Silent update check on launch
-        UpdateChecker.shared.checkForUpdates(silent: true)
+        if !AppRuntime.isRunningUITests {
+            // Silent update check on launch
+            UpdateChecker.shared.checkForUpdates(silent: true)
 
-        // Start browser server if enabled
-        TextreamService.shared.updateBrowserServer()
+            // Start browser server if enabled
+            TextreamService.shared.updateBrowserServer()
 
-        // Start director server if enabled
-        TextreamService.shared.updateDirectorServer()
+            // Start director server if enabled
+            TextreamService.shared.updateDirectorServer()
 
-        // Set window delegate to intercept close, disable tabs and fullscreen
-        DispatchQueue.main.async {
-            for window in NSApp.windows where !(window is NSPanel) {
-                window.delegate = self
-                window.tabbingMode = .disallowed
-                window.collectionBehavior.remove(.fullScreenPrimary)
-                window.collectionBehavior.insert(.fullScreenNone)
+            // Set window delegate to intercept close, disable tabs and fullscreen
+            DispatchQueue.main.async {
+                for window in NSApp.windows where !(window is NSPanel) {
+                    window.delegate = self
+                    window.tabbingMode = .disallowed
+                    window.collectionBehavior.remove(.fullScreenPrimary)
+                    window.collectionBehavior.insert(.fullScreenNone)
+                }
+                self.removeUnwantedMenus()
             }
-            self.removeUnwantedMenus()
         }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard !AppRuntime.isHeadlessTestRuntime else { return }
+        AttachedDiagnosticsStore.shared.refreshPermissionState()
     }
 
     private func removeUnwantedMenus() {
@@ -116,16 +142,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 struct TextreamApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {
+        UITestRuntimeSupport.configureIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .onOpenURL { url in
-                    if url.pathExtension == "textream" {
-                        TextreamService.shared.openFileAtURL(url)
-                    } else {
-                        TextreamService.shared.handleURL(url)
+            if AppRuntime.isHeadlessTestRuntime {
+                Color.clear
+                    .frame(width: 1, height: 1)
+            } else {
+                rootContentView
+                    .onOpenURL { url in
+                        if url.pathExtension == "textream" {
+                            TextreamService.shared.openFileAtURL(url)
+                        } else {
+                            TextreamService.shared.handleURL(url)
+                        }
                     }
-                }
+            }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
@@ -172,6 +207,15 @@ struct TextreamApp: App {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var rootContentView: some View {
+        if AppRuntime.isRunningUITests {
+            UITestHarnessRootView()
+        } else {
+            ContentView()
         }
     }
 }

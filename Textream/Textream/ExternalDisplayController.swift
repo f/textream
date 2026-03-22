@@ -12,7 +12,7 @@ import Combine
 class ExternalDisplayController {
     private var panel: NSPanel?
     private var cancellables = Set<AnyCancellable>()
-    let overlayContent = OverlayContent()
+    private weak var overlayContent: OverlayContent?
 
     /// Find the target external screen based on saved screen ID, or first non-main screen
     func targetScreen() -> NSScreen? {
@@ -29,22 +29,19 @@ class ExternalDisplayController {
         return screens.first
     }
 
-    func show(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int, hasNextPage: Bool = false) {
+    func show(speechRecognizer: SpeechRecognizer, content: OverlayContent) {
         let settings = NotchSettings.shared
         guard settings.externalDisplayMode != .off else { return }
         guard let screen = targetScreen() else { return }
 
         dismiss()
-
-        overlayContent.words = words
-        overlayContent.totalCharCount = totalCharCount
-        overlayContent.hasNextPage = hasNextPage
+        overlayContent = content
 
         let mirrorAxis = settings.externalDisplayMode == .mirror ? settings.mirrorAxis : nil
         let screenFrame = screen.frame
 
         let content = ExternalDisplayView(
-            content: overlayContent,
+            content: content,
             speechRecognizer: speechRecognizer,
             mirrorAxis: mirrorAxis
         )
@@ -122,6 +119,17 @@ struct ExternalDisplayView: View {
         NotchSettings.shared.listeningMode
     }
 
+    private var hudItems: [HUDPresentationItem] {
+        PersistentHUDPresenter.items(
+            content: content,
+            isListening: speechRecognizer.isListening,
+            configuration: HUDPresentationConfiguration(
+                isEnabled: NotchSettings.shared.persistentHUDEnabled,
+                modules: NotchSettings.shared.hudModules
+            )
+        )
+    }
+
     /// Convert fractional word index to char offset using actual word lengths
     private func charOffsetForWordProgress(_ progress: Double) -> Int {
         let wholeWord = Int(progress)
@@ -153,7 +161,7 @@ struct ExternalDisplayView: View {
     private var effectiveCharCount: Int {
         switch listeningMode {
         case .wordTracking:
-            return speechRecognizer.recognizedCharCount
+            return content.highlightedCharCount
         case .classic, .silencePaused:
             return charOffsetForWordProgress(timerWordProgress)
         }
@@ -170,6 +178,17 @@ struct ExternalDisplayView: View {
         case .classic:
             return true
         }
+    }
+
+    private var shouldShowStatusBlock: Bool {
+        listeningMode == .wordTracking || content.attachedRequiresAttention
+    }
+
+    private var secondaryStatusText: String {
+        if content.attachedRequiresAttention {
+            return content.attachedDetailLine
+        }
+        return speechRecognizer.lastSpokenText.split(separator: " ").suffix(5).joined(separator: " ")
     }
 
     var body: some View {
@@ -258,13 +277,20 @@ struct ExternalDisplayView: View {
                     )
                     .frame(width: 240, height: 32)
 
-                    if listeningMode == .wordTracking {
-                        Text(speechRecognizer.lastSpokenText.split(separator: " ").suffix(5).joined(separator: " "))
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
-                            .truncationMode(.head)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    if shouldShowStatusBlock {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(content.statusLine.isEmpty ? content.trackingState.label : content.statusLine)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.75))
+                            if !secondaryStatusText.isEmpty {
+                                Text(secondaryStatusText)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.42))
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         Spacer()
                     }
@@ -288,7 +314,19 @@ struct ExternalDisplayView: View {
                     }
                 }
                 .padding(.horizontal, hPad)
-                .padding(.bottom, 40)
+                .padding(.bottom, 20)
+
+                if !hudItems.isEmpty {
+                    PersistentHUDStripView(items: hudItems, compact: false)
+                        .padding(.horizontal, hPad)
+                        .padding(.bottom, 40)
+                }
+
+                if NotchSettings.shared.qaDebugOverlayEnabled {
+                    QADebugOverlayView(speechRecognizer: speechRecognizer, compact: false)
+                        .padding(.horizontal, hPad)
+                        .padding(.bottom, 40)
+                }
             }
         }
     }
