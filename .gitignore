@@ -27,8 +27,15 @@ Package.resolved
 # CocoaPods
 Pods/
 
+# Python venv
+.venv/
+
+# CoreML model (regenerate with: python scripts/convert_model.py)
+*.mlpackage/
+
 # Misc
 *.swp
 *~
 *.orig
 *.log
+.superpowers/
