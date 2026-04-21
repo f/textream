@@ -418,15 +418,29 @@ class BrowserServer {
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
 
-        // Detect annotation words: [bracket] or emoji-only (no letters/digits)
+        // Detect annotation words: bracketed cues or emoji/punctuation-only tokens
         function isAnnotation(w){
-          if(w.startsWith('[')&&w.endsWith(']'))return true;
-          return!/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(w);
+          const readable=/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]/;
+          const cuePairs=[
+            ['[',']'],
+            ['【','】'],
+            ['〔','〕'],
+            ['（','）'],
+            ['［','］']
+          ];
+          for(const [open,close] of cuePairs){
+            if(w.startsWith(open)&&w.endsWith(close)){
+              const inner=w.slice(open.length,w.length-close.length).trim();
+              if(inner&&inner.length<=24&&!/[。！？!?;；\\n\\r]/.test(inner))return true;
+            }
+          }
+          return!readable.test(w);
         }
 
         // Count letters+digits in a word
         function letterCount(w){
-          let n=0;for(const ch of w)if(/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(ch))n++;
+          const readable=/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]/;
+          let n=0;for(const ch of w)if(readable.test(ch))n++;
           return Math.max(1,n);
         }
 
