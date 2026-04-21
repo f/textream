@@ -291,7 +291,7 @@ class BrowserServer {
     static func generateHTML(wsPort: UInt16) -> String {
         """
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="\(NotchSettings.shared.effectiveAppLanguageCode)">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -378,9 +378,9 @@ class BrowserServer {
 
         <div id="waiting">
           <div class="icon">📡</div>
-          <div class="title">Waiting for Textream…</div>
-          <div class="sub">Start reading in the app to see your teleprompter here</div>
-          <div class="url" id="conn-status">Connecting…</div>
+          <div class="title">\(L10n.html("Waiting for Textream…"))</div>
+          <div class="sub">\(L10n.html("Start reading in the app to see your teleprompter here"))</div>
+          <div class="url" id="conn-status">\(L10n.html("Connecting…"))</div>
         </div>
 
         <div id="main">
@@ -396,11 +396,13 @@ class BrowserServer {
 
         <div id="done">
           <div class="check">✓</div>
-          <div class="label">Done!</div>
+          <div class="label">\(L10n.html("Done!"))</div>
         </div>
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
+        const STR_CONNECTED='\(L10n.js("Connected"))';
+        const STR_RECONNECTING='\(L10n.js("Reconnecting…"))';
         let ws,rt,prevWordKey='',scrollTgt=null;
 
         /* ---- helpers ---- */
@@ -449,10 +451,10 @@ class BrowserServer {
         function connect(){
           ws=new WebSocket('ws://'+host+':'+WSP);
           ws.onopen=()=>{clearTimeout(rt);
-            document.getElementById('conn-status').textContent='Connected';};
+            document.getElementById('conn-status').textContent=STR_CONNECTED;};
           ws.onmessage=e=>{try{render(JSON.parse(e.data))}catch(x){console.error(x)}};
           ws.onclose=()=>{
-            document.getElementById('conn-status').textContent='Reconnecting…';
+            document.getElementById('conn-status').textContent=STR_RECONNECTING;
             rt=setTimeout(connect,1500);};
           ws.onerror=()=>{ws.close()};
         }

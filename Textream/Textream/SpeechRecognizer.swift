@@ -149,7 +149,7 @@ class SpeechRecognizer {
         // Check microphone permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream."
+            error = L10n.tr("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
             openMicrophoneSettings()
             return
         case .notDetermined:
@@ -158,7 +158,7 @@ class SpeechRecognizer {
                     if granted {
                         self?.requestSpeechAuthAndBegin()
                     } else {
-                        self?.error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream."
+                        self?.error = L10n.tr("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
                     }
                 }
             }
@@ -179,7 +179,7 @@ class SpeechRecognizer {
                 case .authorized:
                     self?.beginRecognition()
                 default:
-                    self?.error = "Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream."
+                    self?.error = L10n.tr("Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream.")
                     self?.openSpeechRecognitionSettings()
                 }
             }
@@ -286,7 +286,7 @@ class SpeechRecognizer {
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
         guard let speechRecognizer, speechRecognizer.isAvailable else {
-            error = "Speech recognizer not available"
+            error = L10n.tr("Speech recognizer not available")
             return
         }
 
@@ -304,7 +304,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                error = "Audio input unavailable"
+                error = L10n.tr("Audio input unavailable")
                 isListening = false
             }
             return
@@ -381,7 +381,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                self.error = "Audio engine failed: \(error.localizedDescription)"
+                self.error = L10n.tr("Audio engine failed: %@", error.localizedDescription)
                 isListening = false
             }
         }

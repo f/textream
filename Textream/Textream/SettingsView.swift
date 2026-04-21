@@ -266,23 +266,25 @@ struct NotchPreviewContent: View {
 // MARK: - Settings Tabs
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case appearance, guidance, teleprompter, external, browser, director
+    case general, appearance, guidance, teleprompter, external, browser, director
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .appearance: return "Appearance"
-        case .guidance:   return "Guidance"
-        case .teleprompter: return "Teleprompter"
-        case .external:   return "External"
-        case .browser:    return "Remote"
-        case .director:   return "Director"
+        case .general: return L10n.tr("General")
+        case .appearance: return L10n.tr("Appearance")
+        case .guidance:   return L10n.tr("Guidance")
+        case .teleprompter: return L10n.tr("Teleprompter")
+        case .external:   return L10n.tr("External")
+        case .browser:    return L10n.tr("Remote")
+        case .director:   return L10n.tr("Director")
         }
     }
 
     var icon: String {
         switch self {
+        case .general: return "gearshape"
         case .appearance: return "paintpalette"
         case .guidance:   return "waveform"
         case .teleprompter: return "macwindow"
@@ -299,14 +301,14 @@ struct SettingsView: View {
     @Bindable var settings: NotchSettings
     @Environment(\.dismiss) private var dismiss
     @State private var previewController = NotchPreviewController()
-    @State private var selectedTab: SettingsTab = .appearance
+    @State private var selectedTab: SettingsTab = .general
     @State private var showResetConfirmation = false
 
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar
             VStack(alignment: .leading, spacing: 2) {
-                Text("Settings")
+                Text(L10n.tr("Settings"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .textCase(.uppercase)
@@ -346,6 +348,8 @@ struct SettingsView: View {
             // Content
             VStack(spacing: 0) {
                 switch selectedTab {
+                case .general:
+                    generalTab
                 case .appearance:
                     appearanceTab
                 case .guidance:
@@ -363,7 +367,7 @@ struct SettingsView: View {
                 Divider()
 
                 HStack {
-                    Button("Reset All") {
+                    Button(L10n.tr("Reset All")) {
                         showResetConfirmation = true
                     }
                     .buttonStyle(.borderless)
@@ -372,7 +376,7 @@ struct SettingsView: View {
 
                     Spacer()
 
-                    Button("Done") {
+                    Button(L10n.tr("Done")) {
                         dismiss()
                     }
                     .keyboardShortcut(.defaultAction)
@@ -386,15 +390,15 @@ struct SettingsView: View {
         .frame(width: 500)
         .frame(minHeight: 280, maxHeight: 500)
         .background(.ultraThinMaterial)
-        .alert("Reset All Settings?", isPresented: $showResetConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Reset", role: .destructive) {
+        .alert(L10n.tr("Reset All Settings?"), isPresented: $showResetConfirmation) {
+            Button(L10n.tr("Cancel"), role: .cancel) { }
+            Button(L10n.tr("Reset"), role: .destructive) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     resetAllSettings()
                 }
             }
         } message: {
-            Text("This will restore all settings to their defaults.")
+            Text(L10n.tr("This will restore all settings to their defaults."))
         }
         .onAppear {
             if settings.overlayMode != .fullscreen {
@@ -443,13 +447,38 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - General Tab
+
+    private var generalTab: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L10n.tr("App Language"))
+                .font(.system(size: 13, weight: .medium))
+
+            Picker("", selection: $settings.appLanguage) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.label).tag(language)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            Text(L10n.tr("Controls Textream's interface language. Speech Language remains independent."))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+        }
+        .padding(16)
+        .environment(\.locale, settings.effectiveAppLocale)
+    }
+
     // MARK: - Appearance Tab
 
     private var appearanceTab: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 // Font Family
-                Text("Font")
+                Text(L10n.tr("Font"))
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -483,7 +512,7 @@ struct SettingsView: View {
                 }
 
                 // Text Size
-                Text("Size")
+                Text(L10n.tr("Size"))
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -519,7 +548,7 @@ struct SettingsView: View {
                 Divider()
 
                 // Highlight Color
-                Text("Highlight Color")
+                Text(L10n.tr("Highlight Color"))
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -564,7 +593,7 @@ struct SettingsView: View {
                 }
 
                 // Cue Color
-                Text("Cue Color")
+                Text(L10n.tr("Cue Color"))
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -609,7 +638,7 @@ struct SettingsView: View {
                 }
 
                 // Cue Brightness
-                Text("Cue Brightness")
+                Text(L10n.tr("Cue Brightness"))
                     .font(.system(size: 13, weight: .medium))
 
                 Picker("", selection: $settings.cueBrightness) {
@@ -623,13 +652,13 @@ struct SettingsView: View {
                 Divider()
 
                 // Dimensions
-                Text("Dimensions")
+                Text(L10n.tr("Dimensions"))
                     .font(.system(size: 13, weight: .medium))
 
                 VStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Width")
+                            Text(L10n.tr("Width"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -646,7 +675,7 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Height")
+                            Text(L10n.tr("Height"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -686,11 +715,11 @@ struct SettingsView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Speech Language")
+                    Text(L10n.tr("Speech Language"))
                         .font(.system(size: 13, weight: .medium))
                     Picker("", selection: $settings.speechLocale) {
                         ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
-                            Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+                            Text(settings.effectiveAppLocale.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
                                 .tag(locale.identifier)
                         }
                     }
@@ -702,10 +731,10 @@ struct SettingsView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Microphone")
+                    Text(L10n.tr("Microphone"))
                         .font(.system(size: 13, weight: .medium))
                     Picker("", selection: $settings.selectedMicUID) {
-                        Text("System Default").tag("")
+                        Text(L10n.tr("System Default")).tag("")
                         ForEach(availableMics) { mic in
                             Text(mic.name).tag(mic.uid)
                         }
@@ -719,10 +748,10 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Scroll Speed")
+                        Text(L10n.tr("Scroll Speed"))
                             .font(.system(size: 13, weight: .medium))
                         Spacer()
-                        Text(String(format: "%.1f words/s", settings.scrollSpeed))
+                        Text(L10n.tr("%.1f words/s", settings.scrollSpeed))
                             .font(.system(size: 12, weight: .regular, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
@@ -732,11 +761,11 @@ struct SettingsView: View {
                         step: 0.5
                     )
                     HStack {
-                        Text("Slower")
+                        Text(L10n.tr("Slower"))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                         Spacer()
-                        Text("Faster")
+                        Text(L10n.tr("Faster"))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
@@ -774,7 +803,7 @@ struct SettingsView: View {
                 if settings.overlayMode == .pinned {
                     Divider()
 
-                    Text("Display")
+                    Text(L10n.tr("Display"))
                         .font(.system(size: 13, weight: .medium))
 
                     Picker("", selection: $settings.notchDisplayMode) {
@@ -802,20 +831,20 @@ struct SettingsView: View {
                     Divider()
 
                     Toggle(isOn: $settings.followCursorWhenUndocked) {
-                        Text("Follow Cursor")
+                        Text(L10n.tr("Follow Cursor"))
                             .font(.system(size: 13, weight: .medium))
                     }
                     .toggleStyle(.switch)
                     .controlSize(.small)
 
-                    Text("The window follows your cursor and sticks to its bottom-right.")
+                    Text(L10n.tr("The window follows your cursor and sticks to its bottom-right."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
 
                     Divider()
 
                     Toggle(isOn: $settings.floatingGlassEffect) {
-                        Text("Glass Effect")
+                        Text(L10n.tr("Glass Effect"))
                             .font(.system(size: 13, weight: .medium))
                     }
                     .toggleStyle(.switch)
@@ -824,7 +853,7 @@ struct SettingsView: View {
                     if settings.floatingGlassEffect {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("Opacity")
+                                Text(L10n.tr("Opacity"))
                                     .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                                 Spacer()
@@ -844,7 +873,7 @@ struct SettingsView: View {
                 if settings.overlayMode == .fullscreen {
                     Divider()
 
-                    Text("Display")
+                    Text(L10n.tr("Display"))
                         .font(.system(size: 13, weight: .medium))
 
                     displayPicker(
@@ -857,7 +886,7 @@ struct SettingsView: View {
                         Image(systemName: "escape")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        Text("Press Esc to stop the teleprompter.")
+                        Text(L10n.tr("Press Esc to stop the teleprompter."))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -874,9 +903,9 @@ struct SettingsView: View {
                 // Options
                 Toggle(isOn: $settings.showElapsedTime) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Elapsed Time")
+                        Text(L10n.tr("Elapsed Time"))
                             .font(.system(size: 13, weight: .medium))
-                        Text("Display a running timer while the teleprompter is active.")
+                        Text(L10n.tr("Display a running timer while the teleprompter is active."))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -885,9 +914,9 @@ struct SettingsView: View {
 
                 Toggle(isOn: $settings.hideFromScreenShare) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Hide from Screen Sharing")
+                        Text(L10n.tr("Hide from Screen Sharing"))
                             .font(.system(size: 13, weight: .medium))
-                        Text("Hide the overlay from screen recordings and video calls.")
+                        Text(L10n.tr("Hide the overlay from screen recordings and video calls."))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -897,14 +926,14 @@ struct SettingsView: View {
                 Divider()
 
                 // Pagination
-                Text("Pagination")
+                Text(L10n.tr("Pagination"))
                     .font(.system(size: 13, weight: .semibold))
 
                 Toggle(isOn: $settings.autoNextPage) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Auto Next Page")
+                        Text(L10n.tr("Auto Next Page"))
                             .font(.system(size: 13, weight: .medium))
-                        Text("Automatically advance to the next page after a countdown.")
+                        Text(L10n.tr("Automatically advance to the next page after a countdown."))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -913,12 +942,12 @@ struct SettingsView: View {
 
                 if settings.autoNextPage {
                     HStack {
-                        Text("Countdown")
+                        Text(L10n.tr("Countdown"))
                             .font(.system(size: 13))
                         Spacer()
                         Picker("", selection: $settings.autoNextPageDelay) {
-                            Text("3 seconds").tag(3)
-                            Text("5 seconds").tag(5)
+                            Text(L10n.tr("3 seconds")).tag(3)
+                            Text(L10n.tr("5 seconds")).tag(5)
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 160)
@@ -936,7 +965,7 @@ struct SettingsView: View {
 
     private var externalTab: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Show the teleprompter on an external display or Sidecar iPad.")
+            Text(L10n.tr("Show the teleprompter on an external display or Sidecar iPad."))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
@@ -955,7 +984,7 @@ struct SettingsView: View {
             if settings.externalDisplayMode == .mirror {
                 Divider()
 
-                Text("Mirror Axis")
+                Text(L10n.tr("Mirror Axis"))
                     .font(.system(size: 13, weight: .medium))
 
                 Picker("", selection: $settings.mirrorAxis) {
@@ -974,14 +1003,14 @@ struct SettingsView: View {
             if settings.externalDisplayMode != .off {
                 Divider()
 
-                Text("Target Display")
+                Text(L10n.tr("Target Display"))
                     .font(.system(size: 13, weight: .medium))
 
                 displayPicker(
                     screens: availableScreens,
                     selectedID: $settings.externalScreenID,
                     onRefresh: { refreshScreens() },
-                    emptyMessage: "No external displays detected. Connect a display or enable Sidecar."
+                    emptyMessage: L10n.tr("No external displays detected. Connect a display or enable Sidecar.")
                 )
             }
             Spacer()
@@ -998,12 +1027,12 @@ struct SettingsView: View {
     private var browserTab: some View {
         ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Scan the QR code or open the URL with your iPhone, Android or TV browser on the same Wi-Fi network.")
+            Text(L10n.tr("Scan the QR code or open the URL with your iPhone, Android or TV browser on the same Wi-Fi network."))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
             Toggle(isOn: $settings.browserServerEnabled) {
-                Text("Enable Remote Connection")
+                Text(L10n.tr("Enable Remote Connection"))
                     .font(.system(size: 13, weight: .medium))
             }
             .toggleStyle(.switch)
@@ -1050,13 +1079,13 @@ struct SettingsView: View {
                         .fill(Color.accentColor.opacity(0.08))
                 )
 
-                DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
+                DisclosureGroup(L10n.tr("Advanced"), isExpanded: $showAdvanced) {
                     VStack(alignment: .leading, spacing: 10) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Port")
+                            Text(L10n.tr("Port"))
                                 .font(.system(size: 13, weight: .medium))
                             HStack(spacing: 8) {
-                                TextField("Port", text: Binding(
+                                TextField(L10n.tr("Port"), text: Binding(
                                     get: { String(settings.browserServerPort) },
                                     set: { str in
                                         if let val = UInt16(str), val >= 1024 {
@@ -1067,13 +1096,13 @@ struct SettingsView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 80)
 
-                                Text("Restart required after change")
+                                Text(L10n.tr("Restart required after change"))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.tertiary)
 
                                 Spacer()
 
-                                Button("Restart") {
+                                Button(L10n.tr("Restart")) {
                                     TextreamService.shared.browserServer.stop()
                                     TextreamService.shared.browserServer.start()
                                     localIP = BrowserServer.localIPAddress() ?? "localhost"
@@ -1087,7 +1116,7 @@ struct SettingsView: View {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
-                            Text("Uses ports \(String(settings.browserServerPort)) (HTTP) and \(String(settings.browserServerPort + 1)) (WebSocket).")
+                            Text(L10n.tr("Uses ports %@ (HTTP) and %@ (WebSocket).", String(settings.browserServerPort), String(settings.browserServerPort + 1)))
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
@@ -1112,12 +1141,12 @@ struct SettingsView: View {
     private var directorTab: some View {
         ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Director Mode lets a remote person control your teleprompter script in real-time via a web browser. The editor will be disabled while active.")
+            Text(L10n.tr("Director Mode lets a remote person control your teleprompter script in real-time via a web browser. The editor will be disabled while active."))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
             Toggle(isOn: $settings.directorModeEnabled) {
-                Text("Enable Director Mode")
+                Text(L10n.tr("Enable Director Mode"))
                     .font(.system(size: 13, weight: .medium))
             }
             .toggleStyle(.switch)
@@ -1168,18 +1197,18 @@ struct SettingsView: View {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Text("Word tracking is forced when the director starts reading.")
+                    Text(L10n.tr("Word tracking is forced when the director starts reading."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
 
-                DisclosureGroup("Advanced", isExpanded: $showDirectorAdvanced) {
+                DisclosureGroup(L10n.tr("Advanced"), isExpanded: $showDirectorAdvanced) {
                     VStack(alignment: .leading, spacing: 10) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Port")
+                            Text(L10n.tr("Port"))
                                 .font(.system(size: 13, weight: .medium))
                             HStack(spacing: 8) {
-                                TextField("Port", text: Binding(
+                                TextField(L10n.tr("Port"), text: Binding(
                                     get: { String(settings.directorServerPort) },
                                     set: { str in
                                         if let val = UInt16(str), val >= 1024 {
@@ -1190,13 +1219,13 @@ struct SettingsView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 80)
 
-                                Text("Restart required after change")
+                                Text(L10n.tr("Restart required after change"))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.tertiary)
 
                                 Spacer()
 
-                                Button("Restart") {
+                                Button(L10n.tr("Restart")) {
                                     TextreamService.shared.directorServer.stop()
                                     TextreamService.shared.directorServer.start()
                                     directorLocalIP = BrowserServer.localIPAddress() ?? "localhost"
@@ -1210,7 +1239,7 @@ struct SettingsView: View {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
-                            Text("Uses ports \(String(settings.directorServerPort)) (HTTP) and \(String(settings.directorServerPort + 1)) (WebSocket).")
+                            Text(L10n.tr("Uses ports %@ (HTTP) and %@ (WebSocket).", String(settings.directorServerPort), String(settings.directorServerPort + 1)))
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
@@ -1290,7 +1319,7 @@ struct SettingsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("Refresh")
+                    Text(L10n.tr("Refresh"))
                         .font(.system(size: 11, weight: .medium))
                 }
                 .foregroundStyle(.secondary)
@@ -1316,6 +1345,7 @@ struct SettingsView: View {
     // MARK: - Helpers
 
     private func resetAllSettings() {
+        settings.appLanguage = .system
         settings.notchWidth = NotchSettings.defaultWidth
         settings.textAreaHeight = NotchSettings.defaultHeight
         settings.fontSizePreset = .lg

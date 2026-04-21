@@ -42,7 +42,7 @@ class DictationManager {
         // Check microphone permission
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone."
+            error = L10n.tr("Microphone access denied. Open System Settings → Privacy & Security → Microphone.")
             return
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
@@ -50,7 +50,7 @@ class DictationManager {
                     if granted {
                         self?.requestSpeechAuthAndBegin()
                     } else {
-                        self?.error = "Microphone access denied."
+                        self?.error = L10n.tr("Microphone access denied.")
                     }
                 }
             }
@@ -76,7 +76,7 @@ class DictationManager {
                 case .authorized:
                     self?.beginRecognition()
                 default:
-                    self?.error = "Speech recognition not authorized."
+                    self?.error = L10n.tr("Speech recognition not authorized.")
                 }
             }
         }
@@ -126,7 +126,7 @@ class DictationManager {
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
         guard let speechRecognizer, speechRecognizer.isAvailable else {
-            error = "Speech recognizer not available"
+            error = L10n.tr("Speech recognizer not available")
             return
         }
 
@@ -138,7 +138,7 @@ class DictationManager {
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
         guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
-            error = "Audio input unavailable"
+            error = L10n.tr("Audio input unavailable")
             return
         }
 
@@ -200,7 +200,7 @@ class DictationManager {
             try audioEngine.start()
             isRecording = true
         } catch {
-            self.error = "Audio engine failed: \(error.localizedDescription)"
+            self.error = L10n.tr("Audio engine failed: %@", error.localizedDescription)
             isRecording = false
         }
     }

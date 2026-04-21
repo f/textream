@@ -18,7 +18,7 @@ enum FontSizePreset: String, CaseIterable, Identifiable {
         switch self {
         case .xs: return "XS"
         case .sm: return "SM"
-        case .lg: return "LG"
+        case .lg: return L10n.tr("LG")
         case .xl: return "XL"
         }
     }
@@ -42,10 +42,10 @@ enum FontFamilyPreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .sans:     return "Sans"
-        case .serif:    return "Serif"
-        case .mono:     return "Mono"
-        case .dyslexia: return "Dyslexia"
+        case .sans:     return L10n.tr("Sans")
+        case .serif:    return L10n.tr("Serif")
+        case .mono:     return L10n.tr("Mono")
+        case .dyslexia: return L10n.tr("Dyslexia")
         }
     }
 
@@ -107,12 +107,12 @@ enum FontColorPreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .white:  return "White"
-        case .yellow: return "Yellow"
-        case .green:  return "Green"
-        case .blue:   return "Blue"
-        case .pink:   return "Pink"
-        case .orange: return "Orange"
+        case .white:  return L10n.tr("White")
+        case .yellow: return L10n.tr("Yellow")
+        case .green:  return L10n.tr("Green")
+        case .blue:   return L10n.tr("Blue")
+        case .pink:   return L10n.tr("Pink")
+        case .orange: return L10n.tr("Orange")
         }
     }
 
@@ -137,10 +137,10 @@ enum CueBrightness: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .dim:    return "Dim"
-        case .low:    return "Low"
-        case .medium: return "Medium"
-        case .bright: return "Bright"
+        case .dim:    return L10n.tr("Dim")
+        case .low:    return L10n.tr("Low")
+        case .medium: return L10n.tr("Medium")
+        case .bright: return L10n.tr("Bright")
         }
     }
 
@@ -174,17 +174,17 @@ enum OverlayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .pinned:     return "Pinned to Notch"
-        case .floating:   return "Floating Window"
-        case .fullscreen: return "Fullscreen"
+        case .pinned:     return L10n.tr("Pinned to Notch")
+        case .floating:   return L10n.tr("Floating Window")
+        case .fullscreen: return L10n.tr("Fullscreen")
         }
     }
 
     var description: String {
         switch self {
-        case .pinned:     return "Anchored below the notch at the top of your screen."
-        case .floating:   return "A draggable window you can place anywhere. Always on top."
-        case .fullscreen: return "Fullscreen teleprompter on the selected display. Press Esc to stop."
+        case .pinned:     return L10n.tr("Anchored below the notch at the top of your screen.")
+        case .floating:   return L10n.tr("A draggable window you can place anywhere. Always on top.")
+        case .fullscreen: return L10n.tr("Fullscreen teleprompter on the selected display. Press Esc to stop.")
         }
     }
 
@@ -206,15 +206,15 @@ enum NotchDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .followMouse:  return "Follow Mouse"
-        case .fixedDisplay: return "Fixed Display"
+        case .followMouse:  return L10n.tr("Follow Mouse")
+        case .fixedDisplay: return L10n.tr("Fixed Display")
         }
     }
 
     var description: String {
         switch self {
-        case .followMouse:  return "The notch moves to whichever display your mouse is on."
-        case .fixedDisplay: return "The notch stays on the selected display."
+        case .followMouse:  return L10n.tr("The notch moves to whichever display your mouse is on.")
+        case .fixedDisplay: return L10n.tr("The notch stays on the selected display.")
         }
     }
 }
@@ -228,17 +228,17 @@ enum ExternalDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .off:          return "Off"
-        case .teleprompter: return "Teleprompter"
-        case .mirror:       return "Mirror"
+        case .off:          return L10n.tr("Off")
+        case .teleprompter: return L10n.tr("Teleprompter")
+        case .mirror:       return L10n.tr("Mirror")
         }
     }
 
     var description: String {
         switch self {
-        case .off:          return "No external display output."
-        case .teleprompter: return "Fullscreen teleprompter on the selected display."
-        case .mirror:       return "Horizontally flipped for use with a prompter mirror rig."
+        case .off:          return L10n.tr("No external display output.")
+        case .teleprompter: return L10n.tr("Fullscreen teleprompter on the selected display.")
+        case .mirror:       return L10n.tr("Horizontally flipped for use with a prompter mirror rig.")
         }
     }
 }
@@ -252,17 +252,17 @@ enum MirrorAxis: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .horizontal: return "Horizontal"
-        case .vertical:   return "Vertical"
-        case .both:       return "Both"
+        case .horizontal: return L10n.tr("Horizontal")
+        case .vertical:   return L10n.tr("Vertical")
+        case .both:       return L10n.tr("Both")
         }
     }
 
     var description: String {
         switch self {
-        case .horizontal: return "Flipped left-to-right. Standard for prompter mirror rigs."
-        case .vertical:   return "Flipped top-to-bottom."
-        case .both:       return "Flipped on both axes (rotated 180°)."
+        case .horizontal: return L10n.tr("Flipped left-to-right. Standard for prompter mirror rigs.")
+        case .vertical:   return L10n.tr("Flipped top-to-bottom.")
+        case .both:       return L10n.tr("Flipped on both axes (rotated 180°).")
         }
     }
 
@@ -290,17 +290,17 @@ enum ListeningMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .classic:        return "Classic"
-        case .silencePaused:  return "Voice-Activated"
-        case .wordTracking:   return "Word Tracking"
+        case .classic:        return L10n.tr("Classic")
+        case .silencePaused:  return L10n.tr("Voice-Activated")
+        case .wordTracking:   return L10n.tr("Word Tracking")
         }
     }
 
     var description: String {
         switch self {
-        case .classic:        return "Auto-scrolls at a constant speed. No microphone needed."
-        case .silencePaused:  return "Scrolls while you speak, pauses when you're silent."
-        case .wordTracking:   return "Tracks each word you say and highlights it in real time."
+        case .classic:        return L10n.tr("Auto-scrolls at a constant speed. No microphone needed.")
+        case .silencePaused:  return L10n.tr("Scrolls while you speak, pauses when you're silent.")
+        case .wordTracking:   return L10n.tr("Tracks each word you say and highlights it in real time.")
         }
     }
 
@@ -309,6 +309,22 @@ enum ListeningMode: String, CaseIterable, Identifiable {
         case .classic:        return "arrow.down.circle"
         case .silencePaused:  return "waveform.circle"
         case .wordTracking:   return "text.word.spacing"
+        }
+    }
+}
+
+// MARK: - App Language
+
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case system, english, simplifiedChinese
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return L10n.tr("Follow System")
+        case .english: return L10n.tr("English")
+        case .simplifiedChinese: return L10n.tr("Simplified Chinese")
         }
     }
 }
@@ -328,6 +344,10 @@ class NotchSettings {
 
     var speechLocale: String {
         didSet { UserDefaults.standard.set(speechLocale, forKey: "speechLocale") }
+    }
+
+    var appLanguage: AppLanguage {
+        didSet { persistAppLanguagePreference() }
     }
 
     var fontSizePreset: FontSizePreset {
@@ -445,9 +465,31 @@ class NotchSettings {
         fontFamilyPreset.font(size: fontSizePreset.pointSize)
     }
 
+    var effectiveAppLanguageCode: String {
+        switch appLanguage {
+        case .english:
+            return "en"
+        case .simplifiedChinese:
+            return "zh-Hans"
+        case .system:
+            return Self.systemAppLanguageCode
+        }
+    }
+
+    var effectiveAppLocale: Locale {
+        Locale(identifier: effectiveAppLanguageCode)
+    }
+
     static let defaultWidth: CGFloat = 340
     static let defaultHeight: CGFloat = 150
     static let defaultLocale: String = Locale.current.identifier
+    static var systemAppLanguageCode: String {
+        guard let preferred = Locale.preferredLanguages.first else { return "en" }
+        if preferred.hasPrefix("zh-Hans") || preferred.hasPrefix("zh-CN") || preferred.hasPrefix("zh-SG") {
+            return "zh-Hans"
+        }
+        return "en"
+    }
 
     static let minWidth: CGFloat = 310
     static let maxWidth: CGFloat = 500
@@ -460,6 +502,7 @@ class NotchSettings {
         self.notchWidth = savedWidth > 0 ? CGFloat(savedWidth) : Self.defaultWidth
         self.textAreaHeight = savedHeight > 0 ? CGFloat(savedHeight) : Self.defaultHeight
         self.speechLocale = UserDefaults.standard.string(forKey: "speechLocale") ?? Self.defaultLocale
+        self.appLanguage = AppLanguage(rawValue: UserDefaults.standard.string(forKey: "appLanguage") ?? "") ?? .system
         self.fontSizePreset = FontSizePreset(rawValue: UserDefaults.standard.string(forKey: "fontSizePreset") ?? "") ?? .lg
         self.fontFamilyPreset = FontFamilyPreset(rawValue: UserDefaults.standard.string(forKey: "fontFamilyPreset") ?? "") ?? .sans
         self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white
@@ -494,5 +537,11 @@ class NotchSettings {
         self.directorModeEnabled = UserDefaults.standard.object(forKey: "directorModeEnabled") as? Bool ?? false
         let savedDirectorPort = UserDefaults.standard.integer(forKey: "directorServerPort")
         self.directorServerPort = savedDirectorPort > 0 ? UInt16(savedDirectorPort) : 7575
+        persistAppLanguagePreference()
+    }
+
+    private func persistAppLanguagePreference() {
+        UserDefaults.standard.set(appLanguage.rawValue, forKey: "appLanguage")
+        UserDefaults.standard.set([effectiveAppLanguageCode], forKey: "AppleLanguages")
     }
 }

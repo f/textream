@@ -11,6 +11,7 @@ import CoreImage.CIFilterBuiltins
 
 struct ContentView: View {
     @ObservedObject private var service = TextreamService.shared
+    @State private var settings = NotchSettings.shared
     @State private var isRunning = false
     @State private var isRecording = false
     @State private var dictation = DictationManager()
@@ -19,26 +20,16 @@ struct ContentView: View {
     @State private var editorCaretPosition: Int = 0
     @State private var isDroppingPresentation = false
     @State private var dropError: String?
-    @State private var dropAlertTitle: String = "Import Error"
+    @State private var dropAlertTitle: String = L10n.tr("Import Error")
     @State private var showSettings = false
     @State private var showAbout = false
     @FocusState private var isTextFocused: Bool
 
-    private let defaultText = """
-Welcome to Textream! This is your personal teleprompter that sits right below your MacBook's notch. [smile]
-
-As you read aloud, the text will highlight in real-time, following your voice. The speech recognition matches your words and keeps track of your progress. [pause]
-
-You can pause at any time, go back and re-read sections, and the highlighting will follow along. When you finish reading all the text, the overlay will automatically close with a smooth animation. [nod]
-
-Try reading this passage out loud to see how the highlighting works. The waveform at the bottom shows your voice activity, and you'll see the last few words you spoke displayed next to it.
-
-Happy presenting! [wave]
-"""
+    private var defaultText: String { L10n.tr("default.script") }
 
     private var languageLabel: String {
-        let locale = NotchSettings.shared.speechLocale
-        return Locale.current.localizedString(forIdentifier: locale)
+        let locale = settings.speechLocale
+        return settings.effectiveAppLocale.localizedString(forIdentifier: locale)
             ?? locale
     }
 
@@ -282,10 +273,10 @@ Happy presenting! [wave]
                     Image(systemName: "doc.text")
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(Color.accentColor)
-                    Text("Drop PowerPoint (.pptx) file")
+                    Text(L10n.tr("Drop PowerPoint (.pptx) file"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
-                    Text("For Keynote or Google Slides,\nexport as PPTX first.")
+                    Text(L10n.tr("For Keynote or Google Slides,\nexport as PPTX first."))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -309,15 +300,15 @@ Happy presenting! [wave]
                         let ext = url.pathExtension.lowercased()
                         if ext == "key" {
                             DispatchQueue.main.async {
-                                dropAlertTitle = "Conversion Required"
-                                dropError = "Keynote files can't be imported directly. Please export your Keynote presentation as PowerPoint (.pptx) first, then drop the exported file here."
+                                dropAlertTitle = L10n.tr("Conversion Required")
+                                dropError = L10n.tr("Keynote files can't be imported directly. Please export your Keynote presentation as PowerPoint (.pptx) first, then drop the exported file here.")
                             }
                             return
                         }
                         guard ext == "pptx" else {
                             DispatchQueue.main.async {
-                                dropAlertTitle = "Import Error"
-                                dropError = "Unsupported file. Drop a PowerPoint (.pptx) file."
+                                dropAlertTitle = L10n.tr("Import Error")
+                                dropError = L10n.tr("Unsupported file. Drop a PowerPoint (.pptx) file.")
                             }
                             return
                         }
@@ -340,10 +331,10 @@ Happy presenting! [wave]
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.secondary)
 
-            Text("Director Mode")
+            Text(L10n.tr("Director Mode"))
                 .font(.system(size: 22, weight: .bold))
 
-            Text(service.directorIsReading ? "Reading from director…" : "Waiting for director to send script…")
+            Text(service.directorIsReading ? L10n.tr("Reading from director…") : L10n.tr("Waiting for director to send script…"))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
@@ -382,7 +373,7 @@ Happy presenting! [wave]
             Button {
                 showSettings = true
             } label: {
-                Text("Open Settings")
+                Text(L10n.tr("Open Settings"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -406,7 +397,7 @@ Happy presenting! [wave]
 
     var body: some View {
         Group {
-            if NotchSettings.shared.directorModeEnabled {
+            if settings.directorModeEnabled {
                 directorOverlay
             } else {
                 NavigationSplitView {
@@ -418,7 +409,7 @@ Happy presenting! [wave]
             }
         }
         .alert(dropAlertTitle, isPresented: Binding(get: { dropError != nil }, set: { if !$0 { dropError = nil } })) {
-            Button("OK") { dropError = nil }
+            Button(L10n.tr("OK")) { dropError = nil }
         } message: {
             Text(dropError ?? "")
         }
@@ -436,7 +427,7 @@ Happy presenting! [wave]
                                     .fill(.orange)
                                     .frame(width: 6, height: 6)
                             }
-                            Text(service.currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
+                            Text(service.currentFileURL?.deletingPathExtension().lastPathComponent ?? L10n.tr("Untitled"))
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                         }
@@ -454,7 +445,7 @@ Happy presenting! [wave]
                         HStack(spacing: 3) {
                             Image(systemName: "plus")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text("Page")
+                            Text(L10n.tr("Page"))
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.secondary)
@@ -465,11 +456,11 @@ Happy presenting! [wave]
                         showSettings = true
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: NotchSettings.shared.listeningMode.icon)
+                            Image(systemName: settings.listeningMode.icon)
                                 .font(.system(size: 10))
-                            Text(NotchSettings.shared.listeningMode == .wordTracking
+                            Text(settings.listeningMode == .wordTracking
                                  ? languageLabel
-                                 : NotchSettings.shared.listeningMode.label)
+                                 : settings.listeningMode.label)
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                         }
@@ -481,7 +472,7 @@ Happy presenting! [wave]
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView(settings: NotchSettings.shared)
+            SettingsView(settings: settings)
         }
         .sheet(isPresented: $showAbout) {
             AboutView()
@@ -521,7 +512,7 @@ Happy presenting! [wave]
 
     private func pagePreview(_ page: String) -> String {
         let trimmed = page.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "Empty" }
+        if trimmed.isEmpty { return L10n.tr("Empty") }
         let words = trimmed.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         let preview = words.prefix(5).joined(separator: " ")
         return preview.count > 30 ? String(preview.prefix(30)) + "…" : preview
@@ -564,7 +555,7 @@ Happy presenting! [wave]
                         Button(role: .destructive) {
                             removePage(at: index)
                         } label: {
-                            Label("Delete Page", systemImage: "trash")
+                            Label(L10n.tr("Delete Page"), systemImage: "trash")
                         }
                     }
                 }
@@ -578,7 +569,7 @@ Happy presenting! [wave]
                     service.currentPageIndex = service.pages.count - 1
                 }
             } label: {
-                Label("Add Page", systemImage: "plus")
+                Label(L10n.tr("Add Page"), systemImage: "plus")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -644,6 +635,7 @@ Happy presenting! [wave]
                 }
             } catch {
                 DispatchQueue.main.async {
+                    dropAlertTitle = L10n.tr("Import Error")
                     dropError = error.localizedDescription
                     isImporting = false
                 }
@@ -662,6 +654,7 @@ Happy presenting! [wave]
 
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var settings = NotchSettings.shared
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -681,13 +674,13 @@ struct AboutView: View {
             VStack(spacing: 4) {
                 Text("Textream")
                     .font(.system(size: 20, weight: .bold))
-                Text("Version \(appVersion)")
+                Text(L10n.tr("Version %@", appVersion))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
             // Description
-            Text("A free, open-source teleprompter that highlights your script in real-time as you speak.")
+            Text(L10n.tr("A free, open-source teleprompter that highlights your script in real-time as you speak."))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -714,7 +707,7 @@ struct AboutView: View {
                         Image(systemName: "heart.fill")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.pink)
-                        Text("Donate")
+                        Text(L10n.tr("Donate"))
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundStyle(.primary)
@@ -728,15 +721,15 @@ struct AboutView: View {
             Divider().padding(.horizontal, 20)
 
             VStack(spacing: 4) {
-                Text("Made by Fatih Kadir Akin")
+                Text(L10n.tr("Made by Fatih Kadir Akin"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text("Original idea by Semih Kışlar")
+                Text(L10n.tr("Original idea by Semih Kışlar"))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
 
-            Button("OK") {
+            Button(L10n.tr("OK")) {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
@@ -746,6 +739,7 @@ struct AboutView: View {
         .padding(24)
         .frame(width: 320)
         .background(.ultraThinMaterial)
+        .environment(\.locale, settings.effectiveAppLocale)
     }
 }
 
