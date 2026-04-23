@@ -69,5 +69,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Textream uses the camera to detect hand gestures for hands-free script control.</string>
 </dict>
 </plist>

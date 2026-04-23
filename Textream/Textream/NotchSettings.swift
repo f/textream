@@ -415,6 +415,10 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(selectedMicUID, forKey: "selectedMicUID") }
     }
 
+    var handGestureRewind: Bool {
+        didSet { UserDefaults.standard.set(handGestureRewind, forKey: "handGestureRewind") }
+    }
+
     var autoNextPage: Bool {
         didSet { UserDefaults.standard.set(autoNextPage, forKey: "autoNextPage") }
     }
@@ -494,6 +498,7 @@ class NotchSettings {
         self.hideFromScreenShare = UserDefaults.standard.object(forKey: "hideFromScreenShare") as? Bool ?? true
         self.showElapsedTime = UserDefaults.standard.object(forKey: "showElapsedTime") as? Bool ?? true
         self.selectedMicUID = UserDefaults.standard.string(forKey: "selectedMicUID") ?? ""
+        self.handGestureRewind = UserDefaults.standard.object(forKey: "handGestureRewind") as? Bool ?? true
         self.autoNextPage = UserDefaults.standard.object(forKey: "autoNextPage") as? Bool ?? false
         let savedDelay = UserDefaults.standard.integer(forKey: "autoNextPageDelay")
         self.autoNextPageDelay = savedDelay > 0 ? savedDelay : 3
