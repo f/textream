@@ -159,11 +159,29 @@ struct NotchPreviewContent: View {
 
             ZStack(alignment: .top) {
                 // Shape: concave corners flatten via cornerPhase, then cross-fade to rounded via offsetPhase
-                DynamicIslandShape(
-                    topInset: 16 * (1 - cornerPhase),
-                    bottomRadius: 18
-                )
-                .fill(.black)
+                let isTransparent = settings.overlayTransparency && settings.overlayMode == .pinned
+                Group {
+                    if isTransparent {
+                        ZStack {
+                            NotchBlurView()
+                            DynamicIslandShape(
+                                topInset: 16 * (1 - cornerPhase),
+                                bottomRadius: 18
+                            )
+                            .fill(.black.opacity(1.0 - settings.overlayTransparencyOpacity))
+                        }
+                        .clipShape(DynamicIslandShape(
+                            topInset: 16 * (1 - cornerPhase),
+                            bottomRadius: 18
+                        ))
+                    } else {
+                        DynamicIslandShape(
+                            topInset: 16 * (1 - cornerPhase),
+                            bottomRadius: 18
+                        )
+                        .fill(.black)
+                    }
+                }
                 .opacity(Double(1 - offsetPhase))
                 .frame(width: currentWidth, height: contentHeight)
 
@@ -825,6 +843,48 @@ struct SettingsView: View {
                             onRefresh: { refreshOverlayScreens() }
                         )
                     }
+
+                    Divider()
+
+                    Toggle(isOn: $settings.overlayTransparency) {
+                        Text("Transparency")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+
+                    Text("Makes the overlay see-through so desktop content shows through.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+
+                    if settings.overlayTransparency {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Amount")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(settings.overlayTransparencyOpacity * 100))%")
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Slider(
+                                value: $settings.overlayTransparencyOpacity,
+                                in: 0.2...0.95,
+                                step: 0.05
+                            )
+                            HStack {
+                                Text("More transparent")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.tertiary)
+                                Spacer()
+                                Text("Less transparent")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
 
                 if settings.overlayMode == .floating {
@@ -1358,6 +1418,8 @@ struct SettingsView: View {
         settings.pinnedScreenID = 0
         settings.floatingGlassEffect = false
         settings.glassOpacity = 0.15
+        settings.overlayTransparency = false
+        settings.overlayTransparencyOpacity = 0.85
         settings.followCursorWhenUndocked = false
         settings.fullscreenScreenID = 0
         settings.externalDisplayMode = .off

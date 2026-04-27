@@ -534,6 +534,19 @@ struct StopButtonView: View {
     }
 }
 
+// MARK: - Notch Blur View (for transparency mode)
+
+struct NotchBlurView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.blendingMode = .behindWindow
+        v.material = .hudWindow
+        v.state = .active
+        return v
+    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
 // MARK: - Dynamic Island Shape (concave top corners, convex bottom corners)
 
 struct DynamicIslandShape: Shape {
@@ -699,13 +712,34 @@ struct NotchOverlayView: View {
             let currentWidth = notchWidth + (geo.size.width - notchWidth) * expansion
 
             ZStack(alignment: .top) {
-                // Container shape
-                DynamicIslandShape(
-                    topInset: currentTopInset,
-                    bottomRadius: currentBottomRadius
-                )
-                .fill(.black)
-                .frame(width: currentWidth, height: currentHeight)
+                // Container shape — solid black or transparent with blur
+                let isTransparent = NotchSettings.shared.overlayTransparency
+                let transparencyOpacity = NotchSettings.shared.overlayTransparencyOpacity
+
+                if isTransparent {
+                    // Blurred background layer clipped to the Dynamic Island shape
+                    NotchBlurView()
+                        .clipShape(DynamicIslandShape(
+                            topInset: currentTopInset,
+                            bottomRadius: currentBottomRadius
+                        ))
+                        .frame(width: currentWidth, height: currentHeight)
+
+                    // Dark tint overlay so text remains readable
+                    DynamicIslandShape(
+                        topInset: currentTopInset,
+                        bottomRadius: currentBottomRadius
+                    )
+                    .fill(.black.opacity(1.0 - transparencyOpacity))
+                    .frame(width: currentWidth, height: currentHeight)
+                } else {
+                    DynamicIslandShape(
+                        topInset: currentTopInset,
+                        bottomRadius: currentBottomRadius
+                    )
+                    .fill(.black)
+                    .frame(width: currentWidth, height: currentHeight)
+                }
 
                 // Content - appears after container expands
                 if contentVisible {
@@ -721,7 +755,7 @@ struct NotchOverlayView: View {
 
                         if content.showPagePicker {
                             pagePickerView
-                        } else if isDone {
+                        } else if isDone && (listeningMode == .wordTracking || hasNextPage) {
                             doneView
                         } else {
                             prompterView
@@ -765,12 +799,19 @@ struct NotchOverlayView: View {
         .animation(.easeInOut(duration: 0.5), value: isDone)
         .onChange(of: isDone) { _, done in
             if done {
-                // Stop listening when page is done
-                speechRecognizer.stop()
+                // In word tracking mode, stop listening when page is done
+                if listeningMode == .wordTracking {
+                    speechRecognizer.stop()
+                }
                 if !hasNextPage {
-                    // Show "Done" briefly, then auto-dismiss
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        speechRecognizer.shouldDismiss = true
+                    // Only auto-dismiss in word tracking mode.
+                    // In classic/silence-paused modes the speaker may still be
+                    // talking after the auto-scroll finishes, so keep the text
+                    // visible and let them dismiss manually (X button or Esc).
+                    if listeningMode == .wordTracking {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            speechRecognizer.shouldDismiss = true
+                        }
                     }
                 } else if NotchSettings.shared.autoNextPage {
                     startCountdown()
@@ -1213,7 +1254,7 @@ struct FloatingOverlayView: View {
         VStack(spacing: 0) {
             if content.showPagePicker {
                 floatingPagePickerView
-            } else if isDone {
+            } else if isDone && (listeningMode == .wordTracking || hasNextPage) {
                 floatingDoneView
             } else {
                 floatingPrompterView
@@ -1260,11 +1301,14 @@ struct FloatingOverlayView: View {
         .animation(.easeInOut(duration: 0.5), value: isDone)
         .onChange(of: isDone) { _, done in
             if done {
-                // Stop listening when page is done
-                speechRecognizer.stop()
+                if listeningMode == .wordTracking {
+                    speechRecognizer.stop()
+                }
                 if !hasNextPage {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        speechRecognizer.shouldDismiss = true
+                    if listeningMode == .wordTracking {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            speechRecognizer.shouldDismiss = true
+                        }
                     }
                 } else if followingCursor || NotchSettings.shared.autoNextPage {
                     startCountdown()

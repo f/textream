@@ -390,6 +390,14 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(glassOpacity, forKey: "glassOpacity") }
     }
 
+    var overlayTransparency: Bool {
+        didSet { UserDefaults.standard.set(overlayTransparency, forKey: "overlayTransparency") }
+    }
+
+    var overlayTransparencyOpacity: Double {
+        didSet { UserDefaults.standard.set(overlayTransparencyOpacity, forKey: "overlayTransparencyOpacity") }
+    }
+
     var followCursorWhenUndocked: Bool {
         didSet { UserDefaults.standard.set(followCursorWhenUndocked, forKey: "followCursorWhenUndocked") }
     }
@@ -515,6 +523,9 @@ class NotchSettings {
         self.floatingGlassEffect = UserDefaults.standard.object(forKey: "floatingGlassEffect") as? Bool ?? false
         let savedOpacity = UserDefaults.standard.double(forKey: "glassOpacity")
         self.glassOpacity = savedOpacity > 0 ? savedOpacity : 0.15
+        self.overlayTransparency = UserDefaults.standard.object(forKey: "overlayTransparency") as? Bool ?? false
+        let savedTransparencyOpacity = UserDefaults.standard.double(forKey: "overlayTransparencyOpacity")
+        self.overlayTransparencyOpacity = savedTransparencyOpacity > 0 ? savedTransparencyOpacity : 0.85
         self.followCursorWhenUndocked = UserDefaults.standard.object(forKey: "followCursorWhenUndocked") as? Bool ?? false
         self.externalDisplayMode = ExternalDisplayMode(rawValue: UserDefaults.standard.string(forKey: "externalDisplayMode") ?? "") ?? .off
         let savedScreenID = UserDefaults.standard.integer(forKey: "externalScreenID")

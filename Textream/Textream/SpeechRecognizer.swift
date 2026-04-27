@@ -295,10 +295,10 @@ class SpeechRecognizer {
         recognitionRequest.shouldReportPartialResults = true
 
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        let hardwareFormat = inputNode.outputFormat(forBus: 0)
 
         // Guard against invalid format during device transitions (e.g. mic switch)
-        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+        guard hardwareFormat.sampleRate > 0, hardwareFormat.channelCount > 0 else {
             // Retry after a longer delay to let the audio system settle
             if retryCount < maxRetries {
                 retryCount += 1
@@ -309,6 +309,17 @@ class SpeechRecognizer {
             }
             return
         }
+
+        // SFSpeechRecognizer requires mono audio. Multi-channel devices (e.g.
+        // RODECaster Pro II at 2ch/48kHz) cause the recognition task to silently
+        // return no results. Request a mono tap and let AVAudioEngine downmix.
+        let monoFormat = AVAudioFormat(
+            commonFormat: hardwareFormat.commonFormat,
+            sampleRate: hardwareFormat.sampleRate,
+            channels: 1,
+            interleaved: hardwareFormat.isInterleaved
+        )
+        let tapFormat = (hardwareFormat.channelCount > 1) ? monoFormat : hardwareFormat
 
         // Observe audio configuration changes (e.g. mic switched externally) to restart gracefully
         configurationChangeObserver = NotificationCenter.default.addObserver(
@@ -323,7 +334,7 @@ class SpeechRecognizer {
         // Belt-and-suspenders: ensure no stale tap exists before installing
         inputNode.removeTap(onBus: 0)
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             recognitionRequest.append(buffer)
 
             guard let channelData = buffer.floatChannelData?[0] else { return }
