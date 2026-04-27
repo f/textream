@@ -5,6 +5,10 @@
 <h1 align="center">Textream</h1>
 
 <p align="center">
+  <a href="README_ch.md">简体中文</a>
+</p>
+
+<p align="center">
   <strong>A free macOS teleprompter with real-time word tracking, classic auto-scroll, and voice-activated scrolling.</strong>
 </p>
 
