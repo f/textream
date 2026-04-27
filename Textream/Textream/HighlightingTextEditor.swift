@@ -96,7 +96,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
         weak var textView: NSTextView?
 
         private static let annotationPattern = try! NSRegularExpression(
-            pattern: "\\[[^\\]]+\\]",
+            pattern: "\\[[^\\]]+\\]|【[^】]+】|〔[^〕]+〕|（[^）]+）|［[^］]+］",
             options: []
         )
 

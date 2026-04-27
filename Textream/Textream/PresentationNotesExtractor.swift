@@ -18,11 +18,11 @@ enum PresentationNotesExtractor {
         var errorDescription: String? {
             switch self {
             case .unsupportedFormat:
-                return "Unsupported file format. Please drop a .pptx or .key file."
+                return L10n.tr("Unsupported file format. Please drop a .pptx or .key file.")
             case .extractionFailed(let detail):
-                return "Failed to extract notes: \(detail)"
+                return L10n.tr("Failed to extract notes: %@", detail)
             case .noNotesFound:
-                return "No presenter notes found in this presentation."
+                return L10n.tr("No presenter notes found in this presentation.")
             }
         }
     }
@@ -56,7 +56,7 @@ enum PresentationNotesExtractor {
         process.waitUntilExit()
 
         guard process.terminationStatus == 0 else {
-            throw ExtractionError.extractionFailed("Could not unzip PPTX file.")
+            throw ExtractionError.extractionFailed(L10n.tr("Could not unzip PPTX file."))
         }
 
         let notesDir = tempDir.appendingPathComponent("ppt/notesSlides")

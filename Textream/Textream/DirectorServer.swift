@@ -314,7 +314,7 @@ class DirectorServer {
     static func generateHTML(wsPort: UInt16, authToken: String) -> String {
         """
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="\(NotchSettings.shared.effectiveAppLanguageCode)">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -413,7 +413,7 @@ class DirectorServer {
 
         <div id="status-bar">
           <div id="status-dot"></div>
-          <div id="status-text">Connecting…</div>
+          <div id="status-text">\(L10n.html("Connecting…"))</div>
           <div id="progress-text"></div>
         </div>
 
@@ -421,24 +421,28 @@ class DirectorServer {
           <div id="editor-container">
             <div id="read-text"></div>
             <div id="read-divider"></div>
-            <div id="edit-text" contenteditable="true" data-placeholder="Type or paste your script here…" spellcheck="false"></div>
+            <div id="edit-text" contenteditable="true" data-placeholder="\(L10n.html("Type or paste your script here…"))" spellcheck="false"></div>
           </div>
         </div>
 
         <div id="controls">
-          <button id="go-btn" class="ctrl-btn" onclick="toggleGo()">▶ Go</button>
+          <button id="go-btn" class="ctrl-btn" onclick="toggleGo()">▶ \(L10n.html("Go"))</button>
           <div id="waveform"></div>
           <div id="mic-indicator">🎤</div>
         </div>
 
         <div id="done-overlay">
           <div class="check">✓</div>
-          <div class="label">Done!</div>
-          <button class="reset-btn" onclick="resetAll()">New Script</button>
+          <div class="label">\(L10n.html("Done!"))</div>
+          <button class="reset-btn" onclick="resetAll()">\(L10n.html("New Script"))</button>
         </div>
 
         <script>
         const WSP=\(wsPort),host=location.hostname,AUTH_TOKEN='\(authToken)';
+        const STR_CONNECTED='\(L10n.js("Connected"))';
+        const STR_RECONNECTING='\(L10n.js("Reconnecting…"))';
+        const STR_GO='\(L10n.js("Go"))';
+        const STR_STOP='\(L10n.js("Stop"))';
         let ws,rt,isActive=false,isRunning=false,lastReadCount=0;
 
         /* ---- connection ---- */
@@ -447,11 +451,11 @@ class DirectorServer {
           ws.onopen=()=>{clearTimeout(rt);
             ws.send(JSON.stringify({type:'auth',text:AUTH_TOKEN}));
             document.getElementById('status-dot').className='connected';
-            document.getElementById('status-text').textContent='Connected';};
+            document.getElementById('status-text').textContent=STR_CONNECTED;};
           ws.onmessage=e=>{try{handleState(JSON.parse(e.data))}catch(x){console.error(x)}};
           ws.onclose=()=>{
             document.getElementById('status-dot').className='';
-            document.getElementById('status-text').textContent='Reconnecting…';
+            document.getElementById('status-text').textContent=STR_RECONNECTING;
             rt=setTimeout(connect,1500);};
           ws.onerror=()=>{ws.close()};
         }
@@ -559,10 +563,10 @@ class DirectorServer {
         function updateGoButton(){
           const btn=document.getElementById('go-btn');
           if(isRunning){
-            btn.textContent='⏹ Stop';
+            btn.textContent='⏹ '+STR_STOP;
             btn.classList.add('running');
           } else {
-            btn.textContent='▶ Go';
+            btn.textContent='▶ '+STR_GO;
             btn.classList.remove('running');
           }
         }

@@ -102,6 +102,14 @@ class SpeechRecognizer {
     private var sessionGeneration: Int = 0
     private var suppressConfigChange: Bool = false
 
+    private var speechLocaleIdentifier: String {
+        NotchSettings.shared.speechLocale
+    }
+
+    private var isChineseSpeechLocale: Bool {
+        speechLocaleIdentifier.hasPrefix("zh")
+    }
+
     /// Update the source text while preserving the current recognized char count.
     /// Used by Director Mode to live-edit unread text without resetting read progress.
     func updateText(_ text: String, preservingCharCount: Int) {
@@ -141,7 +149,7 @@ class SpeechRecognizer {
         // Check microphone permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream."
+            error = L10n.tr("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
             openMicrophoneSettings()
             return
         case .notDetermined:
@@ -150,7 +158,7 @@ class SpeechRecognizer {
                     if granted {
                         self?.requestSpeechAuthAndBegin()
                     } else {
-                        self?.error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream."
+                        self?.error = L10n.tr("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
                     }
                 }
             }
@@ -171,7 +179,7 @@ class SpeechRecognizer {
                 case .authorized:
                     self?.beginRecognition()
                 default:
-                    self?.error = "Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream."
+                    self?.error = L10n.tr("Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream.")
                     self?.openSpeechRecognitionSettings()
                 }
             }
@@ -278,7 +286,7 @@ class SpeechRecognizer {
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
         guard let speechRecognizer, speechRecognizer.isAvailable else {
-            error = "Speech recognizer not available"
+            error = L10n.tr("Speech recognizer not available")
             return
         }
 
@@ -296,7 +304,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                error = "Audio input unavailable"
+                error = L10n.tr("Audio input unavailable")
                 isListening = false
             }
             return
@@ -384,7 +392,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                self.error = "Audio engine failed: \(error.localizedDescription)"
+                self.error = L10n.tr("Audio engine failed: %@", error.localizedDescription)
                 isListening = false
             }
         }
@@ -402,8 +410,9 @@ class SpeechRecognizer {
     // MARK: - Fuzzy character-level matching
 
     private func matchCharacters(spoken: String) {
-        // Strategy 1: character-level fuzzy match from the start offset
-        let charResult = charLevelMatch(spoken: spoken)
+        let charResult = charMatchCandidates(for: spoken)
+            .map(charLevelMatch(normalizedSpoken:))
+            .max() ?? 0
 
         // Strategy 2: word-level match (handles STT word substitutions)
         let wordResult = wordLevelMatch(spoken: spoken)
@@ -417,10 +426,29 @@ class SpeechRecognizer {
         }
     }
 
-    private func charLevelMatch(spoken: String) -> Int {
+    private func charMatchCandidates(for spoken: String) -> [String] {
+        let normalizedSpoken = Self.normalize(spoken)
+        guard !normalizedSpoken.isEmpty else { return [normalizedSpoken] }
+
+        let normalizedSourcePrefix = Self.normalize(String(sourceText.dropFirst(matchStartOffset)))
+        let fillerLength = leadingSpeechFillerLength(
+            in: normalizedSpoken,
+            sourcePrefix: normalizedSourcePrefix,
+            localeIdentifier: speechLocaleIdentifier
+        )
+
+        var candidates = [normalizedSpoken]
+        if fillerLength > 0 && fillerLength < normalizedSpoken.count {
+            candidates.append(String(normalizedSpoken.dropFirst(fillerLength)))
+        }
+        var seen = Set<String>()
+        return candidates.filter { seen.insert($0).inserted }
+    }
+
+    private func charLevelMatch(normalizedSpoken: String) -> Int {
         let remainingSource = String(sourceText.dropFirst(matchStartOffset))
-        let src = Array(remainingSource.lowercased().unicodeScalars).map { Character($0) }
-        let spk = Array(Self.normalize(spoken).unicodeScalars).map { Character($0) }
+        let src = Array(Self.foldForCharMatch(remainingSource))
+        let spk = Array(normalizedSpoken)
 
         var si = 0
         var ri = 0
@@ -446,10 +474,24 @@ class SpeechRecognizer {
                 ri += 1
                 lastGoodOrigIndex = si
             } else {
-                // Try to re-sync: look ahead in both strings
                 var found = false
 
-                // Skip up to 3 chars in spoken (STT inserted extra chars)
+                let spokenSuffix = String(spk[ri...])
+                let sourceSuffix = String(src[si...])
+                let fillerSkip = leadingSpeechFillerLength(
+                    in: spokenSuffix,
+                    sourcePrefix: sourceSuffix,
+                    localeIdentifier: speechLocaleIdentifier
+                )
+                if fillerSkip > 0 {
+                    let nextRI = ri + fillerSkip
+                    if nextRI < spk.count && spk[nextRI] == sc {
+                        ri = nextRI
+                        found = true
+                    }
+                }
+                if found { continue }
+
                 let maxSkipR = min(3, spk.count - ri - 1)
                 if maxSkipR >= 1 {
                     for skipR in 1...maxSkipR {
@@ -488,15 +530,13 @@ class SpeechRecognizer {
     }
 
     private static func isAnnotationWord(_ word: String) -> Bool {
-        if word.hasPrefix("[") && word.hasSuffix("]") { return true }
-        let stripped = word.filter { $0.isLetter || $0.isNumber }
-        return stripped.isEmpty
+        isAnnotationToken(word)
     }
 
     private func wordLevelMatch(spoken: String) -> Int {
         let remainingSource = String(sourceText.dropFirst(matchStartOffset))
-        let sourceWords = remainingSource.split(separator: " ").map { String($0) }
-        let spokenWords = spoken.lowercased().split(separator: " ").map { String($0) }
+        let sourceWords = splitTextIntoWords(remainingSource)
+        let spokenWords = splitTextIntoWords(spoken)
 
         var si = 0 // source word index
         var ri = 0 // spoken word index
@@ -511,10 +551,8 @@ class SpeechRecognizer {
                 continue
             }
 
-            let srcWord = sourceWords[si].lowercased()
-                .filter { $0.isLetter || $0.isNumber }
-            let spkWord = spokenWords[ri]
-                .filter { $0.isLetter || $0.isNumber }
+            let srcWord = Self.normalize(sourceWords[si]).replacingOccurrences(of: " ", with: "")
+            let spkWord = Self.normalize(spokenWords[ri]).replacingOccurrences(of: " ", with: "")
 
             if srcWord == spkWord || isFuzzyMatch(srcWord, spkWord) {
                 // Count original chars including trailing punctuation, plus space
@@ -527,9 +565,9 @@ class SpeechRecognizer {
             } else {
                 // Try skipping up to 3 spoken words (STT hallucinated words)
                 var foundSpk = false
-                let maxSpkSkip = min(3, spokenWords.count - ri - 1)
+                let maxSpkSkip = min(isChineseSpeechLocale ? 6 : 3, spokenWords.count - ri - 1)
                 for skip in 1...max(1, maxSpkSkip) where skip <= maxSpkSkip {
-                    let nextSpk = spokenWords[ri + skip].filter { $0.isLetter || $0.isNumber }
+                    let nextSpk = Self.normalize(spokenWords[ri + skip]).replacingOccurrences(of: " ", with: "")
                     if srcWord == nextSpk || isFuzzyMatch(srcWord, nextSpk) {
                         ri += skip
                         foundSpk = true
@@ -540,9 +578,9 @@ class SpeechRecognizer {
 
                 // Try skipping up to 3 source words (user read fast, STT missed words)
                 var foundSrc = false
-                let maxSrcSkip = min(3, sourceWords.count - si - 1)
+                let maxSrcSkip = min(isChineseSpeechLocale ? 6 : 3, sourceWords.count - si - 1)
                 for skip in 1...max(1, maxSrcSkip) where skip <= maxSrcSkip {
-                    let nextSrc = sourceWords[si + skip].lowercased().filter { $0.isLetter || $0.isNumber }
+                    let nextSrc = Self.normalize(sourceWords[si + skip]).replacingOccurrences(of: " ", with: "")
                     if nextSrc == spkWord || isFuzzyMatch(nextSrc, spkWord) {
                         // Add all skipped source words' char counts
                         for s in 0..<skip {
@@ -581,6 +619,13 @@ class SpeechRecognizer {
         if a.isEmpty || b.isEmpty { return false }
         // Exact match
         if a == b { return true }
+        let containsCJK = a.unicodeScalars.contains(where: \.isCJK) || b.unicodeScalars.contains(where: \.isCJK)
+        if containsCJK {
+            let shorter = min(a.count, b.count)
+            if shorter <= 1 { return false }
+            if a.hasPrefix(b) || b.hasPrefix(a) { return true }
+            return shorter >= 3 && editDistance(a, b) <= 1
+        }
         // One starts with the other (phonetic prefix: "not" ~ "notch")
         if a.hasPrefix(b) || b.hasPrefix(a) { return true }
         // One contains the other
@@ -612,7 +657,11 @@ class SpeechRecognizer {
     }
 
     private static func normalize(_ text: String) -> String {
-        text.lowercased()
-            .filter { $0.isLetter || $0.isNumber || $0.isWhitespace }
+        normalizedSpeechText(text)
+    }
+
+    private static func foldForCharMatch(_ text: String) -> String {
+        let folded = text.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? text
+        return folded.lowercased()
     }
 }

@@ -59,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func removeUnwantedMenus() {
         guard let mainMenu = NSApp.mainMenu else { return }
         // Remove View and Window menus (keep Edit for copy/paste)
-        let menusToRemove = ["View", "Window"]
+        let menusToRemove = ["View", "Window", "显示", "窗口"]
         for title in menusToRemove {
             if let index = mainMenu.items.firstIndex(where: { $0.title == title }) {
                 mainMenu.removeItem(at: index)
@@ -115,10 +115,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 @main
 struct TextreamApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var settings = NotchSettings.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(\.locale, settings.effectiveAppLocale)
                 .onOpenURL { url in
                     if url.pathExtension == "textream" {
                         TextreamService.shared.openFileAtURL(url)
@@ -132,41 +134,41 @@ struct TextreamApp: App {
 
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Textream") {
+                Button(L10n.tr("About Textream")) {
                     NotificationCenter.default.post(name: .openAbout, object: nil)
                 }
                 Divider()
-                Button("Check for Updates…") {
+                Button(L10n.tr("Check for Updates…")) {
                     UpdateChecker.shared.checkForUpdates()
                 }
             }
             CommandGroup(after: .appSettings) {
-                Button("Settings…") {
+                Button(L10n.tr("Settings…")) {
                     NotificationCenter.default.post(name: .openSettings, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(replacing: .newItem) {
-                Button("Open File or Presentation…") {
+                Button(L10n.tr("Open File or Presentation…")) {
                     TextreamService.shared.openFile()
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
                 Divider()
 
-                Button("Save") {
+                Button(L10n.tr("Save")) {
                     TextreamService.shared.saveFile()
                 }
                 .keyboardShortcut("s", modifiers: .command)
 
-                Button("Save As…") {
+                Button(L10n.tr("Save As…")) {
                     TextreamService.shared.saveFileAs()
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .windowArrangement) { }
             CommandGroup(replacing: .help) {
-                Button("Textream Help") {
+                Button(L10n.tr("Textream Help")) {
                     if let url = URL(string: "https://github.com/f/textream") {
                         NSWorkspace.shared.open(url)
                     }

@@ -298,7 +298,7 @@ class BrowserServer {
     static func generateHTML(wsPort: UInt16) -> String {
         """
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="\(NotchSettings.shared.effectiveAppLanguageCode)">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -385,9 +385,9 @@ class BrowserServer {
 
         <div id="waiting">
           <div class="icon">📡</div>
-          <div class="title">Waiting for Textream…</div>
-          <div class="sub">Start reading in the app to see your teleprompter here</div>
-          <div class="url" id="conn-status">Connecting…</div>
+          <div class="title">\(L10n.html("Waiting for Textream…"))</div>
+          <div class="sub">\(L10n.html("Start reading in the app to see your teleprompter here"))</div>
+          <div class="url" id="conn-status">\(L10n.html("Connecting…"))</div>
         </div>
 
         <div id="main">
@@ -403,11 +403,13 @@ class BrowserServer {
 
         <div id="done">
           <div class="check">✓</div>
-          <div class="label">Done!</div>
+          <div class="label">\(L10n.html("Done!"))</div>
         </div>
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
+        const STR_CONNECTED='\(L10n.js("Connected"))';
+        const STR_RECONNECTING='\(L10n.js("Reconnecting…"))';
         let ws,rt,prevWordKey='',scrollTgt=null;
 
         /* ---- helpers ---- */
@@ -425,15 +427,29 @@ class BrowserServer {
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
 
-        // Detect annotation words: [bracket] or emoji-only (no letters/digits)
+        // Detect annotation words: bracketed cues or emoji/punctuation-only tokens
         function isAnnotation(w){
-          if(w.startsWith('[')&&w.endsWith(']'))return true;
-          return!/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(w);
+          const readable=/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]/;
+          const cuePairs=[
+            ['[',']'],
+            ['【','】'],
+            ['〔','〕'],
+            ['（','）'],
+            ['［','］']
+          ];
+          for(const [open,close] of cuePairs){
+            if(w.startsWith(open)&&w.endsWith(close)){
+              const inner=w.slice(open.length,w.length-close.length).trim();
+              if(inner&&inner.length<=24&&!/[。！？!?;；\\n\\r]/.test(inner))return true;
+            }
+          }
+          return!readable.test(w);
         }
 
         // Count letters+digits in a word
         function letterCount(w){
-          let n=0;for(const ch of w)if(/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(ch))n++;
+          const readable=/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]/;
+          let n=0;for(const ch of w)if(readable.test(ch))n++;
           return Math.max(1,n);
         }
 
@@ -442,10 +458,10 @@ class BrowserServer {
         function connect(){
           ws=new WebSocket('ws://'+host+':'+WSP);
           ws.onopen=()=>{clearTimeout(rt);
-            document.getElementById('conn-status').textContent='Connected';};
+            document.getElementById('conn-status').textContent=STR_CONNECTED;};
           ws.onmessage=e=>{try{render(JSON.parse(e.data))}catch(x){console.error(x)}};
           ws.onclose=()=>{
-            document.getElementById('conn-status').textContent='Reconnecting…';
+            document.getElementById('conn-status').textContent=STR_RECONNECTING;
             rt=setTimeout(connect,1500);};
           ws.onerror=()=>{ws.close()};
         }
