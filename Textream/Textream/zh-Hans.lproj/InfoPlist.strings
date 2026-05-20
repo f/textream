@@ -1,0 +1,8 @@
+"CFBundleDisplayName" = "Textream";
+"CFBundleTypeName" = "Textream 文档";
+"NSMicrophoneUsageDescription" = "Textream 需要访问麦克风，以便聆听你的朗读并高亮对应文字。";
+"NSMenuItem" = "在 Textream 中朗读";
+"NSSpeechRecognitionUsageDescription" = "Textream 使用语音识别来跟随你的朗读，并高亮当前词语。";
+"Read in Textream" = "在 Textream 中朗读";
+"Textream Document" = "Textream 文档";
+"UTTypeDescription" = "Textream 文档";
