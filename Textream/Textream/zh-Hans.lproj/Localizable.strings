@@ -175,3 +175,4 @@
 "web.director.placeholder" = "在这里输入或粘贴你的脚本…";
 "web.director.stop" = "停止";
 "web.reconnecting" = "正在重新连接…";
+"settings.height" = "高度";

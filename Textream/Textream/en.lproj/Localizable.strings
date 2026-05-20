@@ -175,3 +175,4 @@
 "web.director.placeholder" = "Type or paste your script here…";
 "web.director.stop" = "Stop";
 "web.reconnecting" = "Reconnecting…";
+"settings.height" = "Height";
