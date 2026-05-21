@@ -187,12 +187,10 @@ struct NotchPreviewContent: View {
 
                 Group {
                     if settings.floatingGlassEffect {
-                        ZStack {
-                            GlassEffectView()
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.black.opacity(settings.glassOpacity))
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        LiquidGlassBackdrop(
+                            shape: RoundedRectangle(cornerRadius: 16, style: .continuous),
+                            tintOpacity: settings.glassOpacity
+                        )
                     } else {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(.black)
@@ -403,7 +401,7 @@ struct SettingsView: View {
         }
         .frame(width: 500)
         .frame(minHeight: 280, maxHeight: 500)
-        .background(.ultraThinMaterial)
+        .textreamGlass(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .alert("settings.resetAll.confirm.title", isPresented: $showResetConfirmation) {
             Button("common.cancel", role: .cancel) { }
             Button("settings.reset", role: .destructive) {

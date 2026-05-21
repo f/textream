@@ -59,20 +59,8 @@ struct ContentView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
 
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
-            pill
-                .glassEffect(in: .capsule)
-        } else {
-            pill
-                .background(.ultraThinMaterial, in: Capsule())
-                .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        }
-        #else
         pill
-            .background(.ultraThinMaterial, in: Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        #endif
+            .textreamGlass(in: Capsule(), tint: .red.opacity(0.05))
     }
 
     @State private var highlightClearTimer: Timer?
@@ -415,7 +403,7 @@ struct ContentView: View {
             Text(dropError ?? "")
         }
         .frame(minWidth: 360, minHeight: 240)
-        .background(.ultraThinMaterial)
+        .textreamWindowGlass()
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 8) {
@@ -735,7 +723,7 @@ struct AboutView: View {
         }
         .padding(24)
         .frame(width: 320)
-        .background(.ultraThinMaterial)
+        .textreamGlass(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
