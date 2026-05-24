@@ -119,6 +119,8 @@ View your teleprompter on **any device** — phone, tablet, or another computer 
 - **Enable in Settings → Remote** — Starts a lightweight HTTP + WebSocket server on your Mac.
 - **QR code** — Scan the generated QR code from your phone or tablet to open the teleprompter instantly.
 - **Real-time sync** — Words highlight, waveform animates, and progress updates in real time over WebSocket.
+- **Mirror toggle (per device)** — Tap **Mirror** in the remote view to flip horizontally for teleprompter glass.
+- **Mirror URL override** — Append `?mirror=1` (mirrored) or `?mirror=0` (normal), for example `http://YOUR-IP:7373?mirror=1`.
 - **No app needed** — Works in any modern browser. No installation required on the remote device.
 - **Configurable port** — Default port 7373, adjustable in advanced settings.
 - **Fully local** — All traffic stays on your local network. Nothing leaves your Wi-Fi.
