@@ -382,6 +382,14 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(followCursorWhenUndocked, forKey: "followCursorWhenUndocked") }
     }
 
+    var floatingMirrorDisplay: Bool {
+        didSet { UserDefaults.standard.set(floatingMirrorDisplay, forKey: "floatingMirrorDisplay") }
+    }
+
+    var floatingMirrorAxis: MirrorAxis {
+        didSet { UserDefaults.standard.set(floatingMirrorAxis.rawValue, forKey: "floatingMirrorAxis") }
+    }
+
     var externalDisplayMode: ExternalDisplayMode {
         didSet { UserDefaults.standard.set(externalDisplayMode.rawValue, forKey: "externalDisplayMode") }
     }
@@ -425,6 +433,14 @@ class NotchSettings {
 
     var fullscreenScreenID: UInt32 {
         didSet { UserDefaults.standard.set(Int(fullscreenScreenID), forKey: "fullscreenScreenID") }
+    }
+
+    var fullscreenMirrorDisplay: Bool {
+        didSet { UserDefaults.standard.set(fullscreenMirrorDisplay, forKey: "fullscreenMirrorDisplay") }
+    }
+
+    var fullscreenMirrorAxis: MirrorAxis {
+        didSet { UserDefaults.standard.set(fullscreenMirrorAxis.rawValue, forKey: "fullscreenMirrorAxis") }
     }
 
     var browserServerEnabled: Bool {
@@ -484,6 +500,8 @@ class NotchSettings {
         let savedTransparencyOpacity = UserDefaults.standard.double(forKey: "overlayTransparencyOpacity")
         self.overlayTransparencyOpacity = savedTransparencyOpacity > 0 ? savedTransparencyOpacity : 0.85
         self.followCursorWhenUndocked = UserDefaults.standard.object(forKey: "followCursorWhenUndocked") as? Bool ?? false
+        self.floatingMirrorDisplay = UserDefaults.standard.object(forKey: "floatingMirrorDisplay") as? Bool ?? false
+        self.floatingMirrorAxis = MirrorAxis(rawValue: UserDefaults.standard.string(forKey: "floatingMirrorAxis") ?? "") ?? .horizontal
         self.externalDisplayMode = ExternalDisplayMode(rawValue: UserDefaults.standard.string(forKey: "externalDisplayMode") ?? "") ?? .off
         let savedScreenID = UserDefaults.standard.integer(forKey: "externalScreenID")
         self.externalScreenID = UInt32(savedScreenID)
@@ -499,6 +517,8 @@ class NotchSettings {
         self.autoNextPageDelay = savedDelay > 0 ? savedDelay : 3
         let savedFullscreenScreenID = UserDefaults.standard.integer(forKey: "fullscreenScreenID")
         self.fullscreenScreenID = UInt32(savedFullscreenScreenID)
+        self.fullscreenMirrorDisplay = UserDefaults.standard.object(forKey: "fullscreenMirrorDisplay") as? Bool ?? false
+        self.fullscreenMirrorAxis = MirrorAxis(rawValue: UserDefaults.standard.string(forKey: "fullscreenMirrorAxis") ?? "") ?? .horizontal
         self.browserServerEnabled = UserDefaults.standard.object(forKey: "browserServerEnabled") as? Bool ?? false
         let savedPort = UserDefaults.standard.integer(forKey: "browserServerPort")
         self.browserServerPort = savedPort > 0 ? UInt16(savedPort) : 7373
