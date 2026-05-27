@@ -68,6 +68,10 @@ struct HighlightingTextEditor: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
 
+        if textView.hasMarkedText() {
+            return
+        }
+
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text
@@ -106,12 +110,14 @@ struct HighlightingTextEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            guard !textView.hasMarkedText() else { return }
             parent.text = textView.string
             applyHighlighting(textView)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            guard !textView.hasMarkedText() else { return }
             let pos = textView.selectedRange().location
             if parent.editorCaretPosition != pos {
                 DispatchQueue.main.async { [weak self] in
@@ -141,6 +147,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
 
         func applyHighlighting(_ textView: NSTextView) {
             guard let textStorage = textView.textStorage else { return }
+            guard !textView.hasMarkedText() else { return }
             let fullRange = NSRange(location: 0, length: textStorage.length)
             let text = textStorage.string
 
