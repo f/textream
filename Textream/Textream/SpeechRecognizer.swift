@@ -300,7 +300,9 @@ class SpeechRecognizer {
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
         guard let speechRecognizer, speechRecognizer.isAvailable else {
-            error = "Speech recognizer not available"
+            // Recognizer temporarily unavailable (e.g. during session transition on macOS Tahoe)
+            // Retry instead of stopping — fixes ~58s mic dropout on Italian + Apple Silicon
+            scheduleBeginRecognition(after: 0.5)
             return
         }
 
@@ -562,7 +564,7 @@ class SpeechRecognizer {
 
     private func startPreemptiveTimer() {
         preemptiveRestartTimer?.invalidate()
-        preemptiveRestartTimer = Timer.scheduledTimer(withTimeInterval: 55.0, repeats: true) { [weak self] _ in
+        preemptiveRestartTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: true) { [weak self] _ in
             guard let self, self.isListening, !self.sourceText.isEmpty else { return }
             self.restartTask()
         }
