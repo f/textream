@@ -46,9 +46,10 @@ struct AudioInputDevice: Identifiable, Hashable {
                 mScope: kAudioObjectPropertyScopeGlobal,
                 mElement: kAudioObjectPropertyElementMain
             )
-            var uid: CFString = "" as CFString
-            var uidSize = UInt32(MemoryLayout<CFString>.size)
+            var uid: Unmanaged<CFString>? = nil
+            var uidSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
             guard AudioObjectGetPropertyData(deviceID, &uidAddress, 0, nil, &uidSize, &uid) == noErr else { continue }
+            let uidValue = uid?.takeRetainedValue() as String? ?? ""
 
             // Get name
             var nameAddress = AudioObjectPropertyAddress(
@@ -56,11 +57,12 @@ struct AudioInputDevice: Identifiable, Hashable {
                 mScope: kAudioObjectPropertyScopeGlobal,
                 mElement: kAudioObjectPropertyElementMain
             )
-            var name: CFString = "" as CFString
-            var nameSize = UInt32(MemoryLayout<CFString>.size)
+            var name: Unmanaged<CFString>? = nil
+            var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
             guard AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &name) == noErr else { continue }
+            let nameValue = name?.takeRetainedValue() as String? ?? ""
 
-            result.append(AudioInputDevice(id: deviceID, uid: uid as String, name: name as String))
+            result.append(AudioInputDevice(id: deviceID, uid: uidValue, name: nameValue))
         }
         return result
     }
@@ -79,6 +81,8 @@ class SpeechRecognizer {
     var lastSpokenText: String = ""
     var shouldDismiss: Bool = false
     var shouldAdvancePage: Bool = false
+    private var lastSpokenContext: String = ""
+    private var lastPartialSpoken: String = ""
 
     /// True when recent audio levels indicate the user is actively speaking
     var isSpeaking: Bool {
@@ -130,6 +134,32 @@ class SpeechRecognizer {
         }
     }
 
+    private func forceRestartAfterTimeout() {
+        print("Timeout restart - recreating audio engine")
+        
+        // Save state
+        let savedOffset = recognizedCharCount
+        let savedSource = sourceText
+        
+        // Full stop
+        cleanupRecognition()
+        
+        // Recreate engine (essential!)
+        audioEngine = AVAudioEngine()
+        
+        // Restore state
+        sourceText = savedSource
+        recognizedCharCount = savedOffset
+        matchStartOffset = savedOffset
+        recentMatchPositions = []
+        retryCount = 0
+        
+        // Small delay to release resources
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            self?.beginRecognition()
+        }
+    }
+    
     func start(with text: String) {
         // Clean up any previous session immediately so pending restarts
         // and stale taps are removed before the async auth callback fires.
@@ -307,15 +337,20 @@ class SpeechRecognizer {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest else { return }
         recognitionRequest.shouldReportPartialResults = true
-
-        // Add contextual strings from the source text to improve STT accuracy
+        
+        // Add context from last spoken words
+        var allContext: [String] = []
+        if !lastSpokenContext.isEmpty {
+            allContext.append(lastSpokenContext)
+        }
+        // Context for remaining text
         let upcoming = String(sourceText.dropFirst(matchStartOffset))
         let contextWords = upcoming.split(separator: " ")
             .map { String($0).lowercased().filter { $0.isLetter || $0.isNumber } }
             .filter { $0.count >= 5 }
-        let uniqueContextWords = Array(Set(contextWords).prefix(50))
-        if !uniqueContextWords.isEmpty {
-            recognitionRequest.contextualStrings = uniqueContextWords
+        allContext.append(contentsOf: Array(Set(contextWords)).prefix(50))
+        if !allContext.isEmpty {
+            recognitionRequest.contextualStrings = allContext
         }
 
         let inputNode = audioEngine.inputNode
@@ -386,6 +421,7 @@ class SpeechRecognizer {
                 DispatchQueue.main.async {
                     // Ignore stale results from a previous session
                     guard self.sessionGeneration == currentGeneration else { return }
+                    self.lastPartialSpoken = spoken
                     self.retryCount = 0 // Reset on success
                     self.lastSpokenText = spoken
                     self.matchCharacters(spoken: spoken)
@@ -393,7 +429,7 @@ class SpeechRecognizer {
             }
             if let error {
                 DispatchQueue.main.async {
-                    // If recognitionRequest is nil, cleanup already ran (intentional cancel) — don't retry
+                    guard self.sessionGeneration == currentGeneration else { return }
                     guard self.recognitionRequest != nil else { return }
                     guard self.isListening && !self.shouldDismiss && !self.sourceText.isEmpty else {
                         self.isListening = false
@@ -410,13 +446,18 @@ class SpeechRecognizer {
                     let isTimeout = nsError.code == 1110 || nsError.code == 216
 
                     if isTimeout {
-                        // Expected timeout — restart immediately, no retry limit
                         self.retryCount = 0
-                        if self.audioEngine.isRunning {
-                            self.restartTask()
-                        } else {
-                            self.scheduleBeginRecognition(after: 0.1)
+                        // Advance with the last partial phrase before interruption
+                        if !self.lastPartialSpoken.isEmpty {
+                            let extraMatch = self.charLevelMatch(spoken: self.lastPartialSpoken)
+                            self.recognizedCharCount = min(
+                                self.matchStartOffset + extraMatch,
+                                self.sourceText.count
+                            )
+                            self.matchStartOffset = self.recognizedCharCount
                         }
+                        // After a timeout, ALWAYS perform a full engine restart
+                        self.forceRestartAfterTimeout()
                     } else if self.retryCount < self.maxRetries {
                         self.retryCount += 1
                         let delay = min(Double(self.retryCount) * 0.5, 1.5)
@@ -470,25 +511,41 @@ class SpeechRecognizer {
         // Update match offset before restarting
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
-
-        // Cancel any pending restart to avoid stale beginRecognition clobbering this session
+        
+        // Cancel any pending restart
         pendingRestart?.cancel()
         pendingRestart = nil
-
-        // Cancel the old task and atomically swap to a new request under lock.
-        // The lock prevents the audio tap from appending to the old request
-        // between endAudio() and the new assignment.
+        
+        // IMPORTANT: Do NOT stop audioEngine or remove the tap
+        // Only stop the recognition task, not the audio stream
+        
+        // Lock the old request and task
+        requestLock.lock()
+        let oldRequest = recognitionRequest
+        recognitionRequest = nil  // Prevent new appends
+        requestLock.unlock()
+        
+        oldRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        
+        // Create a NEW request but reuse the same audioEngine (still running)
         let newRequest = SFSpeechAudioBufferRecognitionRequest()
         newRequest.shouldReportPartialResults = true
-
-        // Add contextual strings for the remaining text
+        
+        // Add context from last spoken words
+        var allContext: [String] = []
+        if !lastSpokenContext.isEmpty {
+            allContext.append(lastSpokenContext)
+        }
+        // Context for remaining text
         let upcoming = String(sourceText.dropFirst(matchStartOffset))
         let contextWords = upcoming.split(separator: " ")
             .map { String($0).lowercased().filter { $0.isLetter || $0.isNumber } }
             .filter { $0.count >= 5 }
-        let uniqueWords = Array(Set(contextWords).prefix(50))
-        if !uniqueWords.isEmpty {
-            newRequest.contextualStrings = uniqueWords
+        allContext.append(contentsOf: Array(Set(contextWords)).prefix(50))
+        if !allContext.isEmpty {
+            newRequest.contextualStrings = allContext
         }
 
         // Nil out recognitionRequest before cancelling the old task so the
@@ -519,6 +576,7 @@ class SpeechRecognizer {
                 let spoken = result.bestTranscription.formattedString
                 DispatchQueue.main.async {
                     guard self.sessionGeneration == currentGeneration else { return }
+                    self.lastPartialSpoken = spoken
                     self.retryCount = 0
                     self.lastSpokenText = spoken
                     self.matchCharacters(spoken: spoken)
@@ -531,19 +589,23 @@ class SpeechRecognizer {
                         self.isListening = false
                         return
                     }
-
+                    
                     self.matchStartOffset = self.recognizedCharCount
-
                     let nsError = error as NSError
                     let isTimeout = nsError.code == 1110 || nsError.code == 216
-
+                    
                     if isTimeout {
                         self.retryCount = 0
-                        if self.audioEngine.isRunning {
-                            self.restartTask()
-                        } else {
-                            self.scheduleBeginRecognition(after: 0.1)
+                        if !self.lastPartialSpoken.isEmpty {
+                            let extraMatch = self.charLevelMatch(spoken: self.lastPartialSpoken)
+                            self.recognizedCharCount = min(
+                                self.matchStartOffset + extraMatch,
+                                self.sourceText.count
+                            )
+                            self.matchStartOffset = self.recognizedCharCount
                         }
+                        // CORRECT: full restart instead of restartTask()
+                        self.forceRestartAfterTimeout()
                     } else if self.retryCount < self.maxRetries {
                         self.retryCount += 1
                         let delay = min(Double(self.retryCount) * 0.5, 1.5)
@@ -554,18 +616,17 @@ class SpeechRecognizer {
                 }
             }
         }
-
-        startPreemptiveTimer()
     }
-
+        
     // MARK: - Pre-emptive restart timer
 
     private func startPreemptiveTimer() {
-        preemptiveRestartTimer?.invalidate()
-        preemptiveRestartTimer = Timer.scheduledTimer(withTimeInterval: 55.0, repeats: true) { [weak self] _ in
-            guard let self, self.isListening, !self.sourceText.isEmpty else { return }
-            self.restartTask()
-        }
+        // Timer disabled - let natural timeout handle the restart
+        // preemptiveRestartTimer?.invalidate()
+        // preemptiveRestartTimer = Timer.scheduledTimer(withTimeInterval: 55.0, repeats: true) { [weak self] _ in
+        //     guard let self, self.isListening, !self.sourceText.isEmpty else { return }
+        //     self.restartTask()
+        // }
     }
 
     private func stopPreemptiveTimer() {
@@ -625,6 +686,10 @@ class SpeechRecognizer {
 
         if confirmed || smallStep {
             recognizedCharCount = candidate
+            
+            // Preserve last 5 words for next restart context
+            let contextWords = spoken.split(separator: " ").map(String.init).suffix(5)
+            lastSpokenContext = contextWords.joined(separator: " ")
         }
     }
 
