@@ -326,9 +326,7 @@ class SpeechRecognizer {
             recognitionRequest.shouldReportPartialResults = true
 
             let upcoming = String(sourceText.dropFirst(matchStartOffset))
-            let contextWords = upcoming.split(separator: " ")
-                .map { String($0).lowercased().filter { $0.isLetter || $0.isNumber } }
-                .filter { $0.count >= 5 }
+            let contextWords = Self.cjkContextWords(from: upcoming)
             let uniqueContextWords = Array(Set(contextWords).prefix(50))
             if !uniqueContextWords.isEmpty {
                 recognitionRequest.contextualStrings = uniqueContextWords
@@ -489,9 +487,7 @@ class SpeechRecognizer {
         newRequest.shouldReportPartialResults = true
 
         let upcoming = String(sourceText.dropFirst(matchStartOffset))
-        let contextWords = upcoming.split(separator: " ")
-            .map { String($0).lowercased().filter { $0.isLetter || $0.isNumber } }
-            .filter { $0.count >= 5 }
+        let contextWords = Self.cjkContextWords(from: upcoming)
         let uniqueWords = Array(Set(contextWords).prefix(50))
         if !uniqueWords.isEmpty {
             newRequest.contextualStrings = uniqueWords
@@ -693,6 +689,7 @@ class SpeechRecognizer {
 
         let home = NSHomeDirectory()
         let candidates = [
+            "\(home)/Tools/本地语音大模型/SenseVoice.cpp/build/bin/sense-voice-stream",
             "\(home)/Tools/SenseVoice.cpp/build/bin/sense-voice-stream",
         ]
 
@@ -757,13 +754,18 @@ class SpeechRecognizer {
         let charResult = charLevelMatch(spoken: spoken)
         let wordResult = wordLevelMatch(spoken: spoken)
         let spokenCompactCount = compactCharacters(from: spoken).count
+        let isCJK = Self.hasCJKCharacters(sourceText)
 
         let best: Int
-        let tolerance = 20
-        if abs(charResult - wordResult) <= tolerance {
-            best = (charResult + wordResult) / 2
+        if isCJK {
+            best = max(charResult, wordResult)
         } else {
-            best = min(charResult, wordResult)
+            let tolerance = 20
+            if abs(charResult - wordResult) <= tolerance {
+                best = (charResult + wordResult) / 2
+            } else {
+                best = min(charResult, wordResult)
+            }
         }
 
         var newCount = matchStartOffset + best
@@ -794,7 +796,7 @@ class SpeechRecognizer {
             recentMatchPositions.removeFirst()
         }
 
-        let agreementThreshold = 10
+        let agreementThreshold = isCJK ? 25 : 10
         var confirmed = false
         if recentMatchPositions.count >= 2 {
             var agreeCount = 0
@@ -806,7 +808,9 @@ class SpeechRecognizer {
             confirmed = agreeCount >= 2
         }
 
-        let smallStep = candidate - recognizedCharCount <= 15
+        let smallStep = isCJK
+            ? (candidate - recognizedCharCount <= 25)
+            : (candidate - recognizedCharCount <= 15)
 
         if confirmed || smallStep {
             recognizedCharCount = candidate
@@ -1357,13 +1361,51 @@ class SpeechRecognizer {
         if a == b { return true }
         if a.hasPrefix(b) || b.hasPrefix(a) { return true }
         if a.contains(b) || b.contains(a) { return true }
-        let shared = zip(a, b).prefix(while: { $0 == $1 }).count
+
         let shorter = min(a.count, b.count)
+        if shorter <= 2 && Self.hasCJKCharacters(a) { return false }
+        if shorter <= 2 && Self.hasCJKCharacters(b) { return false }
+
+        let shared = zip(a, b).prefix(while: { $0 == $1 }).count
         if shorter >= 2 && shared >= max(2, shorter * 3 / 5) { return true }
         let dist = editDistance(a, b)
         if shorter <= 4 { return dist <= 1 }
         if shorter <= 8 { return dist <= 2 }
         return dist <= max(a.count, b.count) / 3
+    }
+
+    private static func cjkContextWords(from splitText: String) -> [String] {
+        let parts = splitText.split(separator: " ").map(String.init)
+        var words: [String] = []
+        var buffer = ""
+        for part in parts {
+            let cleaned = part.lowercased().filter { $0.isLetter || $0.isNumber }
+            if cleaned.count == 1, Self.hasCJKCharacters(cleaned) {
+                buffer += cleaned
+            } else {
+                if !buffer.isEmpty {
+                    words.append(buffer)
+                    buffer = ""
+                }
+                if !cleaned.isEmpty {
+                    words.append(cleaned)
+                }
+            }
+        }
+        if !buffer.isEmpty {
+            words.append(buffer)
+        }
+        return words
+    }
+
+    private static func hasCJKCharacters(_ s: String) -> Bool {
+        s.unicodeScalars.contains { scalar in
+            let v = scalar.value
+            return (v >= 0x4E00 && v <= 0x9FFF)
+                || (v >= 0x3400 && v <= 0x4DBF)
+                || (v >= 0x20000 && v <= 0x2A6DF)
+                || (v >= 0xF900 && v <= 0xFAFF)
+        }
     }
 
     private func editDistance(_ a: String, _ b: String) -> Int {
