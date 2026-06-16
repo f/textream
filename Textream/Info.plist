@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDisplayName</key>
+	<string>auto-cue</string>
 	<key>ATSApplicationFontsPath</key>
 	<string>.</string>
 	<key>CFBundleDocumentTypes</key>
@@ -57,12 +59,12 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Read in Textream</string>
+				<string>Read in auto-cue</string>
 			</dict>
 			<key>NSMessage</key>
-			<string>readInTextream</string>
+			<string>readInAutoCue</string>
 			<key>NSPortName</key>
-			<string>Textream</string>
+			<string>auto-cue</string>
 			<key>NSSendTypes</key>
 			<array>
 				<string>public.utf8-plain-text</string>
