@@ -10,6 +10,7 @@ import AppKit
 import Speech
 import Combine
 import CoreImage.CIFilterBuiltins
+import UniformTypeIdentifiers
 
 // MARK: - Preview Panel Controller
 
@@ -319,6 +320,7 @@ struct SettingsView: View {
     @State private var previewController = NotchPreviewController()
     @State private var selectedTab: SettingsTab = .appearance
     @State private var showResetConfirmation = false
+    @State private var showAppearancePreview = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -415,14 +417,7 @@ struct SettingsView: View {
             Text("这将恢复所有设置到默认值。")
         }
         .onAppear {
-            if settings.overlayMode != .fullscreen {
-                previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
-            }
+            updatePreviewPanelVisibility()
         }
         .onDisappear {
             previewController.dismiss()
@@ -431,6 +426,7 @@ struct SettingsView: View {
             previewController.hide()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard shouldShowAppearancePreview else { return }
             if settings.overlayMode != .fullscreen {
                 previewController.show(settings: settings)
                 if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
@@ -440,7 +436,10 @@ struct SettingsView: View {
                 }
             }
         }
+        .onChange(of: selectedTab) { _, _ in updatePreviewPanelVisibility() }
+        .onChange(of: showAppearancePreview) { _, _ in updatePreviewPanelVisibility() }
         .onChange(of: settings.followCursorWhenUndocked) { _, follow in
+            guard shouldShowAppearancePreview else { return }
             if follow && settings.overlayMode == .floating {
                 previewController.animateToCursor(settings: settings)
             } else {
@@ -448,6 +447,10 @@ struct SettingsView: View {
             }
         }
         .onChange(of: settings.overlayMode) { _, mode in
+            guard shouldShowAppearancePreview else {
+                previewController.hide()
+                return
+            }
             if mode == .fullscreen {
                 previewController.hide()
             } else {
@@ -461,11 +464,38 @@ struct SettingsView: View {
         }
     }
 
+    private var shouldShowAppearancePreview: Bool {
+        showAppearancePreview && selectedTab == .appearance && settings.overlayMode != .fullscreen
+    }
+
+    private func updatePreviewPanelVisibility() {
+        guard shouldShowAppearancePreview else {
+            previewController.dismiss()
+            return
+        }
+
+        previewController.show(settings: settings)
+        if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                previewController.animateToCursor(settings: settings)
+            }
+        } else if previewController.isAtCursor {
+            previewController.animateFromCursor()
+        }
+    }
+
     // MARK: - Appearance Tab
 
     private var appearanceTab: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
+                Toggle(isOn: $showAppearancePreview) {
+                    Text("实时预览（额外窗口）")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+
                 // Font Family
                 Text("字体")
                     .font(.system(size: 13, weight: .medium))
@@ -922,36 +952,96 @@ struct SettingsView: View {
 
     private func importSenseVoiceExecutable() {
         let panel = NSOpenPanel()
-        panel.title = "选择 sense-voice-stream 可执行文件"
-        panel.canChooseFiles = true
+        panel.message = "选择带有流式识别程序的本地语音大模型"
         panel.canChooseDirectories = false
+        panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         panel.prompt = "导入"
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        settings.localSenseVoiceExecutablePath = url.path
+        if panel.runModal() == .OK, let url = panel.url {
+            let path = url.path
+            let fileName = url.lastPathComponent.lowercased()
+            guard fileName.contains("sense-voice-stream") else {
+                showLocalImportWarning("请选择 `sense-voice-stream` 可执行文件，不要选择视频或其他文件。")
+                return
+            }
+
+            let fileManager = FileManager.default
+            if !fileManager.isExecutableFile(atPath: path) {
+                do {
+                    try fileManager.setAttributes([.posixPermissions: NSNumber(value: 0o755)], ofItemAtPath: path)
+                } catch {
+                    // keep old state and report in a user-facing alert
+                }
+            }
+
+            guard fileManager.isExecutableFile(atPath: path) else {
+                showLocalImportWarning("该文件没有可执行权限，请先执行 `chmod +x \"\(path)\"`。")
+                return
+            }
+
+            settings.localSenseVoiceExecutablePath = path
+        }
+    }
+
+    private func showLocalImportWarning(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "导入失败"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
     }
 
     private func importSenseVoiceModel() {
         let panel = NSOpenPanel()
-        panel.title = "选择 .gguf 模型文件"
-        panel.canChooseFiles = true
+        panel.message = "选择本地语音大模型文件（例如 .gguf）"
         panel.canChooseDirectories = false
+        panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
+        var types: [UTType] = []
+        if let gguf = UTType(filenameExtension: "gguf") {
+            types.append(gguf)
+        }
+        if let bin = UTType(filenameExtension: "bin") {
+            types.append(bin)
+        }
+        if !types.isEmpty {
+            panel.allowedContentTypes = types
+        }
         panel.prompt = "导入"
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        settings.localSenseVoiceModelPath = url.path
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.localSenseVoiceModelPath = url.path
+        }
     }
 
     private func autofillSenseVoicePaths() {
-        let home = NSHomeDirectory()
-        let defaultExecutable = "\(home)/Tools/SenseVoice.cpp/build/bin/sense-voice-stream"
         let fileManager = FileManager.default
+        let home = NSHomeDirectory()
 
-        if settings.localSenseVoiceExecutablePath.isEmpty,
-           fileManager.fileExists(atPath: defaultExecutable) {
-            settings.localSenseVoiceExecutablePath = defaultExecutable
+        let executableCandidates = [
+            "\(home)/Tools/本地语音大模型/SenseVoice.cpp/build/bin/sense-voice-stream",
+            "\(home)/Tools/SenseVoice.cpp/build/bin/sense-voice-stream",
+        ]
+        if let executablePath = executableCandidates.first(where: { fileManager.isExecutableFile(atPath: $0) }) {
+            settings.localSenseVoiceExecutablePath = executablePath
+        }
+
+        let modelRoots = [
+            "\(home)/Tools/本地语音大模型/sensevoice-models",
+            "\(home)/Tools/sensevoice-models",
+        ]
+        for modelRoot in modelRoots {
+            if let items = try? fileManager.contentsOfDirectory(atPath: modelRoot) {
+                let models = items
+                    .filter { $0.lowercased().hasSuffix(".gguf") || $0.lowercased().hasSuffix(".bin") }
+                    .sorted()
+                if let firstModel = models.first {
+                    settings.localSenseVoiceModelPath = "\(modelRoot)/\(firstModel)"
+                    break
+                }
+            }
         }
     }
 
@@ -1587,6 +1677,11 @@ struct SettingsView: View {
         settings.selectedMicUID = ""
         settings.autoNextPage = false
         settings.autoNextPageDelay = 3
+        settings.speechEngineMode = .apple
+        settings.localSenseVoiceExecutablePath = ""
+        settings.localSenseVoiceModelPath = ""
+        settings.localSenseVoiceLanguage = "zh"
+        settings.localSenseVoiceDisableGPU = false
         settings.browserServerEnabled = false
         settings.browserServerPort = 7373
         settings.directorModeEnabled = false
