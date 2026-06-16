@@ -24,17 +24,17 @@ struct ContentView: View {
     @State private var showAbout = false
     @FocusState private var isTextFocused: Bool
 
-    private let defaultText = """
-Welcome to Textream! This is your personal teleprompter that sits right below your MacBook's notch. [smile]
+    private let defaultText = String(localized: """
+欢迎使用 auto-cue！这是你的个人提词器，它就在 MacBook 的刘海下方。 [smile]
 
-As you read aloud, the text will highlight in real-time, following your voice. The speech recognition matches your words and keeps track of your progress. [pause]
+当你朗读时，文字会实时高亮，跟随你的声音移动。语音识别会匹配你说的内容，实时跟踪你的进度。 [pause]
 
-You can pause at any time, go back and re-read sections, and the highlighting will follow along. When you finish reading all the text, the overlay will automatically close with a smooth animation. [nod]
+你可以随时暂停、回退重读某段，高亮会跟随你的朗读。当你读完所有文字，覆盖层会自动平滑关闭。 [nod]
 
-Try reading this passage out loud to see how the highlighting works. The waveform at the bottom shows your voice activity, and you'll see the last few words you spoke displayed next to it.
+试试朗读这段文字，看看高亮是如何工作的。底部的波形图显示你的声音活动，旁边会显示你最近说出的几个字。
 
-Happy presenting! [wave]
-"""
+祝演讲愉快！ [wave]
+""")
 
     private var languageLabel: String {
         let locale = NotchSettings.shared.speechLocale
@@ -282,10 +282,10 @@ Happy presenting! [wave]
                     Image(systemName: "doc.text")
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(Color.accentColor)
-                    Text("Drop PowerPoint (.pptx) file")
+                    Text("拖放 PowerPoint (.pptx) 文件")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
-                    Text("For Keynote or Google Slides,\nexport as PPTX first.")
+                    Text("Keynote 或 Google Slides 用户，\n请先导出为 PPTX 格式。")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -309,15 +309,15 @@ Happy presenting! [wave]
                         let ext = url.pathExtension.lowercased()
                         if ext == "key" {
                             DispatchQueue.main.async {
-                                dropAlertTitle = "Conversion Required"
-                                dropError = "Keynote files can't be imported directly. Please export your Keynote presentation as PowerPoint (.pptx) first, then drop the exported file here."
+                                dropAlertTitle = "需要转换"
+                                dropError = "Keynote 文件不能直接导入。请先导出为 PowerPoint (.pptx) 格式，再拖放导出的文件。"
                             }
                             return
                         }
                         guard ext == "pptx" else {
                             DispatchQueue.main.async {
-                                dropAlertTitle = "Import Error"
-                                dropError = "Unsupported file. Drop a PowerPoint (.pptx) file."
+                                dropAlertTitle = "导入错误"
+                                dropError = "不支持的文件格式。请拖放 PowerPoint (.pptx) 文件。"
                             }
                             return
                         }
@@ -340,10 +340,10 @@ Happy presenting! [wave]
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.secondary)
 
-            Text("Director Mode")
+            Text("导演模式")
                 .font(.system(size: 22, weight: .bold))
 
-            Text(service.directorIsReading ? "Reading from director…" : "Waiting for director to send script…")
+            Text(service.directorIsReading ? "正在接收导演的文稿…" : "等待导演发送文稿…")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
@@ -382,7 +382,7 @@ Happy presenting! [wave]
             Button {
                 showSettings = true
             } label: {
-                Text("Open Settings")
+                Text("打开设置")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -454,7 +454,7 @@ Happy presenting! [wave]
                         HStack(spacing: 3) {
                             Image(systemName: "plus")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text("Page")
+                            Text("页面")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.secondary)
@@ -521,7 +521,7 @@ Happy presenting! [wave]
 
     private func pagePreview(_ page: String) -> String {
         let trimmed = page.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "Empty" }
+        if trimmed.isEmpty { return "空页面" }
         let words = trimmed.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         let preview = words.prefix(5).joined(separator: " ")
         return preview.count > 30 ? String(preview.prefix(30)) + "…" : preview
@@ -562,7 +562,7 @@ Happy presenting! [wave]
                         Button(role: .destructive) {
                             removePage(at: index)
                         } label: {
-                            Label("Delete Page", systemImage: "trash")
+                            Label("删除页面", systemImage: "trash")
                         }
                     }
                 }
@@ -576,7 +576,7 @@ Happy presenting! [wave]
                     service.currentPageIndex = service.pages.count - 1
                 }
             } label: {
-                Label("Add Page", systemImage: "plus")
+                Label("添加页面", systemImage: "plus")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -677,15 +677,15 @@ struct AboutView: View {
 
             // App name & version
             VStack(spacing: 4) {
-                Text("Textream")
+                Text("auto-cue")
                     .font(.system(size: 20, weight: .bold))
-                Text("Version \(appVersion)")
+                Text("版本 \(appVersion)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
             // Description
-            Text("A free, open-source teleprompter that highlights your script in real-time as you speak.")
+            Text("一个免费开源的提词器，在你朗读时实时高亮你的文稿。")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -693,7 +693,7 @@ struct AboutView: View {
 
             // Links
             HStack(spacing: 12) {
-                Link(destination: URL(string: "https://github.com/f/textream")!) {
+                Link(destination: URL(string: "https://github.com/Golden0Voyager/auto_cue")!) {
                     HStack(spacing: 5) {
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
                             .font(.system(size: 11, weight: .semibold))
@@ -707,18 +707,18 @@ struct AboutView: View {
                     .clipShape(Capsule())
                 }
 
-                Link(destination: URL(string: "https://donate.stripe.com/aFa8wO4NF2S96jDfn4dMI09")!) {
+                Link(destination: URL(string: "https://github.com/Golden0Voyager/auto_cue")!) {
                     HStack(spacing: 5) {
-                        Image(systemName: "heart.fill")
+                        Image(systemName: "star.fill")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.pink)
-                        Text("Donate")
+                            .foregroundStyle(.yellow)
+                        Text("加星")
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
-                    .background(Color.pink.opacity(0.1))
+                    .background(Color.yellow.opacity(0.1))
                     .clipShape(Capsule())
                 }
             }
@@ -726,15 +726,15 @@ struct AboutView: View {
             Divider().padding(.horizontal, 20)
 
             VStack(spacing: 4) {
-                Text("Made by Fatih Kadir Akin")
+                Text("基于 Textream（作者 Fatih Kadir Akın）")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text("Original idea by Semih Kışlar")
+                Text("原始创意 by Semih Kışlar")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
 
-            Button("OK") {
+            Button("确定") {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
