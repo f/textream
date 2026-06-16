@@ -290,12 +290,12 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .appearance: return "Appearance"
-        case .guidance:   return "Guidance"
-        case .teleprompter: return "Teleprompter"
-        case .external:   return "External"
-        case .browser:    return "Remote"
-        case .director:   return "Director"
+        case .appearance: return "外观"
+        case .guidance:   return "引导"
+        case .teleprompter: return "提词器"
+        case .external:   return "外接"
+        case .browser:    return "远程"
+        case .director:   return "导演"
         }
     }
 
@@ -324,7 +324,7 @@ struct SettingsView: View {
         HStack(spacing: 0) {
             // Sidebar
             VStack(alignment: .leading, spacing: 2) {
-                Text("Settings")
+                Text("设置")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .textCase(.uppercase)
@@ -381,7 +381,7 @@ struct SettingsView: View {
                 Divider()
 
                 HStack {
-                    Button("Reset All") {
+                    Button("重置所有") {
                         showResetConfirmation = true
                     }
                     .buttonStyle(.borderless)
@@ -390,7 +390,7 @@ struct SettingsView: View {
 
                     Spacer()
 
-                    Button("Done") {
+                    Button("完成") {
                         dismiss()
                     }
                     .keyboardShortcut(.defaultAction)
@@ -404,15 +404,15 @@ struct SettingsView: View {
         .frame(width: 500)
         .frame(minHeight: 280, maxHeight: 500)
         .background(.ultraThinMaterial)
-        .alert("Reset All Settings?", isPresented: $showResetConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Reset", role: .destructive) {
+        .alert("重置所有设置？", isPresented: $showResetConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("重置", role: .destructive) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     resetAllSettings()
                 }
             }
         } message: {
-            Text("This will restore all settings to their defaults.")
+            Text("这将恢复所有设置到默认值。")
         }
         .onAppear {
             if settings.overlayMode != .fullscreen {
@@ -467,7 +467,7 @@ struct SettingsView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 // Font Family
-                Text("Font")
+                Text("字体")
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -501,7 +501,7 @@ struct SettingsView: View {
                 }
 
                 // Text Size
-                Text("Size")
+                Text("字号")
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -537,7 +537,7 @@ struct SettingsView: View {
                 Divider()
 
                 // Highlight Color
-                Text("Highlight Color")
+                Text("高亮颜色")
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -582,7 +582,7 @@ struct SettingsView: View {
                 }
 
                 // Cue Color
-                Text("Cue Color")
+                Text("提示颜色")
                     .font(.system(size: 13, weight: .medium))
 
                 HStack(spacing: 8) {
@@ -627,7 +627,7 @@ struct SettingsView: View {
                 }
 
                 // Cue Brightness
-                Text("Cue Brightness")
+                Text("提示亮度")
                     .font(.system(size: 13, weight: .medium))
 
                 Picker("", selection: $settings.cueBrightness) {
@@ -641,13 +641,13 @@ struct SettingsView: View {
                 Divider()
 
                 // Dimensions
-                Text("Dimensions")
+                Text("尺寸")
                     .font(.system(size: 13, weight: .medium))
 
                 VStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Width")
+                            Text("宽度")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -664,7 +664,7 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Height")
+                            Text("高度")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -687,87 +687,273 @@ struct SettingsView: View {
     // MARK: - Guidance Tab
 
     private var guidanceTab: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Picker("", selection: $settings.listeningMode) {
-                ForEach(ListeningMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            Text(settings.listeningMode.description)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            if settings.listeningMode == .wordTracking {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Speech Language")
-                        .font(.system(size: 13, weight: .medium))
-                    Picker("", selection: $settings.speechLocale) {
-                        ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
-                            Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
-                                .tag(locale.identifier)
-                        }
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("", selection: $settings.listeningMode) {
+                    ForEach(ListeningMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
                     }
-                    .labelsHidden()
                 }
-            }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-            if settings.listeningMode != .classic {
-                Divider()
+                Text(settings.listeningMode.description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Microphone")
-                        .font(.system(size: 13, weight: .medium))
-                    Picker("", selection: $settings.selectedMicUID) {
-                        Text("System Default").tag("")
-                        ForEach(availableMics) { mic in
-                            Text(mic.name).tag(mic.uid)
-                        }
-                    }
-                    .labelsHidden()
-                }
-            }
+                if settings.listeningMode == .wordTracking {
+                    Divider()
 
-            if settings.listeningMode != .wordTracking {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Scroll Speed")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("语音引擎")
                             .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text(String(format: "%.1f words/s", settings.scrollSpeed))
-                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                        Picker("", selection: $settings.speechEngineMode) {
+                            ForEach(SpeechEngineMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+
+                        Text(settings.speechEngineMode.description)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
-                    Slider(
-                        value: $settings.scrollSpeed,
-                        in: 0.5...8,
-                        step: 0.5
-                    )
-                    HStack {
-                        Text("Slower")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text("Faster")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
+
+                    if settings.speechEngineMode == .apple {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("语音语言")
+                                .font(.system(size: 13, weight: .medium))
+                            Picker("", selection: $settings.speechLocale) {
+                                ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
+                                    Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+                                        .tag(locale.identifier)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                    }
+
+                    if settings.speechEngineMode == .localSenseVoice {
+                        localSenseVoiceConfigSection
                     }
                 }
-            }
 
-            Spacer()
+                if settings.listeningMode != .classic {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("麦克风")
+                            .font(.system(size: 13, weight: .medium))
+                        Picker("", selection: $settings.selectedMicUID) {
+                            Text("系统默认").tag("")
+                            ForEach(availableMics) { mic in
+                                Text(mic.name).tag(mic.uid)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                }
+
+                if settings.listeningMode != .wordTracking {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("滚动速度")
+                                .font(.system(size: 13, weight: .medium))
+                            Spacer()
+                            Text(String(format: "%.1f 词/秒", settings.scrollSpeed))
+                                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(
+                            value: $settings.scrollSpeed,
+                            in: 0.5...8,
+                            step: 0.5
+                        )
+                        HStack {
+                            Text("更慢")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                            Text("更快")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
         .onAppear { availableMics = AudioInputDevice.allInputDevices() }
     }
 
     @State private var availableMics: [AudioInputDevice] = []
+
+    // MARK: - Local SenseVoice
+
+    private let localSenseVoiceLanguages: [(id: String, label: String)] = [
+        ("auto", "自动"),
+        ("zh", "中文（普通话）"),
+        ("yue", "粤语"),
+        ("en", "英语"),
+        ("ja", "日语"),
+        ("ko", "韩语"),
+    ]
+
+    private var localSenseVoiceConfigSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Divider()
+
+            Text("本地模型")
+                .font(.system(size: 13, weight: .medium))
+
+            localPathRow(
+                title: "识别程序",
+                path: settings.localSenseVoiceExecutablePath,
+                placeholder: "未导入（请选择 sense-voice-stream）"
+            )
+
+            Button("导入识别程序") {
+                importSenseVoiceExecutable()
+            }
+            .controlSize(.small)
+
+            localPathRow(
+                title: "模型文件",
+                path: settings.localSenseVoiceModelPath,
+                placeholder: "未导入（请选择 .gguf 模型）"
+            )
+
+            Button("导入模型文件") {
+                importSenseVoiceModel()
+            }
+            .controlSize(.small)
+
+            HStack(spacing: 8) {
+                Text("语言")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $settings.localSenseVoiceLanguage) {
+                    ForEach(localSenseVoiceLanguages, id: \.id) { lang in
+                        Text(lang.label).tag(lang.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 220)
+            }
+
+            Toggle(isOn: $settings.localSenseVoiceDisableGPU) {
+                Text("兼容模式（禁用 GPU）")
+                    .font(.system(size: 12))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
+            HStack(spacing: 6) {
+                Image(systemName: localSenseVoiceStatus.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(localSenseVoiceStatus.isReady ? .green : .orange)
+                Text(localSenseVoiceStatus.message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 2)
+
+            Button("尝试自动填充默认路径") {
+                autofillSenseVoicePaths()
+            }
+            .buttonStyle(.borderless)
+            .font(.system(size: 11, weight: .medium))
+        }
+    }
+
+    private func localPathRow(title: String, path: String, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Text(path.isEmpty ? placeholder : path)
+                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .foregroundStyle(path.isEmpty ? .tertiary : .primary)
+                .lineLimit(2)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.05))
+                )
+        }
+    }
+
+    private var localSenseVoiceStatus: (isReady: Bool, message: String) {
+        let fileManager = FileManager.default
+
+        guard !settings.localSenseVoiceExecutablePath.isEmpty else {
+            return (false, "请先导入识别程序（sense-voice-stream）。")
+        }
+        guard fileManager.fileExists(atPath: settings.localSenseVoiceExecutablePath) else {
+            return (false, "识别程序路径不存在，请重新导入。")
+        }
+        let executableName = URL(fileURLWithPath: settings.localSenseVoiceExecutablePath).lastPathComponent.lowercased()
+        guard executableName.contains("sense-voice-stream") else {
+            return (false, "请导入 sense-voice-stream（实时识别版本）。")
+        }
+        guard fileManager.isExecutableFile(atPath: settings.localSenseVoiceExecutablePath) else {
+            return (false, "识别程序没有执行权限，请执行 chmod +x 后重试。")
+        }
+
+        guard !settings.localSenseVoiceModelPath.isEmpty else {
+            return (false, "请导入模型文件（.gguf）。")
+        }
+        guard fileManager.fileExists(atPath: settings.localSenseVoiceModelPath) else {
+            return (false, "模型路径不存在，请重新导入。")
+        }
+
+        return (true, "本地模型配置可用，可直接开始逐词跟踪。")
+    }
+
+    private func importSenseVoiceExecutable() {
+        let panel = NSOpenPanel()
+        panel.title = "选择 sense-voice-stream 可执行文件"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "导入"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        settings.localSenseVoiceExecutablePath = url.path
+    }
+
+    private func importSenseVoiceModel() {
+        let panel = NSOpenPanel()
+        panel.title = "选择 .gguf 模型文件"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "导入"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        settings.localSenseVoiceModelPath = url.path
+    }
+
+    private func autofillSenseVoicePaths() {
+        let home = NSHomeDirectory()
+        let defaultExecutable = "\(home)/Tools/SenseVoice.cpp/build/bin/sense-voice-stream"
+        let fileManager = FileManager.default
+
+        if settings.localSenseVoiceExecutablePath.isEmpty,
+           fileManager.fileExists(atPath: defaultExecutable) {
+            settings.localSenseVoiceExecutablePath = defaultExecutable
+        }
+    }
 
     // MARK: - Teleprompter Tab
 
@@ -792,7 +978,7 @@ struct SettingsView: View {
                 if settings.overlayMode == .pinned {
                     Divider()
 
-                    Text("Display")
+                    Text("显示器")
                         .font(.system(size: 13, weight: .medium))
 
                     Picker("", selection: $settings.notchDisplayMode) {
@@ -818,13 +1004,13 @@ struct SettingsView: View {
                     Divider()
 
                     Toggle(isOn: $settings.overlayTransparency) {
-                        Text("Transparency")
+                        Text("透明模式")
                             .font(.system(size: 13, weight: .medium))
                     }
                     .toggleStyle(.switch)
                     .controlSize(.small)
 
-                    Text("Makes the overlay see-through so desktop content shows through.")
+                    Text("让覆盖层变为半透明，显示桌面内容。")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
 
