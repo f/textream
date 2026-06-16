@@ -434,7 +434,7 @@ class TextreamService: NSObject, ObservableObject {
     }
 
     // macOS Services handler
-    @objc func readInTextream(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+    @objc func readInAutoCue(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string) else {
             error.pointee = "No text found on pasteboard" as NSString
             return
