@@ -2,14 +2,18 @@
   <img src="Textream/Textream/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" height="128" alt="Textream icon">
 </p>
 
-<h1 align="center">Textream</h1>
+<h1 align="center">auto-cue</h1>
 
 <p align="center">
-  <strong>A free macOS teleprompter with real-time word tracking, classic auto-scroll, and voice-activated scrolling.</strong>
+  <strong>macOS 智能提词器 — 语音跟词、经典滚动、语音激活，适配任何对屏讲话场景。</strong>
 </p>
 
 <p align="center">
-  Built for streamers, interviewers, presenters, and podcasters.
+  📺 直播 · 🎙️ 采访 · 📽️ 演讲 · 💼 会议 · 🎓 录制
+</p>
+
+<p align="center">
+  <em>Forked from <a href="https://github.com/f/textream">Textream</a> by <a href="https://fka.dev">Fatih Kadir Akin</a></em>
 </p>
 
 <p align="center">
@@ -17,35 +21,29 @@
 </p>
 
 <p align="center">
-  <img src="docs/video.gif" width="600" alt="Textream demo">
+  <img src="docs/video.gif" width="600" alt="auto-cue demo">
 </p>
 
 ---
 
-## What is Textream?
+## What is auto-cue?
 
-Textream is a free, open-source macOS app that guides you through your script with three modes: **word tracking** (highlights each word as you say it), **classic** (constant-speed auto-scroll), and **voice-activated** (scrolls while you speak, pauses when you're silent). It displays your text in a sleek **Dynamic Island-style overlay** at the top of your screen, a **draggable floating window**, or **fullscreen on a Sidecar iPad** — visible only to you, invisible to your audience.
+auto-cue is a free, open-source macOS 提词器 that guides you through your script with three modes: **word tracking** (highlights each word as you say it), **classic** (constant-speed auto-scroll), and **voice-activated** (scrolls while you speak, pauses when you're silent). It displays your text in a sleek **Dynamic Island-style overlay** at the top of your screen, a **draggable floating window**, or **fullscreen on a Sidecar iPad** — visible only to you, invisible to your audience.
 
 Paste your script, hit play, and start speaking. When you're done, the overlay closes automatically.
 
 ## Download
 
-**[Download the latest .dmg from Releases](https://github.com/f/textream/releases/latest)**
-
-Or install with Homebrew:
-
-```bash
-brew install f/textream/textream
-```
+**[Download the latest .dmg from Releases](https://github.com/Golden0Voyager/auto_cue/releases/latest)**
 
 > Requires **macOS 15 Sequoia** or later. Works on Apple Silicon and Intel.
 
 ### First launch
 
-Since Textream is distributed outside the Mac App Store, macOS may block it on first open. Run this once in Terminal:
+Since auto-cue is distributed outside the Mac App Store, macOS may block it on first open. Run this once in Terminal:
 
 ```bash
-xattr -cr /Applications/Textream.app
+xattr -cr /Applications/auto-cue.app
 ```
 
 Then right-click the app → **Open**. After the first launch, macOS remembers your choice.
@@ -56,10 +54,12 @@ Then right-click the app → **Open**. After the first launch, macOS remembers y
 
 | Mode | Description | Microphone |
 |---|---|---|
-| **Word Tracking** (default) | On-device speech recognition highlights each word as you say it. No cloud, no latency, works offline. Supports dozens of languages. | Required |
+| **Word Tracking** (default) | On-device speech recognition highlights each word as you say it. No cloud, no latency, works offline. Supports dozens of languages. Choose between **System Speech** (macOS built-in) or **Local Model** (SenseVoice) for Chinese/CJK. | Required |
 | **Classic** | Auto-scrolls at a constant speed. No microphone needed. | Not needed |
 | **Voice-Activated** | Scrolls while you speak, pauses when you're silent or muted. Perfect for natural pacing. | Required |
 
+- **Speech Engine** — Choose **System Speech** (macOS Speech.framework, supports 50+ languages) or **Local Model** (SenseVoice GGUF model for superior Chinese/CJK accuracy).
+- **Local SenseVoice Model** — import a `sense-voice-stream` executable and a `.gguf` model file in Settings → Guidance to enable high-accuracy offline Chinese, Cantonese, Japanese, and Korean speech recognition.
 - **Scroll speed** — Adjustable 0.5–8 words/s for Classic and Voice-Activated modes.
 - **Speech language** — Choose your preferred speech recognition language for Word Tracking mode.
 - **Mouse scroll to catch up** — In Classic and Voice-Activated modes, scroll with your mouse to jump ahead or back. The timer pauses while you scroll and resumes from the new position.
@@ -149,12 +149,14 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 - **Pause & resume** — Go off-script, take a break, come back. The tracker picks up where you left off.
 - **Mute / unmute** — Toggle the microphone on or off from the overlay in any mode.
 - **Completely private** — All processing happens on-device. No accounts, no tracking, no data leaves your Mac.
-- **Auto update checker** — Checks GitHub Releases for new versions on launch and from the Textream menu.
+- **Bilingual UI** — Fully localized in Chinese and English. Switches automatically based on your system language.
+- **CJK optimizations** — Intelligent Chinese/Japanese/Korean word matching with anchor-based jump detection and compact character indexing for accurate real-time tracking.
+- **Auto update checker** — Checks GitHub Releases for new versions on launch and from the auto-cue menu.
 - **Open source** — MIT licensed. Contributions welcome.
 
 ## Who it's for
 
-| Use case | How Textream helps |
+| Use case | How auto-cue helps |
 |---|---|
 | **Streamers** | Read sponsor segments, announcements, and talking points without looking away from the camera. |
 | **Interviewers** | Keep your questions visible while maintaining natural eye contact with your guest. |
@@ -178,8 +180,8 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 ### Build
 
 ```bash
-git clone https://github.com/f/textream.git
-cd textream/Textream
+git clone https://github.com/Golden0Voyager/auto_cue.git
+cd auto_cue/Textream
 open Textream.xcodeproj
 ```
 
@@ -199,18 +201,19 @@ Textream/
     ├── NotchOverlayController.swift   # Dynamic Island + floating overlay
     ├── ExternalDisplayController.swift # Sidecar / external display output
     ├── NotchSettings.swift            # User preferences and presets
-    ├── SettingsView.swift             # Tabbed settings UI
+    ├── SettingsView.swift             # Tabbed settings UI (zh/en bilingual)
     ├── MarqueeTextView.swift          # Word flow layout and highlighting
     ├── BrowserServer.swift            # Remote connection HTTP + WebSocket server
     ├── DirectorServer.swift           # Director mode HTTP + WebSocket server
     ├── PresentationNotesExtractor.swift # PPTX presenter notes extraction
     ├── UpdateChecker.swift            # GitHub release update checker
+    ├── Localizable.xcstrings          # String catalog (Chinese + English)
     └── Assets.xcassets/               # App icon and colors
 ```
 
 ## URL Scheme
 
-Textream supports the `textream://` URL scheme for launching directly into the overlay:
+auto-cue supports the `textream://` URL scheme for launching directly into the overlay (retained for backward compatibility):
 
 ```
 textream://read?text=Hello%20world
@@ -341,5 +344,6 @@ MIT
 
 <p align="center">
   Original idea by <a href="https://x.com/semihdev">Semih Kışlar</a> — thanks to him!<br>
-  Made by <a href="https://fka.dev">Fatih Kadir Akin</a>
+  Made by <a href="https://fka.dev">Fatih Kadir Akin</a><br>
+  Fork maintained by <a href="https://github.com/Golden0Voyager">Golden0Voyager</a> as <strong>auto-cue</strong>
 </p>
