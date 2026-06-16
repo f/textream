@@ -7,16 +7,16 @@
 | Latest release | ✅ |
 | Older releases | ❌ |
 
-Only the latest release receives security updates. Please keep Textream up to date.
+Only the latest release receives security updates. Please keep auto-cue up to date.
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Textream, **please do not open a public issue.**
+If you discover a security vulnerability in auto-cue, **please do not open a public issue.**
 
 Instead, report it privately:
 
-- **Email:** [fka@fka.dev](mailto:fka@fka.dev)
-- **Subject:** `[SECURITY] Textream — <brief description>`
+- **GitHub Issues:** [https://github.com/Golden0Voyager/auto_cue/issues](https://github.com/Golden0Voyager/auto_cue/issues)
+- **Subject:** `[SECURITY] auto-cue — <brief description>`
 
 Please include:
 
@@ -35,7 +35,7 @@ All speech recognition runs locally via Apple's Speech framework. No audio data,
 
 ### Network Servers
 
-Textream includes two optional network servers that bind to your **local network only**:
+auto-cue includes two optional network servers that bind to your **local network only**:
 
 | Server | Default Port | Purpose |
 |--------|-------------|---------|
@@ -52,7 +52,7 @@ Textream includes two optional network servers that bind to your **local network
 
 ### Permissions
 
-Textream requests the following macOS permissions:
+auto-cue requests the following macOS permissions:
 
 - **Microphone** — Required for speech recognition and voice-activated features.
 - **Speech Recognition** — Required for on-device word tracking.
