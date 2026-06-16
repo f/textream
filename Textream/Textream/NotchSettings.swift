@@ -1,13 +1,4 @@
-//
-//  NotchSettings.swift
-//  Textream
-//
-//  Created by Fatih Kadir Akın on 8.02.2026.
-//
-
 import SwiftUI
-
-// MARK: - Font Size Preset
 
 enum FontSizePreset: String, CaseIterable, Identifiable {
     case xs, sm, lg, xl
@@ -33,8 +24,6 @@ enum FontSizePreset: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Font Family Preset
-
 enum FontFamilyPreset: String, CaseIterable, Identifiable {
     case sans, serif, mono, dyslexia
 
@@ -42,10 +31,10 @@ enum FontFamilyPreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .sans:     return "Sans"
-        case .serif:    return "Serif"
-        case .mono:     return "Mono"
-        case .dyslexia: return "Dyslexia"
+        case .sans:     return "无衬线"
+        case .serif:    return "衬线"
+        case .mono:     return "等宽"
+        case .dyslexia: return "阅读友好"
         }
     }
 
@@ -78,7 +67,6 @@ enum FontFamilyPreset: String, CaseIterable, Identifiable {
             if let dyslexicFont = NSFont(name: "OpenDyslexic3", size: size) {
                 return dyslexicFont
             }
-            // Fallback to rounded system font if OpenDyslexic not available
             if let designed = descriptor.withDesign(.rounded) {
                 return NSFont(descriptor: designed, size: size) ?? base
             }
@@ -86,8 +74,6 @@ enum FontFamilyPreset: String, CaseIterable, Identifiable {
         }
     }
 }
-
-// MARK: - Font Color Preset
 
 enum FontColorPreset: String, CaseIterable, Identifiable {
     case white, yellow, green, blue, pink, orange
@@ -107,12 +93,12 @@ enum FontColorPreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .white:  return "White"
-        case .yellow: return "Yellow"
-        case .green:  return "Green"
-        case .blue:   return "Blue"
-        case .pink:   return "Pink"
-        case .orange: return "Orange"
+        case .white:  return "白色"
+        case .yellow: return "黄色"
+        case .green:  return "绿色"
+        case .blue:   return "蓝色"
+        case .pink:   return "粉色"
+        case .orange: return "橙色"
         }
     }
 
@@ -128,8 +114,6 @@ enum FontColorPreset: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Cue Brightness
-
 enum CueBrightness: String, CaseIterable, Identifiable {
     case dim, low, medium, bright
 
@@ -137,14 +121,13 @@ enum CueBrightness: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .dim:    return "Dim"
-        case .low:    return "Low"
-        case .medium: return "Medium"
-        case .bright: return "Bright"
+        case .dim:    return "较暗"
+        case .low:    return "昏暗"
+        case .medium: return "中等"
+        case .bright: return "明亮"
         }
     }
 
-    /// Opacity for unread annotations
     var unreadOpacity: Double {
         switch self {
         case .dim:    return 0.2
@@ -154,7 +137,6 @@ enum CueBrightness: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Opacity for already-read annotations
     var readOpacity: Double {
         switch self {
         case .dim:    return 0.5
@@ -165,8 +147,6 @@ enum CueBrightness: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Overlay Mode
-
 enum OverlayMode: String, CaseIterable, Identifiable {
     case pinned, floating, fullscreen
 
@@ -174,17 +154,17 @@ enum OverlayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .pinned:     return "Pinned to Notch"
-        case .floating:   return "Floating Window"
-        case .fullscreen: return "Fullscreen"
+        case .pinned:     return "固定在刘海"
+        case .floating:   return "悬浮窗口"
+        case .fullscreen: return "全屏"
         }
     }
 
     var description: String {
         switch self {
-        case .pinned:     return "Anchored below the notch at the top of your screen."
-        case .floating:   return "A draggable window you can place anywhere. Always on top."
-        case .fullscreen: return "Fullscreen teleprompter on the selected display. Press Esc to stop."
+        case .pinned:     return "固定在屏幕顶部刘海下方。"
+        case .floating:   return "可拖拽窗口，可放在任意位置并始终置顶。"
+        case .fullscreen: return "在所选显示器上全屏显示提词器。按 Esc 停止。"
         }
     }
 
@@ -197,8 +177,6 @@ enum OverlayMode: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Notch Display Mode
-
 enum NotchDisplayMode: String, CaseIterable, Identifiable {
     case followMouse, fixedDisplay
 
@@ -206,20 +184,18 @@ enum NotchDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .followMouse:  return "Follow Mouse"
-        case .fixedDisplay: return "Fixed Display"
+        case .followMouse:  return "跟随鼠标"
+        case .fixedDisplay: return "固定显示器"
         }
     }
 
     var description: String {
         switch self {
-        case .followMouse:  return "The notch moves to whichever display your mouse is on."
-        case .fixedDisplay: return "The notch stays on the selected display."
+        case .followMouse:  return "刘海模式会跟随鼠标所在显示器。"
+        case .fixedDisplay: return "刘海模式固定在所选显示器。"
         }
     }
 }
-
-// MARK: - External Display Mode
 
 enum ExternalDisplayMode: String, CaseIterable, Identifiable {
     case off, teleprompter, mirror
@@ -228,22 +204,20 @@ enum ExternalDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .off:          return "Off"
-        case .teleprompter: return "Teleprompter"
-        case .mirror:       return "Mirror"
+        case .off:          return "关闭"
+        case .teleprompter: return "提词器"
+        case .mirror:       return "镜像"
         }
     }
 
     var description: String {
         switch self {
-        case .off:          return "No external display output."
-        case .teleprompter: return "Fullscreen teleprompter on the selected display."
-        case .mirror:       return "Horizontally flipped for use with a prompter mirror rig."
+        case .off:          return "没有外接显示输出。"
+        case .teleprompter: return "在所选显示器上全屏显示提词器。"
+        case .mirror:       return "水平镜像，适用于提词镜。"
         }
     }
 }
-
-// MARK: - Mirror Axis
 
 enum MirrorAxis: String, CaseIterable, Identifiable {
     case horizontal, vertical, both
@@ -252,17 +226,17 @@ enum MirrorAxis: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .horizontal: return "Horizontal"
-        case .vertical:   return "Vertical"
-        case .both:       return "Both"
+        case .horizontal: return "水平"
+        case .vertical:   return "垂直"
+        case .both:       return "双向"
         }
     }
 
     var description: String {
         switch self {
-        case .horizontal: return "Flipped left-to-right. Standard for prompter mirror rigs."
-        case .vertical:   return "Flipped top-to-bottom."
-        case .both:       return "Flipped on both axes (rotated 180°)."
+        case .horizontal: return "左右翻转（提词镜常用模式）。"
+        case .vertical:   return "上下翻转。"
+        case .both:       return "上下左右同时翻转（旋转 180°）。"
         }
     }
 
@@ -281,8 +255,6 @@ enum MirrorAxis: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Listening Mode
-
 enum ListeningMode: String, CaseIterable, Identifiable {
     case wordTracking, classic, silencePaused
 
@@ -290,17 +262,17 @@ enum ListeningMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .classic:        return "Classic"
-        case .silencePaused:  return "Voice-Activated"
-        case .wordTracking:   return "Word Tracking"
+        case .classic:        return "经典"
+        case .silencePaused:  return "语音驱动"
+        case .wordTracking:   return "逐词跟踪"
         }
     }
 
     var description: String {
         switch self {
-        case .classic:        return "Auto-scrolls at a constant speed. No microphone needed."
-        case .silencePaused:  return "Scrolls while you speak, pauses when you're silent."
-        case .wordTracking:   return "Tracks each word you say and highlights it in real time."
+        case .classic:        return "按固定速度自动滚动，无需麦克风。"
+        case .silencePaused:  return "说话时滚动，静音时暂停。"
+        case .wordTracking:   return "实时跟踪你说出的每个词并高亮显示。"
         }
     }
 
@@ -313,7 +285,25 @@ enum ListeningMode: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Settings
+enum SpeechEngineMode: String, CaseIterable, Identifiable {
+    case apple, localSenseVoice
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .apple: return "系统识别"
+        case .localSenseVoice: return "本地模型"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .apple: return "使用 macOS 语音识别（Speech.framework）。"
+        case .localSenseVoice: return "使用本地语音大模型进行识别。"
+        }
+    }
+}
 
 @Observable
 class NotchSettings {
@@ -328,6 +318,26 @@ class NotchSettings {
 
     var speechLocale: String {
         didSet { UserDefaults.standard.set(speechLocale, forKey: "speechLocale") }
+    }
+
+    var speechEngineMode: SpeechEngineMode {
+        didSet { UserDefaults.standard.set(speechEngineMode.rawValue, forKey: "speechEngineMode") }
+    }
+
+    var localSenseVoiceExecutablePath: String {
+        didSet { UserDefaults.standard.set(localSenseVoiceExecutablePath, forKey: "localSenseVoiceExecutablePath") }
+    }
+
+    var localSenseVoiceModelPath: String {
+        didSet { UserDefaults.standard.set(localSenseVoiceModelPath, forKey: "localSenseVoiceModelPath") }
+    }
+
+    var localSenseVoiceLanguage: String {
+        didSet { UserDefaults.standard.set(localSenseVoiceLanguage, forKey: "localSenseVoiceLanguage") }
+    }
+
+    var localSenseVoiceDisableGPU: Bool {
+        didSet { UserDefaults.standard.set(localSenseVoiceDisableGPU, forKey: "localSenseVoiceDisableGPU") }
     }
 
     var fontSizePreset: FontSizePreset {
@@ -398,7 +408,6 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(listeningMode.rawValue, forKey: "listeningMode") }
     }
 
-    /// Words per second for classic and silence-paused modes
     var scrollSpeed: Double {
         didSet { UserDefaults.standard.set(scrollSpeed, forKey: "scrollSpeed") }
     }
@@ -468,6 +477,11 @@ class NotchSettings {
         self.notchWidth = savedWidth > 0 ? CGFloat(savedWidth) : Self.defaultWidth
         self.textAreaHeight = savedHeight > 0 ? CGFloat(savedHeight) : Self.defaultHeight
         self.speechLocale = UserDefaults.standard.string(forKey: "speechLocale") ?? Self.defaultLocale
+        self.speechEngineMode = SpeechEngineMode(rawValue: UserDefaults.standard.string(forKey: "speechEngineMode") ?? "") ?? .apple
+        self.localSenseVoiceExecutablePath = UserDefaults.standard.string(forKey: "localSenseVoiceExecutablePath") ?? ""
+        self.localSenseVoiceModelPath = UserDefaults.standard.string(forKey: "localSenseVoiceModelPath") ?? ""
+        self.localSenseVoiceLanguage = UserDefaults.standard.string(forKey: "localSenseVoiceLanguage") ?? "zh"
+        self.localSenseVoiceDisableGPU = UserDefaults.standard.object(forKey: "localSenseVoiceDisableGPU") as? Bool ?? false
         self.fontSizePreset = FontSizePreset(rawValue: UserDefaults.standard.string(forKey: "fontSizePreset") ?? "") ?? .lg
         self.fontFamilyPreset = FontFamilyPreset(rawValue: UserDefaults.standard.string(forKey: "fontFamilyPreset") ?? "") ?? .sans
         self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white
