@@ -37,9 +37,20 @@ struct ContentView: View {
 """)
 
     private var languageLabel: String {
-        let locale = NotchSettings.shared.speechLocale
-        return Locale.current.localizedString(forIdentifier: locale)
-            ?? locale
+        let settings = NotchSettings.shared
+        if settings.speechEngineMode == .localSenseVoice {
+            let map: [String: String] = [
+                "auto": "自动",
+                "zh": "中文",
+                "yue": "粤语",
+                "en": "英语",
+                "ja": "日语",
+                "ko": "韩语",
+            ]
+            return "本地·" + (map[settings.localSenseVoiceLanguage] ?? settings.localSenseVoiceLanguage)
+        }
+        let locale = settings.speechLocale
+        return Locale.current.localizedString(forIdentifier: locale) ?? locale
     }
 
     private var currentText: Binding<String> {
