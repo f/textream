@@ -1,0 +1,1486 @@
+{
+  "sourceLanguage": "zh-Hans",
+  "strings": {
+    "刘海模式会跟随鼠标所在显示器。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notch mode follows the cursor's display."
+          }
+        }
+      }
+    },
+    "刘海模式固定在所选显示器。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notch mode is fixed to the selected display."
+          }
+        }
+      }
+    },
+    "刷新": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        }
+      }
+    },
+    "双向": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Both"
+          }
+        }
+      }
+    },
+    "可拖拽窗口，可放在任意位置并始终置顶。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draggable window, can be placed anywhere and floats on top."
+          }
+        }
+      }
+    },
+    "启用远程连接": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Remote Connection"
+          }
+        }
+      }
+    },
+    "固定在刘海": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinned to Notch"
+          }
+        }
+      }
+    },
+    "固定在屏幕顶部刘海下方。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinned below the MacBook notch."
+          }
+        }
+      }
+    },
+    "固定显示器": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fixed Display"
+          }
+        }
+      }
+    },
+    "在同一 Wi-Fi 下，使用 iPhone、Android 或电视浏览器扫码或打开该 URL。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan the QR code or open the URL on iPhone, Android, or TV using the same Wi-Fi."
+          }
+        }
+      }
+    },
+    "在外接显示器或 Sidecar iPad 上显示提词器。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show teleprompter on external display or Sidecar iPad."
+          }
+        }
+      }
+    },
+    "在屏幕共享中隐藏": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide in screen share"
+          }
+        }
+      }
+    },
+    "在录屏和视频会议中隐藏悬浮层。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the overlay during screen recordings and video calls."
+          }
+        }
+      }
+    },
+    "在所选显示器上全屏显示提词器。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullscreen teleprompter on the selected display."
+          }
+        }
+      }
+    },
+    "在所选显示器上全屏显示提词器。按 Esc 停止。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullscreen teleprompter on the selected display. Press Esc to stop."
+          }
+        }
+      }
+    },
+    "垂直": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertical"
+          }
+        }
+      }
+    },
+    "基于开源项目深度定制的中文演讲/录制提词器。\\n\\n• 完整汉化界面\\n• 接入本地语音大模型\\n• 优化中文跟读同步稳定性\\n\\n能在您朗读或口播时，确保文案平滑滚动，不“乱跳”，且无需上传任何语音数据至云端。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A deeply customized teleprompter for Chinese speech/recording based on an open source project.\\n\\n• Fully localized interface\\n• Local voice model integration\\n• Optimized Chinese read-along sync stability\\n\\nEnsures smooth scrolling without \"jumping\" exactly as you speak, keeping your data entirely local."
+          }
+        }
+      }
+    },
+    "外接屏": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External Display"
+          }
+        }
+      }
+    },
+    "外观": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        }
+      }
+    },
+    "如果是 Keynote 或 Google Slides，\\n请先导出为 PPTX。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For Keynote or Google Slides,\\nexport to PPTX first."
+          }
+        }
+      }
+    },
+    "字体": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font"
+          }
+        }
+      }
+    },
+    "字号": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font Size"
+          }
+        }
+      }
+    },
+    "完成！": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done!"
+          }
+        }
+      }
+    },
+    "实时跟踪你说出的每个词并高亮显示。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracks and highlights each word in real-time as you speak."
+          }
+        }
+      }
+    },
+    "实时预览（额外窗口）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Preview (Extra Window)"
+          }
+        }
+      }
+    },
+    "宽度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Width"
+          }
+        }
+      }
+    },
+    "尺寸": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size"
+          }
+        }
+      }
+    },
+    "左右翻转（提词镜常用模式）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flipped horizontally (common for prompter mirrors)."
+          }
+        }
+      }
+    },
+    "引导": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guidance"
+          }
+        }
+      }
+    },
+    "悬浮窗口": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Floating Window"
+          }
+        }
+      }
+    },
+    "拖入 PowerPoint（.pptx）文件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop PowerPoint (.pptx) file"
+          }
+        }
+      }
+    },
+    "按 Esc 停止提词器。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press Esc to stop the teleprompter."
+          }
+        }
+      }
+    },
+    "按固定速度自动滚动，无需麦克风。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-scrolls at a constant speed, no microphone needed."
+          }
+        }
+      }
+    },
+    "提词器": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teleprompter"
+          }
+        }
+      }
+    },
+    "提词器运行时显示计时器。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show timer while teleprompter is running."
+          }
+        }
+      }
+    },
+    "无衬线": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans-Serif"
+          }
+        }
+      }
+    },
+    "显示器": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display"
+          }
+        }
+      }
+    },
+    "更快": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faster"
+          }
+        }
+      }
+    },
+    "更慢": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slower"
+          }
+        }
+      }
+    },
+    "更改后需要重启": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Requires restart after changing"
+          }
+        }
+      }
+    },
+    "本地·": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local·"
+          }
+        }
+      }
+    },
+    "本地模型": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Model"
+          }
+        }
+      }
+    },
+    "橙色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange"
+          }
+        }
+      }
+    },
+    "水平": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal"
+          }
+        }
+      }
+    },
+    "水平镜像，适用于提词镜。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal mirror, suitable for mirror rigs."
+          }
+        }
+      }
+    },
+    "没有外接显示输出。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No external display output."
+          }
+        }
+      }
+    },
+    "滚动速度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scroll Speed"
+          }
+        }
+      }
+    },
+    "点击页面快速跳转": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click a page to jump quickly"
+          }
+        }
+      }
+    },
+    "版本 \\(appVersion)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version \\(appVersion)"
+          }
+        }
+      }
+    },
+    "玻璃效果": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glass Effect"
+          }
+        }
+      }
+    },
+    "白色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "White"
+          }
+        }
+      }
+    },
+    "目标显示器": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target Display"
+          }
+        }
+      }
+    },
+    "窗口会跟随光标，并固定在其右下方。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window follows the cursor and stays pinned to its bottom-right."
+          }
+        }
+      }
+    },
+    "端口": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Port"
+          }
+        }
+      }
+    },
+    "等宽": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monospace"
+          }
+        }
+      }
+    },
+    "粉色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pink"
+          }
+        }
+      }
+    },
+    "系统识别": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Recognition"
+          }
+        }
+      }
+    },
+    "系统默认": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Default"
+          }
+        }
+      }
+    },
+    "经典": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Classic"
+          }
+        }
+      }
+    },
+    "绿色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Green"
+          }
+        }
+      }
+    },
+    "自动翻页": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto Next Page"
+          }
+        }
+      }
+    },
+    "蓝色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blue"
+          }
+        }
+      }
+    },
+    "衬线": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serif"
+          }
+        }
+      }
+    },
+    "设置": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        }
+      }
+    },
+    "识别引擎": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognition Engine"
+          }
+        }
+      }
+    },
+    "语言": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        }
+      }
+    },
+    "语音语言": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech Language"
+          }
+        }
+      }
+    },
+    "语音驱动": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice-Activated"
+          }
+        }
+      }
+    },
+    "说话时滚动，静音时暂停。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrolls while you speak, pauses when silent."
+          }
+        }
+      }
+    },
+    "跟随光标": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow Cursor"
+          }
+        }
+      }
+    },
+    "跟随鼠标": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow Mouse"
+          }
+        }
+      }
+    },
+    "跳转到页面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jump to Page"
+          }
+        }
+      }
+    },
+    "运行计时": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run Timer"
+          }
+        }
+      }
+    },
+    "这将把所有设置恢复为默认值。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will reset all settings to defaults."
+          }
+        }
+      }
+    },
+    "远程": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remote"
+          }
+        }
+      }
+    },
+    "透明度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opacity"
+          }
+        }
+      }
+    },
+    "逐词跟踪": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word Tracking"
+          }
+        }
+      }
+    },
+    "镜像": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mirror"
+          }
+        }
+      }
+    },
+    "镜像方向": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mirror Direction"
+          }
+        }
+      }
+    },
+    "阅读友好": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dyslexia-friendly"
+          }
+        }
+      }
+    },
+    "页面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pages"
+          }
+        }
+      }
+    },
+    "高亮颜色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlight Color"
+          }
+        }
+      }
+    },
+    "高度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Height"
+          }
+        }
+      }
+    },
+    "麦克风": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone"
+          }
+        }
+      }
+    },
+    "黄色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yellow"
+          }
+        }
+      }
+    },
+    "兼容模式（禁用 GPU）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compatibility Mode (Disable GPU)"
+          }
+        }
+      }
+    },
+    "导入识别程序...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Recognizer..."
+          }
+        }
+      }
+    },
+    "导入模型...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Model..."
+          }
+        }
+      }
+    },
+    "准备就绪": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        }
+      }
+    },
+    "Textream 中文增强版": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Textream"
+          }
+        }
+      }
+    },
+    "上游原作者：Fatih Kadir Akin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original Author: Fatih Kadir Akin"
+          }
+        }
+      }
+    },
+    "确定": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "GitHub 仓库": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Repo"
+          }
+        }
+      }
+    },
+    "（本地）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(Local)"
+          }
+        }
+      }
+    },
+    "重置所有": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset All"
+          }
+        }
+      }
+    },
+    "完成": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "重置所有设置？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset All Settings?"
+          }
+        }
+      }
+    },
+    "取消": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "重置": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        }
+      }
+    },
+    "这将恢复所有设置到默认值。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will restore all settings to their defaults."
+          }
+        }
+      }
+    },
+    "提示颜色": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cue Color"
+          }
+        }
+      }
+    },
+    "提示亮度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cue Brightness"
+          }
+        }
+      }
+    },
+    "语音引擎": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech Engine"
+          }
+        }
+      }
+    },
+    "识别程序": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executable"
+          }
+        }
+      }
+    },
+    "导入识别程序": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Executable"
+          }
+        }
+      }
+    },
+    "模型文件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model File"
+          }
+        }
+      }
+    },
+    "导入模型文件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Model"
+          }
+        }
+      }
+    },
+    "透明模式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transparency"
+          }
+        }
+      }
+    },
+    "让覆盖层变为半透明，显示桌面内容。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Makes the overlay see-through so desktop content shows through."
+          }
+        }
+      }
+    },
+    "外接": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External"
+          }
+        }
+      }
+    },
+    "导演": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Director"
+          }
+        }
+      }
+    },
+    "拖放 PowerPoint (.pptx) 文件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop PowerPoint (.pptx) file"
+          }
+        }
+      }
+    },
+    "Keynote 或 Google Slides 用户，\n请先导出为 PPTX 格式。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For Keynote or Google Slides,\nexport as PPTX first."
+          }
+        }
+      }
+    },
+    "需要转换": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversion Required"
+          }
+        }
+      }
+    },
+    "Keynote 文件不能直接导入。请先导出为 PowerPoint (.pptx) 格式，再拖放导出的文件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keynote files can't be imported directly. Please export as PPTX first."
+          }
+        }
+      }
+    },
+    "导入错误": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Error"
+          }
+        }
+      }
+    },
+    "不支持的文件格式。请拖放 PowerPoint (.pptx) 文件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsupported file. Drop a PowerPoint (.pptx) file."
+          }
+        }
+      }
+    },
+    "导演模式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Director Mode"
+          }
+        }
+      }
+    },
+    "正在接收导演的文稿…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading from director…"
+          }
+        }
+      }
+    },
+    "等待导演发送文稿…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for director to send script…"
+          }
+        }
+      }
+    },
+    "打开设置": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        }
+      }
+    },
+    "空页面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty"
+          }
+        }
+      }
+    },
+    "删除页面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Page"
+          }
+        }
+      }
+    },
+    "添加页面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Page"
+          }
+        }
+      }
+    },
+    "一个免费开源的提词器，在你朗读时实时高亮你的文稿。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A free, open-source teleprompter that highlights your script in real-time as you speak."
+          }
+        }
+      }
+    },
+    "版本": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        }
+      }
+    },
+    "加星": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Star"
+          }
+        }
+      }
+    },
+    "基于 Textream（作者 Fatih Kadir Akın）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Based on Textream by Fatih Kadir Akin"
+          }
+        }
+      }
+    },
+    "原始创意 by Semih Kışlar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original idea by Semih Kışlar"
+          }
+        }
+      }
+    },
+    "使用 macOS 语音识别（Speech.framework）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses macOS Speech Recognition (Speech.framework)."
+          }
+        }
+      }
+    },
+    "使用本地语音大模型进行识别。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses a local voice model for recognition."
+          }
+        }
+      }
+    },
+    "未配置本地识别程序。请在 设置 → 引导 → 本地模型 中导入 sense-voice-stream。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Voice Engine not configured. Go to Settings → Guidance → Local Model to import sense-voice-stream."
+          }
+        }
+      }
+    },
+    "识别程序无效：": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid executable: "
+          }
+        }
+      }
+    },
+    "请导入 sense-voice-stream 可执行文件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please import the sense-voice-stream executable."
+          }
+        }
+      }
+    },
+    "未配置本地模型文件。请在 设置 → 引导 → 本地模型 中导入 .gguf 文件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No local model file configured. Go to Settings → Guidance → Local Model to import a .gguf file."
+          }
+        }
+      }
+    },
+    "本地模型文件不存在：": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model file not found: "
+          }
+        }
+      }
+    },
+    "本地模型配置可用，可直接开始逐词跟踪。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local model ready for word tracking."
+          }
+        }
+      }
+    },
+    "请先导入识别程序（sense-voice-stream）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please import the sense-voice-stream executable first."
+          }
+        }
+      }
+    },
+    "识别程序路径不存在，请重新导入。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executable path not found, please re-import."
+          }
+        }
+      }
+    },
+    "请导入 sense-voice-stream（实时识别版本）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please import sense-voice-stream (real-time version)."
+          }
+        }
+      }
+    },
+    "识别程序没有执行权限，请执行 chmod +x 后重试。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executable lacks permission. Run chmod +x and try again."
+          }
+        }
+      }
+    },
+    "请导入模型文件（.gguf）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please import a model file (.gguf)."
+          }
+        }
+      }
+    },
+    "模型路径不存在，请重新导入。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model path not found, please re-import."
+          }
+        }
+      }
+    },
+    "未导入（请选择 sense-voice-stream）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not imported (select sense-voice-stream)"
+          }
+        }
+      }
+    },
+    "未导入（请选择 .gguf 模型）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not imported (select .gguf model)"
+          }
+        }
+      }
+    },
+    "尝试自动填充默认路径": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try auto-fill default path"
+          }
+        }
+      }
+    },
+    "选择 sense-voice-stream 可执行文件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select sense-voice-stream executable"
+          }
+        }
+      }
+    },
+    "选择 .gguf 模型文件": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select .gguf model file"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
