@@ -132,7 +132,7 @@ struct TextreamApp: App {
 
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Textream") {
+                Button("About auto-cue") {
                     NotificationCenter.default.post(name: .openAbout, object: nil)
                 }
                 Divider()
@@ -166,8 +166,8 @@ struct TextreamApp: App {
             }
             CommandGroup(replacing: .windowArrangement) { }
             CommandGroup(replacing: .help) {
-                Button("Textream Help") {
-                    if let url = URL(string: "https://github.com/f/textream") {
+                Button("auto-cue Help") {
+                    if let url = URL(string: "https://github.com/Golden0Voyager/auto_cue") {
                         NSWorkspace.shared.open(url)
                     }
                 }
