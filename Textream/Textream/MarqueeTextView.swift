@@ -81,9 +81,6 @@ struct SpeechScrollView: View {
     let highlightedCharCount: Int
     var font: NSFont = .systemFont(ofSize: 18, weight: .semibold)
     var highlightColor: Color = .white
-    var cueColor: Color = .white
-    var cueUnreadOpacity: Double = 0.2
-    var cueReadOpacity: Double = 0.5
     var onWordTap: ((Int) -> Void)? = nil
     /// Called when user starts/stops manual scrolling in smooth mode.
     /// Bool: true = scrolling started (pause timer), false = scrolling ended (resume timer).
@@ -107,9 +104,6 @@ struct SpeechScrollView: View {
                 highlightedCharCount: highlightedCharCount,
                 font: font,
                 highlightColor: highlightColor,
-                cueColor: cueColor,
-                cueUnreadOpacity: cueUnreadOpacity,
-                cueReadOpacity: cueReadOpacity,
                 highlightWords: !smoothScroll,
                 containerWidth: geo.size.width,
                 onWordTap: { charOffset in
@@ -334,9 +328,6 @@ struct WordFlowLayout: View {
     let highlightedCharCount: Int
     let font: NSFont
     var highlightColor: Color = .white
-    var cueColor: Color = .white
-    var cueUnreadOpacity: Double = 0.2
-    var cueReadOpacity: Double = 0.5
     var highlightWords: Bool = true
     let containerWidth: CGFloat
     var onWordTap: ((Int) -> Void)? = nil
@@ -384,10 +375,17 @@ struct WordFlowLayout: View {
         return -1
     }
 
+    /// Returns true if any word in the text contains right-to-left script characters.
+    private var isRTL: Bool {
+        // Pre-compute once from the first page content during setup
+        words.contains { $0.unicodeScalars.contains { isRTLUnicodeScalar($0) } }
+    }
+
     var body: some View {
         let (items, lines) = cachedLayout()
         let nextIdx = nextWordIndex(items: items)
         let totalLines = lines.count
+        let rtl = isRTL
 
         // Estimate line height for visibility culling using actual font metrics
         let lineH = ceil(font.ascender - font.descender + font.leading) + lineSpacing
@@ -398,7 +396,9 @@ struct WordFlowLayout: View {
         let startLine = canCull ? max(0, min(totalLines, Int(floor((-scrollOffset - buffer) / lineH)))) : 0
         let endLine = canCull ? max(startLine, min(totalLines, Int(ceil((viewportHeight - scrollOffset + buffer) / lineH)))) : totalLines
 
-        VStack(alignment: .leading, spacing: lineSpacing) {
+        // For RTL scripts (Arabic, Hebrew, Persian, Urdu), flip the layout direction
+        // so words within each line flow right-to-left instead of left-to-right.
+        VStack(alignment: rtl ? .trailing : .leading, spacing: lineSpacing) {
             if startLine > 0 {
                 Color.clear.frame(height: CGFloat(startLine) * lineH)
             }
@@ -410,13 +410,14 @@ struct WordFlowLayout: View {
                             .id(item.id)
                     }
                 }
+                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
             }
 
             if endLine < totalLines {
                 Color.clear.frame(height: CGFloat(totalLines - endLine) * lineH)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
         .coordinateSpace(name: "flowLayout")
     }
 
@@ -431,7 +432,7 @@ struct WordFlowLayout: View {
         // When highlighting is off (classic/silence-paused), use uniform color
         if !highlightWords {
             let uniformColor: Color = item.isAnnotation
-                ? cueColor.opacity(cueUnreadOpacity)
+                ? Color.white.opacity(0.4)
                 : highlightColor
 
             return Text(item.word + " ")
@@ -451,11 +452,11 @@ struct WordFlowLayout: View {
                 }
         }
 
-        // Annotations: italic, dimmed with cue color
+        // Annotations: italic, always dimmed
         if item.isAnnotation {
             let annotationColor: Color = isFullyLit
-                ? cueColor.opacity(cueReadOpacity)
-                : cueColor.opacity(cueUnreadOpacity)
+                ? Color.white.opacity(0.5)
+                : Color.white.opacity(0.2)
 
             return Text(item.word + " ")
                 .font(Font(font).italic())

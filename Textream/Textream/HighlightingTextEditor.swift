@@ -15,6 +15,49 @@ extension NSFont {
     }
 }
 
+// MARK: - RTL Script Detection
+
+/// Check whether a Unicode scalar belongs to a right-to-left script (Arabic, Hebrew, Persian, Urdu, etc.)
+func isRTLUnicodeScalar(_ scalar: Unicode.Scalar) -> Bool {
+    let v = scalar.value
+    // Hebrew
+    if v >= 0x0590 && v <= 0x05FF { return true }
+    // Arabic
+    if v >= 0x0600 && v <= 0x06FF { return true }
+    // Syriac
+    if v >= 0x0700 && v <= 0x074F { return true }
+    // Arabic Supplement
+    if v >= 0x0750 && v <= 0x077F { return true }
+    // Thaana
+    if v >= 0x0780 && v <= 0x07BF { return true }
+    // NKo
+    if v >= 0x07C0 && v <= 0x07FF { return true }
+    // Samaritan
+    if v >= 0x0800 && v <= 0x083F { return true }
+    // Mandaic
+    if v >= 0x0840 && v <= 0x085F { return true }
+    // Arabic Extended-A
+    if v >= 0x08A0 && v <= 0x08FF { return true }
+    // Arabic Extended-B
+    if v >= 0x0870 && v <= 0x089F { return true }
+    // Arabic Presentation Forms-A
+    if v >= 0xFB50 && v <= 0xFDFF { return true }
+    // Arabic Presentation Forms-B
+    if v >= 0xFE70 && v <= 0xFEFF { return true }
+    // Mende Kikakui
+    if v >= 0x1E800 && v <= 0x1E8DF { return true }
+    // Adlam
+    if v >= 0x1E900 && v <= 0x1E95F { return true }
+    // Arabic Mathematical Alphabetic Symbols
+    if v >= 0x1EE00 && v <= 0x1EEFF { return true }
+    return false
+}
+
+/// Returns true if the string contains any right-to-left script characters.
+func containsRTLText(_ text: String) -> Bool {
+    text.unicodeScalars.contains(where: { isRTLUnicodeScalar($0) })
+}
+
 struct HighlightingTextEditor: NSViewRepresentable {
     @Binding var text: String
     var font: NSFont = .systemFont(ofSize: 16, weight: .regular)
@@ -62,6 +105,9 @@ struct HighlightingTextEditor: NSViewRepresentable {
         textView.string = text
         context.coordinator.applyHighlighting(textView)
 
+        // Auto-detect RTL text direction for the editor
+        updateWritingDirection(textView, text: text)
+
         return scrollView
     }
 
@@ -73,6 +119,8 @@ struct HighlightingTextEditor: NSViewRepresentable {
             textView.string = text
             textView.selectedRanges = selectedRanges
             context.coordinator.applyHighlighting(textView)
+            // Update writing direction when text changes (e.g., paste Arabic)
+            updateWritingDirection(textView, text: text)
         }
 
         // Apply bump highlight on newly dictated range
@@ -91,12 +139,21 @@ struct HighlightingTextEditor: NSViewRepresentable {
         }
     }
 
+    /// Set the text view's base writing direction based on the content's script.
+    private func updateWritingDirection(_ textView: NSTextView, text: String) {
+        if containsRTLText(text) {
+            textView.baseWritingDirection = .rightToLeft
+        } else {
+            textView.baseWritingDirection = .natural
+        }
+    }
+
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: HighlightingTextEditor
         weak var textView: NSTextView?
 
         private static let annotationPattern = try! NSRegularExpression(
-            pattern: "\\[[^\\]]+\\]",
+            pattern: "\\\\[[^\\\\]]+\\\\]",
             options: []
         )
 
