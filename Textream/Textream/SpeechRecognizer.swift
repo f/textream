@@ -601,16 +601,20 @@ class SpeechRecognizer {
         // Strategy 2: word-level match (handles STT word substitutions)
         let wordResult = wordLevelMatch(spoken: spoken)
 
-        // Use agreement-based selection instead of blind max().
         // If both strategies agree within a tolerance, use the average.
-        // If they disagree wildly, use the more conservative (lower) result
-        // to avoid false-positive jumps.
+        // If they disagree wildly, trust the word-level matcher: the char
+        // matcher's 3-char resync cannot bridge word-level substitutions
+        // ("sits" transcribed as "says"), after which it wedges permanently
+        // and taking min() would veto the word matcher forever, freezing the
+        // highlight. Word-level movement requires consecutive fuzzy word
+        // matches, and the 2-of-3 agreement gate below still filters
+        // transient false jumps.
         let best: Int
         let tolerance = 20 // characters
         if abs(charResult - wordResult) <= tolerance {
             best = (charResult + wordResult) / 2
         } else {
-            best = min(charResult, wordResult)
+            best = wordResult
         }
 
         let newCount = matchStartOffset + best
