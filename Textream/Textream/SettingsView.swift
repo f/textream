@@ -761,6 +761,19 @@ struct SettingsView: View {
                 }
             }
 
+            Divider()
+
+            Toggle(isOn: $settings.handGestureRewind) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Hand Gesture Rewind")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Raise your hand to pause and rewind. The higher you raise, the faster it rewinds. Lower your hand to resume. Uses your camera to detect hand position.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.checkbox)
+
             Spacer()
         }
         .padding(16)
