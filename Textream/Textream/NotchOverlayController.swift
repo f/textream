@@ -1051,7 +1051,7 @@ struct NotchOverlayView: View {
     private var pagePickerView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Jump to page")
+                Text("page.jumpTo")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.bottom, 2)
@@ -1086,7 +1086,7 @@ struct NotchOverlayView: View {
                     }
                 }
 
-                Text("Tap a page to jump")
+                Text("page.tapToJump")
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.3))
                     .padding(.top, 4)
@@ -1135,7 +1135,7 @@ struct NotchOverlayView: View {
                         speechRecognizer.shouldAdvancePage = true
                     } label: {
                         VStack(spacing: 4) {
-                            Text("Next Page")
+                            Text("page.next")
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.5))
                             Image(systemName: "forward.fill")
@@ -1149,7 +1149,7 @@ struct NotchOverlayView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Done!")
+                    Text("common.done.exclamation")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                 }
@@ -1157,25 +1157,6 @@ struct NotchOverlayView: View {
             Spacer()
         }
         .transition(.scale.combined(with: .opacity))
-    }
-}
-
-// MARK: - Glass Effect View
-
-struct GlassEffectView: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.isEmphasized = true
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = .hudWindow
-        nsView.blendingMode = .behindWindow
-        nsView.state = .active
     }
 }
 
@@ -1278,12 +1259,10 @@ struct FloatingOverlayView: View {
         .background(
             Group {
                 if NotchSettings.shared.floatingGlassEffect {
-                    ZStack {
-                        GlassEffectView()
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.black.opacity(NotchSettings.shared.glassOpacity))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    LiquidGlassBackdrop(
+                        shape: RoundedRectangle(cornerRadius: 16, style: .continuous),
+                        tintOpacity: NotchSettings.shared.glassOpacity
+                    )
                 } else {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(.black)
@@ -1510,7 +1489,7 @@ struct FloatingOverlayView: View {
     private var floatingPagePickerView: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Jump to page")
+                Text("page.jumpTo")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.bottom, 4)
@@ -1545,7 +1524,7 @@ struct FloatingOverlayView: View {
                     }
                 }
 
-                Text("Tap a page to jump")
+                Text("page.tapToJump")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.3))
                     .padding(.top, 4)
@@ -1569,7 +1548,7 @@ struct FloatingOverlayView: View {
                             .animation(.easeInOut(duration: 0.3), value: countdownRemaining)
                     }
                     if followingCursor {
-                        Text("Next Page")
+                        Text("page.next")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
                     } else {
@@ -1580,7 +1559,7 @@ struct FloatingOverlayView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "play.fill")
                                     .font(.system(size: 14, weight: .bold))
-                                Text("Next Page")
+                                Text("page.next")
                                     .font(.system(size: 14, weight: .bold))
                             }
                             .foregroundStyle(.white)
@@ -1596,7 +1575,7 @@ struct FloatingOverlayView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Done!")
+                    Text("common.done.exclamation")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                 }

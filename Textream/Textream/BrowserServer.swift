@@ -296,9 +296,18 @@ class BrowserServer {
     // MARK: - HTML Template
 
     static func generateHTML(wsPort: UInt16) -> String {
-        """
+        let stringsJSON = L10n.webStringsJSON([
+            "waitingTitle": "web.browser.waitingTitle",
+            "waitingSubtitle": "web.browser.waitingSubtitle",
+            "connecting": "web.connecting",
+            "connected": "web.connected",
+            "reconnecting": "web.reconnecting",
+            "done": "common.done.exclamation"
+        ])
+        let lang = L10n.webLanguageCode
+        return """
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="\(lang)">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -385,9 +394,9 @@ class BrowserServer {
 
         <div id="waiting">
           <div class="icon">📡</div>
-          <div class="title">Waiting for Textream…</div>
-          <div class="sub">Start reading in the app to see your teleprompter here</div>
-          <div class="url" id="conn-status">Connecting…</div>
+          <div class="title" id="waiting-title"></div>
+          <div class="sub" id="waiting-subtitle"></div>
+          <div class="url" id="conn-status"></div>
         </div>
 
         <div id="main">
@@ -403,12 +412,18 @@ class BrowserServer {
 
         <div id="done">
           <div class="check">✓</div>
-          <div class="label">Done!</div>
+          <div class="label" id="done-label"></div>
         </div>
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
+        const L10N=\(stringsJSON);
         let ws,rt,prevWordKey='',scrollTgt=null;
+
+        document.getElementById('waiting-title').textContent=L10N.waitingTitle;
+        document.getElementById('waiting-subtitle').textContent=L10N.waitingSubtitle;
+        document.getElementById('conn-status').textContent=L10N.connecting;
+        document.getElementById('done-label').textContent=L10N.done;
 
         /* ---- helpers ---- */
 
@@ -442,10 +457,10 @@ class BrowserServer {
         function connect(){
           ws=new WebSocket('ws://'+host+':'+WSP);
           ws.onopen=()=>{clearTimeout(rt);
-            document.getElementById('conn-status').textContent='Connected';};
+            document.getElementById('conn-status').textContent=L10N.connected;};
           ws.onmessage=e=>{try{render(JSON.parse(e.data))}catch(x){console.error(x)}};
           ws.onclose=()=>{
-            document.getElementById('conn-status').textContent='Reconnecting…';
+            document.getElementById('conn-status').textContent=L10N.reconnecting;
             rt=setTimeout(connect,1500);};
           ws.onerror=()=>{ws.close()};
         }
