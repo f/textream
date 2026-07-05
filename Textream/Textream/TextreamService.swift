@@ -163,6 +163,7 @@ class TextreamService: NSObject, ObservableObject {
 
     @Published var currentFileURL: URL?
     @Published var savedPages: [String] = [""]
+    @Published var documentTitle: String = "Untitled"
 
     // MARK: - File Operations
 
@@ -177,7 +178,8 @@ class TextreamService: NSObject, ObservableObject {
     func saveFileAs() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.init(filenameExtension: "textream")!]
-        panel.nameFieldStringValue = "Untitled.textream"
+        let title = documentTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        panel.nameFieldStringValue = (title.isEmpty ? "Untitled" : title) + ".textream"
         panel.canCreateDirectories = true
 
         panel.begin { [weak self] response in

@@ -227,8 +227,9 @@ class SpeechRecognizer {
     /// Move recognizedCharCount backward by N words. Used during gesture rewind.
     func rewindByWords(_ count: Int) {
         let chars = Array(sourceText)
+        guard !chars.isEmpty else { return }
         var remaining = count
-        var offset = recognizedCharCount
+        var offset = min(recognizedCharCount, chars.count)
 
         while remaining > 0 && offset > 0 {
             // Skip any spaces at current position

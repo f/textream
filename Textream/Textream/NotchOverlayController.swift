@@ -112,6 +112,22 @@ class NotchOverlayController: NSObject {
             }
         }
 
+        // Live-update panel size when dimension sliders change
+        // Track last known values to only react to actual changes
+        var lastWidth = settings.windowWidthPercent
+        var lastHeight = settings.windowHeightPercent
+        Timer.publish(every: 0.1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                let s = NotchSettings.shared
+                if s.windowWidthPercent != lastWidth || s.windowHeightPercent != lastHeight {
+                    lastWidth = s.windowWidthPercent
+                    lastHeight = s.windowHeightPercent
+                    self?.updatePanelSize()
+                }
+            }
+            .store(in: &cancellables)
+
         // Show floating stop button only in follow-cursor mode (panel ignores mouse events)
         if settings.overlayMode == .floating && settings.followCursorWhenUndocked {
             showStopButton(on: screen)
@@ -131,6 +147,7 @@ class NotchOverlayController: NSObject {
     }
 
     private func handleHandGesture(raised: Bool, height: Float) {
+        guard panel != nil else { return }
         let settings = NotchSettings.shared
         HandGestureController.log("[Controller] handleHandGesture raised=\(raised) height=\(height) mode=\(settings.listeningMode.rawValue)")
 
@@ -305,10 +322,10 @@ class NotchOverlayController: NSObject {
     }
 
     private func showPinned(settings: NotchSettings, screen: NSScreen) {
-        let notchWidth = settings.notchWidth
-        let textAreaHeight = settings.textAreaHeight
-        let maxExtraHeight: CGFloat = 350
         let screenFrame = screen.frame
+        let textAreaHeight = screenFrame.height * settings.windowHeightPercent
+        let maxExtraHeight: CGFloat = 350
+        let notchWidth = screenFrame.width * settings.windowWidthPercent
         let visibleFrame = screen.visibleFrame
 
         // Menu bar / notch height from top of screen
@@ -351,6 +368,8 @@ class NotchOverlayController: NSObject {
         panel.orderFrontRegardless()
         self.panel = panel
 
+        installKeyMonitor()
+
         // Start mouse tracking for follow-mouse mode
         if settings.notchDisplayMode == .followMouse {
             startMouseTracking()
@@ -360,8 +379,8 @@ class NotchOverlayController: NSObject {
     }
 
     private func showFollowCursor(settings: NotchSettings, screen: NSScreen) {
-        let panelWidth = settings.notchWidth
-        let panelHeight = settings.textAreaHeight
+        let panelWidth = screen.frame.width * settings.windowWidthPercent
+        let panelHeight = screen.frame.height * settings.windowHeightPercent
 
         let mouse = NSEvent.mouseLocation
         let cursorOffset: CGFloat = 8
@@ -431,8 +450,8 @@ class NotchOverlayController: NSObject {
     }
 
     private func showFloating(settings: NotchSettings, screenFrame: CGRect) {
-        let panelWidth = settings.notchWidth
-        let panelHeight = settings.textAreaHeight
+        let panelWidth = screenFrame.width * settings.windowWidthPercent
+        let panelHeight = screenFrame.height * settings.windowHeightPercent
 
         let xPosition = screenFrame.midX - panelWidth / 2
         let yPosition = screenFrame.midY - panelHeight / 2 + 100
@@ -458,8 +477,8 @@ class NotchOverlayController: NSObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.ignoresMouseEvents = false
         panel.isMovableByWindowBackground = true
-        panel.minSize = NSSize(width: 280, height: panelHeight)
-        panel.maxSize = NSSize(width: 500, height: panelHeight + 350)
+        panel.minSize = NSSize(width: screenFrame.width * 0.2, height: panelHeight)
+        panel.maxSize = NSSize(width: screenFrame.width * 0.8, height: panelHeight + 350)
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
 
@@ -469,6 +488,50 @@ class NotchOverlayController: NSObject {
         installKeyMonitor()
     }
 
+    private func updatePanelSize() {
+        guard let panel = panel else { return }
+        let settings = NotchSettings.shared
+        guard settings.overlayMode != .fullscreen else { return }
+        guard let screen = panel.screen ?? NSScreen.main else { return }
+        let screenFrame = screen.frame
+        let newWidth = screenFrame.width * settings.windowWidthPercent
+        let newHeight = screenFrame.height * settings.windowHeightPercent
+
+        var frame = panel.frame
+
+        switch settings.overlayMode {
+        case .pinned:
+            let visibleFrame = screen.visibleFrame
+            let menuBarHeight = screenFrame.maxY - visibleFrame.maxY
+            let totalHeight = menuBarHeight + newHeight
+            frame.origin.x = screenFrame.midX - newWidth / 2
+            frame.origin.y = screenFrame.maxY - totalHeight
+            frame.size.width = newWidth
+            frame.size.height = totalHeight
+            panel.setFrame(frame, display: true, animate: false)
+
+            if let tracker = frameTracker {
+                tracker.visibleWidth = newWidth
+                tracker.visibleHeight = totalHeight
+            }
+
+        case .floating:
+            let centerX = frame.midX
+            let centerY = frame.midY
+            frame.origin.x = centerX - newWidth / 2
+            frame.origin.y = centerY - newHeight / 2
+            frame.size.width = newWidth
+            frame.size.height = newHeight
+            panel.setFrame(frame, display: true, animate: false)
+
+            panel.minSize = NSSize(width: screenFrame.width * 0.2, height: screenFrame.height * 0.05)
+            panel.maxSize = NSSize(width: screenFrame.width * 0.8, height: screenFrame.height * 0.5)
+
+        case .fullscreen:
+            break
+        }
+    }
+
     func dismiss() {
         guard !isDismissing else { return }
         isDismissing = true
@@ -476,6 +539,7 @@ class NotchOverlayController: NSObject {
         // Trigger the shrink animation
         speechRecognizer.shouldDismiss = true
         speechRecognizer.forceStop()
+        handGestureController.onHandStateChanged = nil
         handGestureController.stop()
         hideHandIndicator()
         rewindTimer?.invalidate()
@@ -521,6 +585,7 @@ class NotchOverlayController: NSObject {
         removeEscMonitor()
         cancellables.removeAll()
         speechRecognizer.forceStop()
+        handGestureController.onHandStateChanged = nil
         handGestureController.stop()
         hideHandIndicator()
         rewindTimer?.invalidate()
@@ -993,7 +1058,7 @@ struct NotchOverlayView: View {
 
     private func updateFrameTracker() {
         let targetHeight = menuBarHeight + baseTextHeight + extraHeight
-        let fullWidth = NotchSettings.shared.notchWidth
+        let fullWidth = (NSScreen.main?.frame.width ?? 1440) * NotchSettings.shared.windowWidthPercent
         frameTracker.visibleHeight = targetHeight
         frameTracker.visibleWidth = fullWidth
     }
