@@ -132,41 +132,41 @@ struct TextreamApp: App {
 
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Textream") {
+                Button(L10n.string("menu.about")) {
                     NotificationCenter.default.post(name: .openAbout, object: nil)
                 }
                 Divider()
-                Button("Check for Updates…") {
+                Button(L10n.string("menu.checkForUpdates")) {
                     UpdateChecker.shared.checkForUpdates()
                 }
             }
             CommandGroup(after: .appSettings) {
-                Button("Settings…") {
+                Button(L10n.string("menu.settings")) {
                     NotificationCenter.default.post(name: .openSettings, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(replacing: .newItem) {
-                Button("Open File or Presentation…") {
+                Button(L10n.string("menu.openFileOrPresentation")) {
                     TextreamService.shared.openFile()
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
                 Divider()
 
-                Button("Save") {
+                Button(L10n.string("menu.save")) {
                     TextreamService.shared.saveFile()
                 }
                 .keyboardShortcut("s", modifiers: .command)
 
-                Button("Save As…") {
+                Button(L10n.string("menu.saveAs")) {
                     TextreamService.shared.saveFileAs()
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .windowArrangement) { }
             CommandGroup(replacing: .help) {
-                Button("Textream Help") {
+                Button(L10n.string("menu.help")) {
                     if let url = URL(string: "https://github.com/f/textream") {
                         NSWorkspace.shared.open(url)
                     }

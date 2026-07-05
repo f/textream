@@ -177,7 +177,7 @@ class TextreamService: NSObject, ObservableObject {
     func saveFileAs() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.init(filenameExtension: "textream")!]
-        panel.nameFieldStringValue = "Untitled.textream"
+        panel.nameFieldStringValue = L10n.string("document.untitled.filename")
         panel.canCreateDirectories = true
 
         panel.begin { [weak self] response in
@@ -195,7 +195,7 @@ class TextreamService: NSObject, ObservableObject {
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Failed to save file"
+            alert.messageText = L10n.string("file.save.failed.title")
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -222,8 +222,8 @@ class TextreamService: NSObject, ObservableObject {
             let ext = url.pathExtension.lowercased()
             if ext == "key" {
                 let alert = NSAlert()
-                alert.messageText = "Keynote files can't be imported directly"
-                alert.informativeText = "Please export your Keynote presentation as PowerPoint (.pptx) first:\n\nIn Keynote: File → Export To → PowerPoint"
+                alert.messageText = L10n.string("import.keynote.title")
+                alert.informativeText = L10n.string("import.keynote.message")
                 alert.alertStyle = .informational
                 alert.runModal()
             } else if ext == "pptx" {
@@ -248,7 +248,7 @@ class TextreamService: NSObject, ObservableObject {
             } catch {
                 DispatchQueue.main.async {
                     let alert = NSAlert()
-                    alert.messageText = "Import Error"
+                    alert.messageText = L10n.string("import.error.title")
                     alert.informativeText = error.localizedDescription
                     alert.runModal()
                 }
@@ -262,11 +262,11 @@ class TextreamService: NSObject, ObservableObject {
         guard hasUnsavedChanges else { return true }
 
         let alert = NSAlert()
-        alert.messageText = "You have unsaved changes"
-        alert.informativeText = "Do you want to save your changes before opening another file?"
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Discard")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = L10n.string("file.unsaved.title")
+        alert.informativeText = L10n.string("file.unsaved.message")
+        alert.addButton(withTitle: L10n.string("menu.save"))
+        alert.addButton(withTitle: L10n.string("file.discard"))
+        alert.addButton(withTitle: L10n.string("common.cancel"))
         alert.alertStyle = .warning
 
         let response = alert.runModal()
@@ -294,7 +294,7 @@ class TextreamService: NSObject, ObservableObject {
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Failed to open file"
+            alert.messageText = L10n.string("file.open.failed.title")
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -436,7 +436,7 @@ class TextreamService: NSObject, ObservableObject {
     // macOS Services handler
     @objc func readInTextream(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string) else {
-            error.pointee = "No text found on pasteboard" as NSString
+            error.pointee = L10n.string("service.noTextOnPasteboard") as NSString
             return
         }
         readText(text)
