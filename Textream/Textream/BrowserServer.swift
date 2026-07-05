@@ -305,7 +305,7 @@ class BrowserServer {
             "done": "common.done.exclamation"
         ])
         let lang = L10n.webLanguageCode
-        """
+        return """
         <!DOCTYPE html>
         <html lang="\(lang)">
         <head>

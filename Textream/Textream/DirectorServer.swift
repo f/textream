@@ -323,7 +323,7 @@ class DirectorServer {
             "newScript": "web.director.newScript"
         ])
         let lang = L10n.webLanguageCode
-        """
+        return """
         <!DOCTYPE html>
         <html lang="\(lang)">
         <head>
