@@ -80,26 +80,12 @@ class SpeechRecognizer {
     var shouldDismiss: Bool = false
     var shouldAdvancePage: Bool = false
 
-    /// True when recent audio levels indicate the user is actively speaking.
-    /// Uses hysteresis: a level hovering around a single threshold would
-    /// rapidly toggle this flag and stutter the silence-paused scroll timer.
-    private(set) var isSpeaking: Bool = false
-
-    private static let speakingOnLevel: CGFloat = 0.08
-    private static let speakingOffLevel: CGFloat = 0.05
-
-    private func updateSpeakingState() {
+    /// True when recent audio levels indicate the user is actively speaking
+    var isSpeaking: Bool {
         let recent = audioLevels.suffix(10)
-        guard !recent.isEmpty else {
-            isSpeaking = false
-            return
-        }
+        guard !recent.isEmpty else { return false }
         let avg = recent.reduce(0, +) / CGFloat(recent.count)
-        if isSpeaking {
-            if avg < Self.speakingOffLevel { isSpeaking = false }
-        } else if avg > Self.speakingOnLevel {
-            isSpeaking = true
-        }
+        return avg > 0.08
     }
 
     private var speechRecognizer: SFSpeechRecognizer?
@@ -257,9 +243,6 @@ class SpeechRecognizer {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
-        // The tap no longer feeds audioLevels, so the speaking state would
-        // otherwise freeze at its last value.
-        isSpeaking = false
     }
 
     private func cleanupRecognition() {
@@ -388,12 +371,10 @@ class SpeechRecognizer {
             let level = CGFloat(min(rms * 5, 1.0))
 
             DispatchQueue.main.async {
-                guard let self else { return }
-                self.audioLevels.append(level)
-                if self.audioLevels.count > 30 {
-                    self.audioLevels.removeFirst()
+                self?.audioLevels.append(level)
+                if (self?.audioLevels.count ?? 0) > 30 {
+                    self?.audioLevels.removeFirst()
                 }
-                self.updateSpeakingState()
             }
         }
 
