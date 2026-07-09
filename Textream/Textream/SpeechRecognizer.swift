@@ -80,13 +80,10 @@ class SpeechRecognizer {
     var shouldDismiss: Bool = false
     var shouldAdvancePage: Bool = false
 
-    /// True when recent audio levels indicate the user is actively speaking
-    var isSpeaking: Bool {
-        let recent = audioLevels.suffix(10)
-        guard !recent.isEmpty else { return false }
-        let avg = recent.reduce(0, +) / CGFloat(recent.count)
-        return avg > 0.08
-    }
+    /// True when recent audio energy indicates the user is actively speaking.
+    /// Updated from the audio tap using an adaptive noise floor so detection
+    /// works across microphones with different gain levels.
+    var isSpeaking: Bool = false
 
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -118,6 +115,11 @@ class SpeechRecognizer {
     /// ignores results for a short window so pre-jump speech isn't matched
     /// against the text at the new offset.
     private var lastJumpAt: Date = .distantPast
+
+    // Adaptive voice-activity detection (drives Voice-Activated / silence-paused scrolling)
+    private var noiseFloor: CGFloat = 0.02
+    private var lastSpeechAt: Date = .distantPast
+    private let speechHangover: TimeInterval = 0.25
 
     /// Update the source text while preserving the current recognized char count.
     /// Used by Director Mode to live-edit unread text without resetting read progress.
@@ -168,6 +170,9 @@ class SpeechRecognizer {
         matchStartOffset = 0
         retryCount = 0
         recentMatchPositions = []
+        noiseFloor = 0.02
+        lastSpeechAt = .distantPast
+        isSpeaking = false
         error = nil
         sessionGeneration += 1
 
@@ -417,10 +422,12 @@ class SpeechRecognizer {
             let level = CGFloat(min(rms * 5, 1.0))
 
             DispatchQueue.main.async {
-                self?.audioLevels.append(level)
-                if (self?.audioLevels.count ?? 0) > 30 {
-                    self?.audioLevels.removeFirst()
+                guard let self else { return }
+                self.audioLevels.append(level)
+                if self.audioLevels.count > 30 {
+                    self.audioLevels.removeFirst()
                 }
+                self.updateVoiceActivity(level: level)
             }
         }
 
@@ -500,6 +507,34 @@ class SpeechRecognizer {
             cleanupRecognition()
             scheduleBeginRecognition(after: 0.5)
         }
+    }
+
+    // MARK: - Voice-activity detection
+
+    /// Adaptive voice-activity detection driving Voice-Activated scrolling.
+    /// Tracks a slowly-adapting noise floor during silence and flags speech when
+    /// the level rises above it, with a short hangover so natural pauses between
+    /// words don't stall scrolling. Adapting relative to the noise floor keeps
+    /// detection reliable across microphones with very different gain levels.
+    private func updateVoiceActivity(level: CGFloat) {
+        // Continuously adapt the noise floor: rise slowly so brief speech peaks
+        // don't pull it up, but fall quickly so it settles into quiet passages.
+        // This lets steady ambient noise get absorbed into the floor (preventing
+        // false "always speaking") while keeping the floor low for quiet mics.
+        if level > noiseFloor {
+            noiseFloor += (level - noiseFloor) * 0.01
+        } else {
+            noiseFloor += (level - noiseFloor) * 0.30
+        }
+
+        // Gain-relative threshold: speech sits well above the noise floor on any
+        // mic. The absolute minimum stops near-silent rooms (floor ~0) from
+        // triggering on tiny fluctuations.
+        let threshold = max(0.025, noiseFloor * 1.8)
+        if level > threshold {
+            lastSpeechAt = Date()
+        }
+        isSpeaking = Date().timeIntervalSince(lastSpeechAt) < speechHangover
     }
 
     // MARK: - Thread-safe buffer appending
