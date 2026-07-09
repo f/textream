@@ -246,24 +246,33 @@ struct SpeechScrollView: View {
         )
     }
 
+    /// Y position in the viewport where the active word is anchored.
+    /// Smooth modes (classic/silence-paused) anchor in the lower third so read
+    /// text stays visible above while the next lines remain visible below —
+    /// anchoring at the very bottom leaves the speaker no lookahead.
+    /// wordProgressAtCurrentOffset must use the same anchor, otherwise
+    /// releasing a manual scroll snaps the text by the difference.
+    private func readingAnchorY(containerHeight: CGFloat) -> CGFloat {
+        smoothScroll ? containerHeight * 0.7 : containerHeight * 0.5
+    }
+
     private func recalcCenter(containerHeight: CGFloat) {
-        let center = containerHeight * 0.5
+        let anchor = readingAnchorY(containerHeight: containerHeight)
 
         if smoothScroll {
-            // Classic/silence-paused: anchor active word near the bottom, scrolling up
-            let bottomAnchor = containerHeight - 20
+            // Classic/silence-paused: continuous word progress, interpolated
             let wordIdx = Int(smoothWordProgress)
             let fraction = smoothWordProgress - Double(wordIdx)
             let clampedIdx = max(0, min(wordIdx, words.count - 1))
             guard let wordY = wordYPositions[clampedIdx] else { return }
             let nextY = wordYPositions[clampedIdx + 1] ?? wordY
             let interpolatedY = wordY + (nextY - wordY) * CGFloat(fraction)
-            scrollOffset = bottomAnchor - interpolatedY
+            scrollOffset = anchor - interpolatedY
         } else {
-            // Word-tracking/voice-activated: active word at vertical center
+            // Word tracking: active word at vertical center
             let wordIdx = activeWordIndex()
             if let wordY = wordYPositions[wordIdx] {
-                let target = center - wordY
+                let target = anchor - wordY
                 // Only update if it actually changed to avoid redundant animations
                 if abs(scrollOffset - target) > 1 {
                     scrollOffset = target
@@ -274,9 +283,9 @@ struct SpeechScrollView: View {
 
     /// Find the word progress at the current visual position (scrollOffset + manualOffset)
     private func wordProgressAtCurrentOffset() -> Double {
-        let center = containerHeight * 0.5
-        // The Y position currently at the center of the view
-        let targetY = center - (scrollOffset + manualOffset)
+        let anchor = readingAnchorY(containerHeight: containerHeight)
+        // The Y position currently at the reading anchor line
+        let targetY = anchor - (scrollOffset + manualOffset)
 
         // Find the closest word and interpolate
         let sorted = wordYPositions.sorted { $0.key < $1.key }
