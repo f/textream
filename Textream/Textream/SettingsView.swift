@@ -661,6 +661,23 @@ struct SettingsView: View {
 
                 Divider()
 
+                // Text Layout
+                Text("Text Layout")
+                    .font(.system(size: 13, weight: .medium))
+
+                Toggle(isOn: $settings.preserveLineBreaks) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Preserve Line Breaks")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Keep the line breaks and paragraph spacing from your script instead of reflowing the text to fit the width.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Divider()
+
                 // Dimensions
                 Text("Dimensions")
                     .font(.system(size: 13, weight: .medium))
@@ -1419,6 +1436,7 @@ struct SettingsView: View {
         settings.listeningMode = .wordTracking
         settings.scrollSpeed = 3
         settings.showElapsedTime = true
+        settings.preserveLineBreaks = true
         settings.selectedMicUID = ""
         settings.autoNextPage = false
         settings.autoNextPageDelay = 3
