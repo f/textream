@@ -41,6 +41,10 @@ class OverlayContent {
     var seekCharOffset: Int = 0
     var seekToken: Int = 0
 
+    // Live position while a remote is being scrolled. Non-nil overrides the
+    // normal position on every surface until the scroll settles.
+    var scrubCharOffset: Int? = nil
+
     // Page picker
     var pageCount: Int = 1
     var currentPageIndex: Int = 0
@@ -703,6 +707,8 @@ struct NotchOverlayView: View {
     }
 
     private var effectiveCharCount: Int {
+        // While a remote is scrubbing, every surface follows the scrub position
+        if let scrub = content.scrubCharOffset { return scrub }
         switch listeningMode {
         case .wordTracking:
             return speechRecognizer.recognizedCharCount
@@ -1267,6 +1273,8 @@ struct FloatingOverlayView: View {
     }
 
     private var effectiveCharCount: Int {
+        // While a remote is scrubbing, every surface follows the scrub position
+        if let scrub = content.scrubCharOffset { return scrub }
         switch listeningMode {
         case .wordTracking:
             return speechRecognizer.recognizedCharCount

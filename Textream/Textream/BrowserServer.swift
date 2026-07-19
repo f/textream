@@ -28,7 +28,7 @@ struct BrowserState: Codable {
 // MARK: - Browser Command (remote -> app)
 
 struct BrowserCommand: Codable {
-    let type: String        // "seek"
+    let type: String        // "scrub" | "seek"
     let charOffset: Int?
 }
 
@@ -47,8 +47,12 @@ class BrowserServer {
     private weak var speechRecognizer: SpeechRecognizer?
     private var timerWordProgress: Double = 0
     private var contentActive: Bool = false
+    private var scrubCharOffset: Int?
 
-    /// Called when the remote asks to continue reading from a tapped word.
+    /// Called continuously while the remote is being scrolled.
+    var onScrub: ((Int) -> Void)?
+
+    /// Called when the remote settles on a position to continue reading from.
     var onSeek: ((Int) -> Void)?
 
     var httpPort: UInt16 { NotchSettings.shared.browserServerPort }
@@ -86,6 +90,7 @@ class BrowserServer {
         self.totalCharCount = totalCharCount
         self.hasNextPage = hasNextPage
         self.timerWordProgress = 0
+        self.scrubCharOffset = nil
         self.contentActive = true
         startBroadcasting()
     }
@@ -95,6 +100,7 @@ class BrowserServer {
         self.totalCharCount = totalCharCount
         self.hasNextPage = hasNextPage
         self.timerWordProgress = 0
+        self.scrubCharOffset = nil
     }
 
     func hideContent() {
@@ -190,6 +196,10 @@ class BrowserServer {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             switch command.type {
+            case "scrub":
+                if let charOffset = command.charOffset {
+                    self.onScrub?(max(0, min(charOffset, self.totalCharCount)))
+                }
             case "seek":
                 if let charOffset = command.charOffset {
                     self.onSeek?(max(0, min(charOffset, self.totalCharCount)))
@@ -200,9 +210,15 @@ class BrowserServer {
         }
     }
 
-    /// Move this server's own scroll progress (classic / silence-paused modes)
-    /// so the remote reflects a seek immediately.
+    /// Follow a live scroll without committing it.
+    func applyScrub(charOffset: Int) {
+        scrubCharOffset = max(0, min(charOffset, totalCharCount))
+    }
+
+    /// Commit a position: drop the scrub override and move the scroll progress
+    /// so classic / silence-paused modes carry on from here.
     func applySeek(charOffset: Int) {
+        scrubCharOffset = nil
         timerWordProgress = wordProgressForCharOffset(charOffset)
     }
 
@@ -237,7 +253,8 @@ class BrowserServer {
             charCount = charOffsetForWordProgress(timerWordProgress)
         }
 
-        let effective = min(charCount, totalCharCount)
+        // While the remote is being scrolled, everyone follows the scrub position
+        let effective = scrubCharOffset ?? min(charCount, totalCharCount)
         let rawDone = totalCharCount > 0 && effective >= totalCharCount
         // In classic/silence-paused modes on the last page, suppress Done so the
         // browser keeps showing the prompter text (speaker may still be talking).
@@ -387,17 +404,6 @@ class BrowserServer {
         .w{cursor:pointer;-webkit-tap-highlight-color:transparent}
         .w:active{opacity:.55}
 
-        /* "Back to live" pill, shown while manually scrolled away */
-        #live-pill{position:absolute;left:50%;transform:translateX(-50%);
-          bottom:18px;z-index:5;display:none;align-items:center;gap:8px;
-          padding:11px 20px;border-radius:999px;cursor:pointer;
-          background:rgba(255,255,255,.14);color:#fff;
-          font-size:15px;font-weight:600;
-          border:1px solid rgba(255,255,255,.2);
-          backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-        #live-pill.show{display:flex}
-        #live-pill .dot{width:8px;height:8px;border-radius:50%;background:#facc15}
-
         /* Text: match ExternalDisplayView font sizing: max(48, min(96, width/14)) */
         #text-container{
           font-size:clamp(48px,calc(100vw / 14),96px);
@@ -454,7 +460,6 @@ class BrowserServer {
         <div id="main">
           <div id="prompter-wrap">
             <div id="prompter"><div id="text-container"></div></div>
-            <div id="live-pill"><span class="dot"></span><span>Back to live</span></div>
           </div>
           <div id="bar">
             <div id="waveform"></div>
@@ -470,7 +475,8 @@ class BrowserServer {
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
-        let ws,rt,prevWordKey='',scrollTgt=null,manual=false;
+        let ws,rt,prevWordKey='',scrollTgt=null,manual=false,
+            lastScrub=0,scrubEndTimer=null;
 
         /* ---- helpers ---- */
 
@@ -490,16 +496,30 @@ class BrowserServer {
         // Send a command back to the app
         function send(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
 
-        // Manual mode: user scrolled away, so stop auto-following the active word
-        function setManual(on){
-          manual=on;
-          document.getElementById('live-pill').classList.toggle('show',on);
+        // Manual mode: the user is driving, so stop auto-following the active word
+        function setManual(on){manual=on;}
+
+        // Character offset of the word nearest the reading anchor. Binary search,
+        // so this stays cheap on long scripts while scrolling.
+        function centerCharOffset(){
+          const p=document.getElementById('prompter'),
+                spans=document.getElementById('text-container').children;
+          if(!spans.length)return 0;
+          const pr=p.getBoundingClientRect(),targetY=pr.top+pr.height*0.4;
+          let lo=0,hi=spans.length-1,best=0;
+          while(lo<=hi){
+            const mid=(lo+hi)>>1;
+            if(spans[mid].getBoundingClientRect().top<=targetY){best=mid;lo=mid+1}
+            else{hi=mid-1}
+          }
+          return parseInt(spans[best].dataset.s);
         }
 
-        // Re-centre on the word currently being read
-        function backToLive(){
+        // Settled after a scroll: commit the position and resume auto-follow
+        function commitScrub(){
+          scrubEndTimer=null;
+          send({type:'seek',charOffset:centerCharOffset()});
           setManual(false);
-          if(scrollTgt)scrollTgt.scrollIntoView({behavior:'smooth',block:'center'});
         }
 
         // Detect annotation words: [bracket] or emoji-only (no letters/digits)
@@ -665,21 +685,33 @@ class BrowserServer {
           document.getElementById('mic-dot').classList.toggle('on',!!s.isListening);
         }
 
-        // Scrolling by hand suspends auto-follow so you can read ahead or back
+        // Scrolling by hand takes over from auto-follow...
         const promptEl=document.getElementById('prompter');
         ['wheel','touchmove'].forEach(function(ev){
           promptEl.addEventListener(ev,function(){setManual(true)},{passive:true});
         });
 
+        // ...and drags the live prompter along with it. Throttled while moving,
+        // committed once the scroll (including momentum) settles.
+        promptEl.addEventListener('scroll',function(){
+          if(!manual)return;            // ignore our own auto-scrolling
+          const now=Date.now();
+          if(now-lastScrub>100){
+            lastScrub=now;
+            send({type:'scrub',charOffset:centerCharOffset()});
+          }
+          clearTimeout(scrubEndTimer);
+          scrubEndTimer=setTimeout(commitScrub,250);
+        },{passive:true});
+
         // Tap a word to continue reading from there
         document.getElementById('text-container').addEventListener('click',function(e){
           const sp=e.target.closest?e.target.closest('.w'):null;
           if(!sp)return;
+          clearTimeout(scrubEndTimer);scrubEndTimer=null;
           send({type:'seek',charOffset:parseInt(sp.dataset.s)});
           setManual(false);
         });
-
-        document.getElementById('live-pill').addEventListener('click',backToLive);
 
         // Init waveform bars
         const wfInit=document.getElementById('waveform');

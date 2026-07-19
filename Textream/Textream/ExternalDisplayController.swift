@@ -151,6 +151,8 @@ struct ExternalDisplayView: View {
     }
 
     private var effectiveCharCount: Int {
+        // While a remote is scrubbing, every surface follows the scrub position
+        if let scrub = content.scrubCharOffset { return scrub }
         switch listeningMode {
         case .wordTracking:
             return speechRecognizer.recognizedCharCount

@@ -317,9 +317,22 @@ class TextreamService: NSObject, ObservableObject {
     }
 
     private func wireBrowserCallbacks() {
+        browserServer.onScrub = { [weak self] charOffset in
+            self?.scrub(toCharOffset: charOffset)
+        }
         browserServer.onSeek = { [weak self] charOffset in
             self?.seek(toCharOffset: charOffset)
         }
+    }
+
+    /// Follow a remote's live scroll. Every surface shows the scrubbed position,
+    /// but the speech recognizer is deliberately left alone until the scroll
+    /// settles so that dragging can't restart recognition on every update.
+    func scrub(toCharOffset charOffset: Int) {
+        for content in [overlayController.overlayContent, externalDisplayController.overlayContent] {
+            content.scrubCharOffset = charOffset
+        }
+        browserServer.applyScrub(charOffset: charOffset)
     }
 
     /// Continue reading from an arbitrary point, requested by the remote.
@@ -329,6 +342,7 @@ class TextreamService: NSObject, ObservableObject {
         overlayController.speechRecognizer.jumpTo(charOffset: charOffset)
 
         for content in [overlayController.overlayContent, externalDisplayController.overlayContent] {
+            content.scrubCharOffset = nil
             content.seekCharOffset = charOffset
             content.seekToken &+= 1
         }
