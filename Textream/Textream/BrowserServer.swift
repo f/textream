@@ -25,6 +25,13 @@ struct BrowserState: Codable {
     let lastSpokenText: String
 }
 
+// MARK: - Browser Command (remote -> app)
+
+struct BrowserCommand: Codable {
+    let type: String        // "seek"
+    let charOffset: Int?
+}
+
 // MARK: - Browser Server
 
 class BrowserServer {
@@ -40,6 +47,9 @@ class BrowserServer {
     private weak var speechRecognizer: SpeechRecognizer?
     private var timerWordProgress: Double = 0
     private var contentActive: Bool = false
+
+    /// Called when the remote asks to continue reading from a tapped word.
+    var onSeek: ((Int) -> Void)?
 
     var httpPort: UInt16 { NotchSettings.shared.browserServerPort }
     var wsPort: UInt16 { httpPort + 1 }
@@ -167,10 +177,33 @@ class BrowserServer {
     }
 
     private func receiveWSMessage(_ conn: NWConnection) {
-        conn.receiveMessage { [weak self] _, _, _, error in
+        conn.receiveMessage { [weak self] data, _, _, error in
             if error != nil { conn.cancel(); return }
+            if let data { self?.handleIncomingMessage(data) }
             self?.receiveWSMessage(conn)
         }
+    }
+
+    private func handleIncomingMessage(_ data: Data) {
+        guard let command = try? JSONDecoder().decode(BrowserCommand.self, from: data) else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            switch command.type {
+            case "seek":
+                if let charOffset = command.charOffset {
+                    self.onSeek?(max(0, min(charOffset, self.totalCharCount)))
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    /// Move this server's own scroll progress (classic / silence-paused modes)
+    /// so the remote reflects a seek immediately.
+    func applySeek(charOffset: Int) {
+        timerWordProgress = wordProgressForCharOffset(charOffset)
     }
 
     // MARK: - Broadcasting
@@ -249,6 +282,19 @@ class BrowserServer {
     }
 
     // MARK: - Helpers
+
+    private func wordProgressForCharOffset(_ charOffset: Int) -> Double {
+        var offset = 0
+        for (i, word) in words.enumerated() {
+            let end = offset + word.count
+            if charOffset <= end {
+                let frac = Double(charOffset - offset) / Double(max(1, word.count))
+                return Double(i) + frac
+            }
+            offset = end + 1
+        }
+        return Double(words.count)
+    }
 
     private func charOffsetForWordProgress(_ progress: Double) -> Int {
         let wholeWord = Int(progress)
@@ -337,6 +383,21 @@ class BrowserServer {
           -webkit-overflow-scrolling:touch;scroll-behavior:smooth}
         #prompter::-webkit-scrollbar{display:none}
 
+        /* Words are tappable to continue reading from there */
+        .w{cursor:pointer;-webkit-tap-highlight-color:transparent}
+        .w:active{opacity:.55}
+
+        /* "Back to live" pill, shown while manually scrolled away */
+        #live-pill{position:absolute;left:50%;transform:translateX(-50%);
+          bottom:18px;z-index:5;display:none;align-items:center;gap:8px;
+          padding:11px 20px;border-radius:999px;cursor:pointer;
+          background:rgba(255,255,255,.14);color:#fff;
+          font-size:15px;font-weight:600;
+          border:1px solid rgba(255,255,255,.2);
+          backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+        #live-pill.show{display:flex}
+        #live-pill .dot{width:8px;height:8px;border-radius:50%;background:#facc15}
+
         /* Text: match ExternalDisplayView font sizing: max(48, min(96, width/14)) */
         #text-container{
           font-size:clamp(48px,calc(100vw / 14),96px);
@@ -393,6 +454,7 @@ class BrowserServer {
         <div id="main">
           <div id="prompter-wrap">
             <div id="prompter"><div id="text-container"></div></div>
+            <div id="live-pill"><span class="dot"></span><span>Back to live</span></div>
           </div>
           <div id="bar">
             <div id="waveform"></div>
@@ -408,7 +470,7 @@ class BrowserServer {
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
-        let ws,rt,prevWordKey='',scrollTgt=null;
+        let ws,rt,prevWordKey='',scrollTgt=null,manual=false;
 
         /* ---- helpers ---- */
 
@@ -424,6 +486,21 @@ class BrowserServer {
           return m?m.slice(0,3).map(Number):[255,255,255];
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
+
+        // Send a command back to the app
+        function send(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
+
+        // Manual mode: user scrolled away, so stop auto-following the active word
+        function setManual(on){
+          manual=on;
+          document.getElementById('live-pill').classList.toggle('show',on);
+        }
+
+        // Re-centre on the word currently being read
+        function backToLive(){
+          setManual(false);
+          if(scrollTgt)scrollTgt.scrollIntoView({behavior:'smooth',block:'center'});
+        }
 
         // Detect annotation words: [bracket] or emoji-only (no letters/digits)
         function isAnnotation(w){
@@ -490,6 +567,7 @@ class BrowserServer {
               cp+=wd.length+1;
             }
             prevWordKey=wordKey;
+            setManual(false);
           }
 
           // Find the next-word index (first non-fully-lit non-annotation)
@@ -548,8 +626,8 @@ class BrowserServer {
             }
           }
 
-          // Auto-scroll: keep active word centered
-          if(scrollTgt){
+          // Auto-scroll: keep active word centered (suspended while scrolling manually)
+          if(scrollTgt&&!manual){
             const p=document.getElementById('prompter'),
                   r=scrollTgt.getBoundingClientRect(),
                   pr=p.getBoundingClientRect(),
@@ -586,6 +664,22 @@ class BrowserServer {
           // Mic indicator
           document.getElementById('mic-dot').classList.toggle('on',!!s.isListening);
         }
+
+        // Scrolling by hand suspends auto-follow so you can read ahead or back
+        const promptEl=document.getElementById('prompter');
+        ['wheel','touchmove'].forEach(function(ev){
+          promptEl.addEventListener(ev,function(){setManual(true)},{passive:true});
+        });
+
+        // Tap a word to continue reading from there
+        document.getElementById('text-container').addEventListener('click',function(e){
+          const sp=e.target.closest?e.target.closest('.w'):null;
+          if(!sp)return;
+          send({type:'seek',charOffset:parseInt(sp.dataset.s)});
+          setManual(false);
+        });
+
+        document.getElementById('live-pill').addEventListener('click',backToLive);
 
         // Init waveform bars
         const wfInit=document.getElementById('waveform');

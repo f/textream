@@ -210,6 +210,9 @@ struct ExternalDisplayView: View {
                 break
             }
         }
+        .onChange(of: content.seekToken) { _, _ in
+            timerWordProgress = wordProgressForCharOffset(content.seekCharOffset)
+        }
     }
 
     private var prompterView: some View {

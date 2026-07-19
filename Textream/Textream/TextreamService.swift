@@ -309,10 +309,31 @@ class TextreamService: NSObject, ObservableObject {
         if NotchSettings.shared.browserServerEnabled {
             if !browserServer.isRunning {
                 browserServer.start()
+                wireBrowserCallbacks()
             }
         } else {
             browserServer.stop()
         }
+    }
+
+    private func wireBrowserCallbacks() {
+        browserServer.onSeek = { [weak self] charOffset in
+            self?.seek(toCharOffset: charOffset)
+        }
+    }
+
+    /// Continue reading from an arbitrary point, requested by the remote.
+    /// Applies to every surface: word-tracking follows the speech recognizer,
+    /// while classic / silence-paused modes are driven by the scroll progress.
+    func seek(toCharOffset charOffset: Int) {
+        overlayController.speechRecognizer.jumpTo(charOffset: charOffset)
+
+        for content in [overlayController.overlayContent, externalDisplayController.overlayContent] {
+            content.seekCharOffset = charOffset
+            content.seekToken &+= 1
+        }
+
+        browserServer.applySeek(charOffset: charOffset)
     }
 
     // MARK: - Director Server
