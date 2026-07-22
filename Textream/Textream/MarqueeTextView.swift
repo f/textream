@@ -74,6 +74,13 @@ struct WordYPreferenceKey: PreferenceKey {
     }
 }
 
+struct FlowContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 // MARK: - Teleprompter
 
 struct SpeechScrollView: View {
@@ -85,9 +92,9 @@ struct SpeechScrollView: View {
     var cueUnreadOpacity: Double = 0.2
     var cueReadOpacity: Double = 0.5
     var onWordTap: ((Int) -> Void)? = nil
-    /// Called when user starts/stops manual scrolling in smooth mode.
-    /// Bool: true = scrolling started (pause timer), false = scrolling ended (resume timer).
-    /// Double: new word progress to resume from (only meaningful when false).
+    /// Called when the user starts/stops manual scrolling.
+    /// Bool: true = scrolling started, false = scrolling ended.
+    /// Double: the word progress at the viewport anchor when scrolling ends.
     var onManualScroll: ((Bool, Double) -> Void)? = nil
     var smoothScroll: Bool = false
     /// Continuous word progress (e.g. 3.7 = 70% through 4th word). Drives scroll in smooth mode.
@@ -97,8 +104,11 @@ struct SpeechScrollView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var manualOffset: CGFloat = 0
     @State private var wordYPositions: [Int: CGFloat] = [:]
+    @State private var contentHeight: CGFloat = 0
     @State private var containerHeight: CGFloat = 0
     @State private var isUserScrolling: Bool = false
+    @State private var isManuallyBrowsing: Bool = false
+    @State private var needsLayoutRecenter: Bool = true
 
     var body: some View {
         GeometryReader { geo in
@@ -112,24 +122,28 @@ struct SpeechScrollView: View {
                 cueReadOpacity: cueReadOpacity,
                 highlightWords: !smoothScroll,
                 containerWidth: geo.size.width,
-                onWordTap: { charOffset in
+                onWordTap: { charOffset, wordIndex in
+                    isManuallyBrowsing = false
                     manualOffset = 0
+                    needsLayoutRecenter = false
+                    recalcCenter(onWordIndex: wordIndex, containerHeight: containerHeight)
                     onWordTap?(charOffset)
-                    // Force recenter on tapped word
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        recalcCenter(containerHeight: containerHeight)
-                    }
                 },
                 scrollOffset: scrollOffset + manualOffset,
                 viewportHeight: geo.size.height
             )
             .onPreferenceChange(WordYPreferenceKey.self) { positions in
-                let wasEmpty = wordYPositions.isEmpty
                 wordYPositions = positions
-                // After a page switch, wordYPositions was cleared — recenter once new positions arrive
-                if wasEmpty && !positions.isEmpty {
+                // Recenter only for initial/page layout. Virtualization can
+                // briefly empty this preference while scrolling, which must
+                // not be interpreted as a page change.
+                if needsLayoutRecenter && !positions.isEmpty && !isManuallyBrowsing {
+                    needsLayoutRecenter = false
                     recalcCenter(containerHeight: containerHeight)
                 }
+            }
+            .onPreferenceChange(FlowContentHeightPreferenceKey.self) { height in
+                contentHeight = height
             }
             .offset(y: scrollOffset + manualOffset)
             .animation(smoothScroll ? .linear(duration: 0.06) : .easeOut(duration: 0.5), value: scrollOffset)
@@ -140,24 +154,24 @@ struct SpeechScrollView: View {
                     // Initial state: center first line on screen
                     let lineHeight = font.pointSize * 1.4
                     scrollOffset = newHeight * 0.5 - lineHeight * 0.5
-                } else if isListening {
+                } else if isListening && !isManuallyBrowsing {
                     recalcCenter(containerHeight: newHeight)
                 }
             }
             .onChange(of: highlightedCharCount) { _, _ in
-                if isListening && !smoothScroll {
+                if isListening && !smoothScroll && !isUserScrolling && !isManuallyBrowsing {
                     manualOffset = 0
                     recalcCenter(containerHeight: containerHeight)
                 }
             }
             .onChange(of: smoothWordProgress) { _, _ in
-                if isListening && smoothScroll {
+                if isListening && smoothScroll && !isUserScrolling {
                     manualOffset = 0
                     recalcCenter(containerHeight: containerHeight)
                 }
             }
             .onChange(of: isListening) { _, listening in
-                if listening {
+                if listening && !isUserScrolling && !isManuallyBrowsing {
                     manualOffset = 0
                     recalcCenter(containerHeight: containerHeight)
                 }
@@ -168,6 +182,8 @@ struct SpeechScrollView: View {
                 scrollOffset = containerHeight * 0.5 - lineHeight * 0.5
                 manualOffset = 0
                 wordYPositions = [:]
+                isManuallyBrowsing = false
+                needsLayoutRecenter = true
             }
             .onAppear {
                 containerHeight = geo.size.height
@@ -178,52 +194,60 @@ struct SpeechScrollView: View {
             .overlay(
                 ScrollWheelView(
                     onScroll: { delta in
-                        let canScroll = smoothScroll ? isListening : !isListening
-                        guard canScroll else { return }
-
-                        // Pause timer when user starts scrolling in smooth mode
-                        if smoothScroll && !isUserScrolling {
+                        // Manual navigation is available in every mode. While
+                        // the wheel gesture is active, suspend auto-follow so
+                        // microphone updates cannot fight the user's movement.
+                        if !isUserScrolling {
                             isUserScrolling = true
                             onManualScroll?(true, 0)
                         }
+                        if !smoothScroll {
+                            isManuallyBrowsing = true
+                        }
 
-                        let maxY = wordYPositions.values.max() ?? 0
-                        let containerHeight = geo.size.height
-                        let maxUp = containerHeight * 0.5
-                        let maxDown = max(0, maxY - containerHeight * 0.5)
+                        let bounds = scrollBounds(containerHeight: geo.size.height)
+                        let newTotalOffset = scrollOffset + manualOffset + delta
 
-                        let newOffset = manualOffset + delta
-                        let upperBound = maxUp
-                        let lowerBound = -maxDown
-
-                        if newOffset > upperBound {
-                            let over = newOffset - upperBound
-                            manualOffset = upperBound + over * 0.2
-                        } else if newOffset < lowerBound {
-                            let over = lowerBound - newOffset
-                            manualOffset = lowerBound - over * 0.2
+                        if newTotalOffset > bounds.upper {
+                            let over = newTotalOffset - bounds.upper
+                            manualOffset = bounds.upper + over * 0.2 - scrollOffset
+                        } else if newTotalOffset < bounds.lower {
+                            let over = bounds.lower - newTotalOffset
+                            manualOffset = bounds.lower - over * 0.2 - scrollOffset
                         } else {
-                            manualOffset = newOffset
+                            manualOffset = newTotalOffset - scrollOffset
                         }
                     },
                     onScrollEnd: {
-                        if smoothScroll && isUserScrolling {
-                            // Find the word at the new visual center
+                        if isUserScrolling {
+                            // Remove any rubber-band overscroll before deriving
+                            // the progress that tracking should resume from.
+                            let bounds = scrollBounds(containerHeight: geo.size.height)
+                            let totalOffset = scrollOffset + manualOffset
+                            let committedOffset = min(bounds.upper, max(bounds.lower, totalOffset))
+                            manualOffset = committedOffset - scrollOffset
+
                             let newProgress = wordProgressAtCurrentOffset()
-                            withAnimation(.easeOut(duration: 0.15)) {
+
+                            // Fold the manual delta into the base offset without
+                            // moving the text. This also preserves the browsed
+                            // position while Classic/Voice-Activated is paused.
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                scrollOffset = committedOffset
                                 manualOffset = 0
                             }
                             isUserScrolling = false
                             onManualScroll?(false, newProgress)
                         } else {
-                            let maxY = wordYPositions.values.max() ?? 0
-                            let containerHeight = geo.size.height
-                            let upperBound = containerHeight * 0.5
-                            let lowerBound = -max(0, maxY - containerHeight * 0.5)
+                            let bounds = scrollBounds(containerHeight: geo.size.height)
+                            let totalOffset = scrollOffset + manualOffset
+                            let clampedOffset = min(bounds.upper, max(bounds.lower, totalOffset))
 
-                            if manualOffset > upperBound || manualOffset < lowerBound {
+                            if totalOffset != clampedOffset {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    manualOffset = min(upperBound, max(lowerBound, manualOffset))
+                                    manualOffset = clampedOffset - scrollOffset
                                 }
                             }
                         }
@@ -272,11 +296,35 @@ struct SpeechScrollView: View {
         }
     }
 
+    private func recalcCenter(onWordIndex wordIndex: Int, containerHeight: CGFloat) {
+        guard let wordY = wordYPositions[wordIndex] else { return }
+        let anchor = smoothScroll ? containerHeight - 20 : containerHeight * 0.5
+        let target = anchor - wordY
+
+        if abs(scrollOffset - target) > 1 {
+            scrollOffset = target
+        }
+    }
+
+    private func scrollBounds(containerHeight: CGFloat) -> (lower: CGFloat, upper: CGFloat) {
+        let rowHeight = ceil(font.ascender - font.descender + font.leading)
+        let firstWordY = rowHeight * 0.5
+        let fullHeight = max(rowHeight, contentHeight)
+        let lastWordY = max(firstWordY, fullHeight - rowHeight * 0.5)
+        let anchor = smoothScroll ? containerHeight - 20 : containerHeight * 0.5
+
+        return (
+            lower: min(anchor - lastWordY, anchor - firstWordY),
+            upper: anchor - firstWordY
+        )
+    }
+
     /// Find the word progress at the current visual position (scrollOffset + manualOffset)
     private func wordProgressAtCurrentOffset() -> Double {
-        let center = containerHeight * 0.5
-        // The Y position currently at the center of the view
-        let targetY = center - (scrollOffset + manualOffset)
+        // Smooth auto-scroll keeps the active word near the bottom, so manual
+        // scrolling must resolve progress at that same anchor to avoid a jump.
+        let anchor = smoothScroll ? containerHeight - 20 : containerHeight * 0.5
+        let targetY = anchor - (scrollOffset + manualOffset)
 
         // Find the closest word and interpolate
         let sorted = wordYPositions.sorted { $0.key < $1.key }
@@ -339,7 +387,7 @@ struct WordFlowLayout: View {
     var cueReadOpacity: Double = 0.5
     var highlightWords: Bool = true
     let containerWidth: CGFloat
-    var onWordTap: ((Int) -> Void)? = nil
+    var onWordTap: ((Int, Int) -> Void)? = nil
     var scrollOffset: CGFloat = 0
     var viewportHeight: CGFloat = 0
 
@@ -417,6 +465,14 @@ struct WordFlowLayout: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { contentGeo in
+                Color.clear.preference(
+                    key: FlowContentHeightPreferenceKey.self,
+                    value: contentGeo.size.height
+                )
+            }
+        )
         .coordinateSpace(name: "flowLayout")
     }
 
@@ -447,7 +503,7 @@ struct WordFlowLayout: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    onWordTap?(item.charOffset)
+                    onWordTap?(item.charOffset, item.id)
                 }
         }
 
@@ -470,7 +526,7 @@ struct WordFlowLayout: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    onWordTap?(item.charOffset)
+                    onWordTap?(item.charOffset, item.id)
                 }
         }
 
@@ -496,7 +552,7 @@ struct WordFlowLayout: View {
             )
             .contentShape(Rectangle())
             .onTapGesture {
-                onWordTap?(item.charOffset)
+                onWordTap?(item.charOffset, item.id)
             }
     }
 
@@ -621,16 +677,24 @@ struct ScrollWheelView: NSViewRepresentable {
         nsView.onScroll = onScroll
         nsView.onScrollEnd = onScrollEnd
     }
+
+    static func dismantleNSView(_ nsView: ScrollWheelNSView, coordinator: ()) {
+        nsView.stopMonitoring()
+    }
 }
 
 class ScrollWheelNSView: NSView {
     var onScroll: ((CGFloat) -> Void)?
     var onScrollEnd: (() -> Void)?
     private var scrollMonitor: Any?
+    private var scrollEndWorkItem: DispatchWorkItem?
+    private var scrollGeneration = 0
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil && scrollMonitor == nil {
+        if window == nil {
+            stopMonitoring()
+        } else if scrollMonitor == nil {
             scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
                 guard let self, let window = self.window else { return event }
                 // Only handle if event is in our window
@@ -638,9 +702,10 @@ class ScrollWheelNSView: NSView {
                     let delta = event.scrollingDeltaY
                     let scaled = event.hasPreciseScrollingDeltas ? delta : delta * 10
                     self.onScroll?(scaled)
+                    self.scheduleScrollEnd()
 
-                    if event.phase == .ended || event.momentumPhase == .ended {
-                        self.onScrollEnd?()
+                    if event.phase == .cancelled || event.momentumPhase == .ended {
+                        self.finishScroll()
                     }
                 }
                 return event
@@ -648,11 +713,42 @@ class ScrollWheelNSView: NSView {
         }
     }
 
-    override func removeFromSuperview() {
+    private func scheduleScrollEnd() {
+        scrollGeneration += 1
+        let generation = scrollGeneration
+        scrollEndWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.scrollGeneration == generation else { return }
+            self.finishScroll()
+        }
+        scrollEndWorkItem = workItem
+
+        // Legacy mouse wheels report no NSEvent phase. Treat a short period
+        // without wheel events as the end of the manual-scroll gesture.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+    }
+
+    private func finishScroll() {
+        scrollGeneration += 1
+        scrollEndWorkItem?.cancel()
+        scrollEndWorkItem = nil
+        onScrollEnd?()
+    }
+
+    func stopMonitoring() {
+        scrollGeneration += 1
+        scrollEndWorkItem?.cancel()
+        scrollEndWorkItem = nil
+
         if let monitor = scrollMonitor {
             NSEvent.removeMonitor(monitor)
             scrollMonitor = nil
         }
+    }
+
+    override func removeFromSuperview() {
+        stopMonitoring()
         super.removeFromSuperview()
     }
 
