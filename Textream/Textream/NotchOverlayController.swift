@@ -33,6 +33,10 @@ class NotchFrameTracker {
 @Observable
 class OverlayContent {
     var words: [String] = []
+    /// Word indices after which the source text had a hard line break
+    var lineBreaksAfter: Set<Int> = []
+    /// Subset of `lineBreaksAfter` followed by a blank line (paragraph break)
+    var blankLineAfter: Set<Int> = []
     var totalCharCount: Int = 0
     var hasNextPage: Bool = false
 
@@ -72,7 +76,10 @@ class NotchOverlayController: NSObject {
 
         // Populate overlay content
         let normalized = splitTextIntoWords(text)
+        let (breaksAfter, blankAfter) = lineBreakIndices(text)
         overlayContent.words = normalized
+        overlayContent.lineBreaksAfter = breaksAfter
+        overlayContent.blankLineAfter = blankAfter
         overlayContent.totalCharCount = normalized.joined(separator: " ").count
         overlayContent.hasNextPage = hasNextPage
 
@@ -123,6 +130,7 @@ class NotchOverlayController: NSObject {
 
     func updateContent(text: String, hasNextPage: Bool) {
         let normalized = splitTextIntoWords(text)
+        let (breaksAfter, blankAfter) = lineBreakIndices(text)
 
         // Fully reset speech state for new page
         speechRecognizer.recognizedCharCount = 0
@@ -131,6 +139,8 @@ class NotchOverlayController: NSObject {
         speechRecognizer.lastSpokenText = ""
 
         overlayContent.words = normalized
+        overlayContent.lineBreaksAfter = breaksAfter
+        overlayContent.blankLineAfter = blankAfter
         overlayContent.totalCharCount = normalized.joined(separator: " ").count
         overlayContent.hasNextPage = hasNextPage
 
@@ -875,6 +885,8 @@ struct NotchOverlayView: View {
         VStack(spacing: 0) {
             SpeechScrollView(
                 words: words,
+                lineBreaksAfter: content.lineBreaksAfter,
+                blankLineAfter: content.blankLineAfter,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
@@ -1372,6 +1384,8 @@ struct FloatingOverlayView: View {
         VStack(spacing: 0) {
             SpeechScrollView(
                 words: words,
+                lineBreaksAfter: content.lineBreaksAfter,
+                blankLineAfter: content.blankLineAfter,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,

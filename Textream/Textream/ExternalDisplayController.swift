@@ -29,7 +29,7 @@ class ExternalDisplayController {
         return screens.first
     }
 
-    func show(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int, hasNextPage: Bool = false) {
+    func show(speechRecognizer: SpeechRecognizer, words: [String], lineBreaksAfter: Set<Int> = [], blankLineAfter: Set<Int> = [], totalCharCount: Int, hasNextPage: Bool = false) {
         let settings = NotchSettings.shared
         guard settings.externalDisplayMode != .off else { return }
         guard let screen = targetScreen() else { return }
@@ -37,6 +37,8 @@ class ExternalDisplayController {
         dismiss()
 
         overlayContent.words = words
+        overlayContent.lineBreaksAfter = lineBreaksAfter
+        overlayContent.blankLineAfter = blankLineAfter
         overlayContent.totalCharCount = totalCharCount
         overlayContent.hasNextPage = hasNextPage
 
@@ -222,6 +224,8 @@ struct ExternalDisplayView: View {
 
                 SpeechScrollView(
                     words: words,
+                    lineBreaksAfter: content.lineBreaksAfter,
+                    blankLineAfter: content.blankLineAfter,
                     highlightedCharCount: effectiveCharCount,
                     font: .systemFont(ofSize: fontSize, weight: .semibold),
                     highlightColor: NotchSettings.shared.fontColorPreset.color,
