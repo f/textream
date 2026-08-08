@@ -62,6 +62,8 @@ struct HighlightingTextEditor: NSViewRepresentable {
         textView.string = text
         context.coordinator.applyHighlighting(textView)
 
+        updateWritingDirection(textView, text: text)
+
         return scrollView
     }
 
@@ -74,6 +76,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
             textView.selectedRanges = selectedRanges
             context.coordinator.applyHighlighting(textView)
         }
+        updateWritingDirection(textView, text: text)
 
         // Apply bump highlight on newly dictated range
         if let range = highlightRange, range.location + range.length <= textView.string.count {
@@ -88,6 +91,18 @@ struct HighlightingTextEditor: NSViewRepresentable {
             DispatchQueue.main.async {
                 self.caretPosition = nil
             }
+        }
+    }
+
+    /// Set the text view's base writing direction based on the content's script.
+    private func updateWritingDirection(_ textView: NSTextView, text: String) {
+        switch textBaseDirection(in: text) {
+        case .rightToLeft:
+            textView.baseWritingDirection = .rightToLeft
+        case .leftToRight:
+            textView.baseWritingDirection = .leftToRight
+        case .natural:
+            textView.baseWritingDirection = .natural
         }
     }
 
@@ -107,6 +122,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            parent.updateWritingDirection(textView, text: textView.string)
             applyHighlighting(textView)
         }
 

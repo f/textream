@@ -384,10 +384,25 @@ struct WordFlowLayout: View {
         return -1
     }
 
+    private func isRightToLeft(items: [WordItem]) -> Bool {
+        for item in items where !item.isAnnotation {
+            switch textBaseDirection(in: item.word) {
+            case .rightToLeft:
+                return true
+            case .leftToRight:
+                return false
+            case .natural:
+                continue
+            }
+        }
+        return false
+    }
+
     var body: some View {
         let (items, lines) = cachedLayout()
         let nextIdx = nextWordIndex(items: items)
         let totalLines = lines.count
+        let rtl = isRightToLeft(items: items)
 
         // Estimate line height for visibility culling using actual font metrics
         let lineH = ceil(font.ascender - font.descender + font.leading) + lineSpacing
@@ -398,7 +413,9 @@ struct WordFlowLayout: View {
         let startLine = canCull ? max(0, min(totalLines, Int(floor((-scrollOffset - buffer) / lineH)))) : 0
         let endLine = canCull ? max(startLine, min(totalLines, Int(ceil((viewportHeight - scrollOffset + buffer) / lineH)))) : totalLines
 
-        VStack(alignment: .leading, spacing: lineSpacing) {
+        // For RTL scripts (Arabic, Hebrew, Persian, Urdu), flip the layout direction
+        // so words within each line flow right-to-left instead of left-to-right.
+        VStack(alignment: rtl ? .trailing : .leading, spacing: lineSpacing) {
             if startLine > 0 {
                 Color.clear.frame(height: CGFloat(startLine) * lineH)
             }
@@ -410,13 +427,14 @@ struct WordFlowLayout: View {
                             .id(item.id)
                     }
                 }
+                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
             }
 
             if endLine < totalLines {
                 Color.clear.frame(height: CGFloat(totalLines - endLine) * lineH)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
         .coordinateSpace(name: "flowLayout")
     }
 
