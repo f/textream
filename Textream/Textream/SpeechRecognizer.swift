@@ -48,7 +48,10 @@ struct AudioInputDevice: Identifiable, Hashable {
             )
             var uid: CFString = "" as CFString
             var uidSize = UInt32(MemoryLayout<CFString>.size)
-            guard AudioObjectGetPropertyData(deviceID, &uidAddress, 0, nil, &uidSize, &uid) == noErr else { continue }
+            let uidStatus = withUnsafeMutablePointer(to: &uid) { uidPointer in
+                AudioObjectGetPropertyData(deviceID, &uidAddress, 0, nil, &uidSize, uidPointer)
+            }
+            guard uidStatus == noErr else { continue }
 
             // Get name
             var nameAddress = AudioObjectPropertyAddress(
@@ -58,7 +61,10 @@ struct AudioInputDevice: Identifiable, Hashable {
             )
             var name: CFString = "" as CFString
             var nameSize = UInt32(MemoryLayout<CFString>.size)
-            guard AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, &name) == noErr else { continue }
+            let nameStatus = withUnsafeMutablePointer(to: &name) { namePointer in
+                AudioObjectGetPropertyData(deviceID, &nameAddress, 0, nil, &nameSize, namePointer)
+            }
+            guard nameStatus == noErr else { continue }
 
             result.append(AudioInputDevice(id: deviceID, uid: uid as String, name: name as String))
         }
@@ -74,6 +80,7 @@ struct AudioInputDevice: Identifiable, Hashable {
 class SpeechRecognizer {
     var recognizedCharCount: Int = 0
     var isListening: Bool = false
+    var isStarting: Bool = false
     var error: String?
     var audioLevels: [CGFloat] = Array(repeating: 0, count: 30)
     var lastSpokenText: String = ""
@@ -82,10 +89,7 @@ class SpeechRecognizer {
 
     /// True when recent audio levels indicate the user is actively speaking
     var isSpeaking: Bool {
-        let recent = audioLevels.suffix(10)
-        guard !recent.isEmpty else { return false }
-        let avg = recent.reduce(0, +) / CGFloat(recent.count)
-        return avg > 0.08
+        voiceActivityDetector.isActive(at: ProcessInfo.processInfo.systemUptime)
     }
 
     private var speechRecognizer: SFSpeechRecognizer?
@@ -94,18 +98,34 @@ class SpeechRecognizer {
     private var audioEngine = AVAudioEngine()
     private var sourceText: String = ""
     private var normalizedSource: String = ""
+    private var annotationRanges: [Range<Int>] = []
+    private var voiceActivityDetector = VoiceActivityDetector()
     private var matchStartOffset: Int = 0  // char offset to start matching from
     private var retryCount: Int = 0
     private let maxRetries: Int = 10
     private var configurationChangeObserver: Any?
     private var pendingRestart: DispatchWorkItem?
     private var sessionGeneration: Int = 0
+    private var recognitionGeneration: Int = 0
+    private var shouldListen: Bool = false
     private var suppressConfigChange: Bool = false
     private var requestLock = NSLock()
     private var preemptiveRestartTimer: Timer?
     /// Sliding window of recent match positions for confidence gating.
     /// We require 2-of-3 recent results to agree before committing a forward jump.
     private var recentMatchPositions: [Int] = []
+    /// Transcript prefix to ignore when matching — set on jumps so the task
+    /// can keep running instead of being restarted (a restart loses the words
+    /// the user re-speaks right after the jump). Stored as the prefix string,
+    /// not a char count: partial results revise earlier text, and trimming by
+    /// the surviving common prefix avoids swallowing post-jump speech when
+    /// the pre-jump portion changes length. Cleared whenever a new
+    /// recognition task starts a fresh transcript.
+    private var spokenAnchorPrefix: String = ""
+    /// Results computed before a jump can be delivered after it; matching
+    /// ignores results for a short window so pre-jump speech isn't matched
+    /// against the text at the new offset.
+    private var lastJumpAt: Date = .distantPast
 
     /// Update the source text while preserving the current recognized char count.
     /// Used by Director Mode to live-edit unread text without resetting read progress.
@@ -114,20 +134,37 @@ class SpeechRecognizer {
         let collapsed = words.joined(separator: " ")
         sourceText = collapsed
         normalizedSource = Self.normalize(collapsed)
+        annotationRanges = SpeechTextAlignment.annotationRanges(in: collapsed)
         recognizedCharCount = min(preservingCharCount, collapsed.count)
+        recognizedCharCount = advancePastAnnotations(from: recognizedCharCount)
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
     }
 
-    /// Jump highlight to a specific char offset (e.g. when user taps a word)
+    /// Jump highlight to a specific char offset (e.g. when user taps a word).
+    /// Nearby jumps keep the recognition task alive and anchor matching past
+    /// the already-spoken transcript, so tracking resumes on the first
+    /// re-spoken word. Far jumps restart the task instead: contextualStrings
+    /// are built for the section being read, and after a page-scale jump
+    /// stale hints hurt recognition more than the task warm-up costs.
+    /// retryCount is deliberately not touched here — resetting it on every
+    /// tap would let a user keep a failing availability-retry loop alive
+    /// forever.
     func jumpTo(charOffset: Int) {
-        recognizedCharCount = charOffset
-        matchStartOffset = charOffset
-        retryCount = 0
+        let clampedOffset = max(0, min(charOffset, sourceText.count))
+        let targetOffset = advancePastAnnotations(from: clampedOffset)
+        let distance = abs(targetOffset - recognizedCharCount)
+        recognizedCharCount = targetOffset
+        matchStartOffset = targetOffset
         recentMatchPositions = []
-        if isListening {
-            restartRecognition()
+        if isListening && (distance > 500 || !audioEngine.isRunning) {
+            // Far jump, or the engine died without a config-change callback —
+            // fall back to a full restart (also refreshes contextualStrings).
+            restartRecognition(resetRetryCount: false)
+            return
         }
+        spokenAnchorPrefix = lastSpokenText
+        lastJumpAt = Date()
     }
 
     func start(with text: String) {
@@ -139,48 +176,68 @@ class SpeechRecognizer {
         let collapsed = words.joined(separator: " ")
         sourceText = collapsed
         normalizedSource = Self.normalize(collapsed)
-        recognizedCharCount = 0
-        matchStartOffset = 0
+        annotationRanges = SpeechTextAlignment.annotationRanges(in: collapsed)
+        recognizedCharCount = advancePastAnnotations(from: 0)
+        matchStartOffset = recognizedCharCount
         retryCount = 0
         recentMatchPositions = []
         error = nil
-        sessionGeneration += 1
+        sessionGeneration &+= 1
+        shouldListen = true
+        isListening = false
+        isStarting = true
+        requestMicrophoneAccessAndBegin(for: sessionGeneration)
+    }
+
+    private func requestMicrophoneAccessAndBegin(for generation: Int) {
+        guard shouldListen, sessionGeneration == generation else { return }
 
         // Check microphone permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream."
+            failListening("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
             openMicrophoneSettings()
-            return
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
                 DispatchQueue.main.async {
+                    guard let self,
+                          self.shouldListen,
+                          self.sessionGeneration == generation else { return }
                     if granted {
-                        self?.requestSpeechAuthAndBegin()
+                        self.beginAfterMicrophoneAccess(for: generation)
                     } else {
-                        self?.error = "Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream."
+                        self.failListening("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
                     }
                 }
             }
-            return
         case .authorized:
-            break
+            beginAfterMicrophoneAccess(for: generation)
         @unknown default:
-            break
+            failListening("Microphone authorization is unavailable.")
         }
-
-        requestSpeechAuthAndBegin()
     }
 
-    private func requestSpeechAuthAndBegin() {
+    private func beginAfterMicrophoneAccess(for generation: Int) {
+        guard shouldListen, sessionGeneration == generation else { return }
+        if NotchSettings.shared.listeningMode == .wordTracking {
+            requestSpeechAuthAndBegin(for: generation)
+        } else {
+            beginRecognition()
+        }
+    }
+
+    private func requestSpeechAuthAndBegin(for generation: Int) {
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             DispatchQueue.main.async {
+                guard let self,
+                      self.shouldListen,
+                      self.sessionGeneration == generation else { return }
                 switch status {
                 case .authorized:
-                    self?.beginRecognition()
+                    self.beginRecognition()
                 default:
-                    self?.error = "Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream."
-                    self?.openSpeechRecognitionSettings()
+                    self.failListening("Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream.")
+                    self.openSpeechRecognitionSettings()
                 }
             }
         }
@@ -198,28 +255,53 @@ class SpeechRecognizer {
         }
     }
 
-    func stop() {
+    private func failListening(_ message: String) {
+        voiceActivityDetector.reset()
+        shouldListen = false
         isListening = false
+        isStarting = false
+        error = message
+        cleanupRecognition()
+    }
+
+    func stop() {
+        shouldListen = false
+        sessionGeneration &+= 1
+        isListening = false
+        isStarting = false
         cleanupRecognition()
     }
 
     func forceStop() {
+        shouldListen = false
+        sessionGeneration &+= 1
         isListening = false
+        isStarting = false
         sourceText = ""
+        annotationRanges = []
         retryCount = maxRetries
         recentMatchPositions = []
         cleanupRecognition()
     }
 
     func resume() {
+        guard !sourceText.isEmpty else { return }
+        cleanupRecognition()
         retryCount = 0
+        recognizedCharCount = advancePastAnnotations(from: recognizedCharCount)
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
         shouldDismiss = false
-        beginRecognition()
+        error = nil
+        sessionGeneration &+= 1
+        shouldListen = true
+        isListening = false
+        isStarting = true
+        requestMicrophoneAccessAndBegin(for: sessionGeneration)
     }
 
     private func cleanupRecognitionTask() {
+        recognitionGeneration &+= 1
         // Cancel any pending restart to prevent overlapping beginRecognition calls
         pendingRestart?.cancel()
         pendingRestart = nil
@@ -248,14 +330,22 @@ class SpeechRecognizer {
     private func cleanupRecognition() {
         cleanupRecognitionTask()
         cleanupAudioEngine()
+        voiceActivityDetector.reset()
     }
 
     /// Coalesces all delayed beginRecognition() calls into a single pending work item.
     /// Any previously scheduled restart is cancelled before the new one is queued.
     private func scheduleBeginRecognition(after delay: TimeInterval) {
         pendingRestart?.cancel()
+        guard shouldListen, !sourceText.isEmpty else { return }
+        isListening = false
+        isStarting = true
+        let expectedSessionGeneration = sessionGeneration
         let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
+            guard let self,
+                  self.shouldListen,
+                  self.sessionGeneration == expectedSessionGeneration,
+                  !self.sourceText.isEmpty else { return }
             self.pendingRestart = nil
             self.beginRecognition()
         }
@@ -264,13 +354,32 @@ class SpeechRecognizer {
     }
 
     private func beginRecognition() {
+        guard shouldListen, !sourceText.isEmpty else {
+            isListening = false
+            isStarting = false
+            return
+        }
+        let expectedSessionGeneration = sessionGeneration
+        let requiresSpeechRecognition = NotchSettings.shared.listeningMode == .wordTracking
         // Ensure clean state
         cleanupRecognition()
+        guard shouldListen, sessionGeneration == expectedSessionGeneration else {
+            isListening = false
+            isStarting = false
+            return
+        }
+        isListening = false
+        isStarting = true
+        // New session = fresh transcript (see restartTask for why
+        // lastSpokenText must be cleared alongside the anchor)
+        spokenAnchorPrefix = ""
+        lastSpokenText = ""
 
         // Create a fresh engine so it picks up the current hardware format.
         // AVAudioEngine caches the device format internally and reset() alone
         // does not reliably flush it after a mic switch.
         audioEngine = AVAudioEngine()
+        suppressConfigChange = false
 
         // Set selected microphone if configured
         let micUID = NotchSettings.shared.selectedMicUID
@@ -293,29 +402,56 @@ class SpeechRecognizer {
                 AudioUnitInitialize(audioUnit)
             }
             // Allow config changes again after a settle period
+            let expectedSessionGeneration = sessionGeneration
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                self?.suppressConfigChange = false
+                guard let self,
+                      self.sessionGeneration == expectedSessionGeneration else { return }
+                self.suppressConfigChange = false
             }
         }
 
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
-        guard let speechRecognizer, speechRecognizer.isAvailable else {
-            error = "Speech recognizer not available"
-            return
-        }
+        if requiresSpeechRecognition {
+            speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
+            guard let speechRecognizer else {
+                // nil means the locale isn't supported for speech recognition —
+                // that's permanent, so fail immediately instead of retrying.
+                failListening("Speech recognition isn't supported for the selected language.")
+                return
+            }
+            guard speechRecognizer.isAvailable else {
+                // Unavailability is often transient (the recognition service
+                // churns briefly after a task cancellation or device change).
+                // Giving up here leaves the engine stopped and the app deaf —
+                // retry like the invalid-format guard below does.
+                if retryCount < maxRetries {
+                    retryCount += 1
+                    scheduleBeginRecognition(after: 0.5)
+                } else {
+                    failListening("Speech recognizer is not available.")
+                }
+                return
+            }
 
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest else { return }
-        recognitionRequest.shouldReportPartialResults = true
+            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+            guard let recognitionRequest else {
+                failListening("Unable to create a speech recognition request.")
+                return
+            }
+            recognitionRequest.shouldReportPartialResults = true
+            recognitionRequest.taskHint = .dictation
 
-        // Add contextual strings from the source text to improve STT accuracy
-        let upcoming = String(sourceText.dropFirst(matchStartOffset))
-        let contextWords = upcoming.split(separator: " ")
-            .map { String($0).lowercased().filter { $0.isLetter || $0.isNumber } }
-            .filter { $0.count >= 5 }
-        let uniqueContextWords = Array(Set(contextWords).prefix(50))
-        if !uniqueContextWords.isEmpty {
-            recognitionRequest.contextualStrings = uniqueContextWords
+            // Add contextual strings from the source text to improve STT accuracy
+            let upcoming = String(sourceText.dropFirst(matchStartOffset))
+            let contextWords = upcoming.split(separator: " ")
+                .map { String($0).lowercased().filter { $0.isLetter || $0.isNumber } }
+                .filter { $0.count >= 5 }
+            let uniqueContextWords = Array(Set(contextWords).prefix(50))
+            if !uniqueContextWords.isEmpty {
+                recognitionRequest.contextualStrings = uniqueContextWords
+            }
+        } else {
+            speechRecognizer = nil
+            recognitionRequest = nil
         }
 
         let inputNode = audioEngine.inputNode
@@ -328,8 +464,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                error = "Audio input unavailable"
-                isListening = false
+                failListening("Audio input is unavailable.")
             }
             return
         }
@@ -351,7 +486,10 @@ class SpeechRecognizer {
             object: audioEngine,
             queue: .main
         ) { [weak self] _ in
-            guard let self, !self.suppressConfigChange, !self.sourceText.isEmpty else { return }
+            guard let self,
+                  self.shouldListen,
+                  !self.suppressConfigChange,
+                  !self.sourceText.isEmpty else { return }
             self.restartRecognition()
         }
 
@@ -371,58 +509,66 @@ class SpeechRecognizer {
             let level = CGFloat(min(rms * 5, 1.0))
 
             DispatchQueue.main.async {
-                self?.audioLevels.append(level)
-                if (self?.audioLevels.count ?? 0) > 30 {
-                    self?.audioLevels.removeFirst()
-                }
+                guard let self,
+                      self.shouldListen,
+                      self.sessionGeneration == expectedSessionGeneration else { return }
+                self.recordAudioLevel(level)
             }
         }
 
-        let currentGeneration = sessionGeneration
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self else { return }
-            if let result {
-                let spoken = result.bestTranscription.formattedString
-                DispatchQueue.main.async {
-                    // Ignore stale results from a previous session
-                    guard self.sessionGeneration == currentGeneration else { return }
-                    self.retryCount = 0 // Reset on success
-                    self.lastSpokenText = spoken
-                    self.matchCharacters(spoken: spoken)
-                }
-            }
-            if let error {
-                DispatchQueue.main.async {
-                    // If recognitionRequest is nil, cleanup already ran (intentional cancel) — don't retry
-                    guard self.recognitionRequest != nil else { return }
-                    guard self.isListening && !self.shouldDismiss && !self.sourceText.isEmpty else {
-                        self.isListening = false
-                        return
+        if let speechRecognizer, let recognitionRequest {
+            recognitionGeneration &+= 1
+            let currentRecognitionGeneration = recognitionGeneration
+            let currentGeneration = sessionGeneration
+            recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                guard let self else { return }
+                if let result {
+                    let spoken = result.bestTranscription.formattedString
+                    DispatchQueue.main.async {
+                        // Ignore stale results from a previous session
+                        guard self.sessionGeneration == currentGeneration,
+                              self.recognitionGeneration == currentRecognitionGeneration else { return }
+                        self.retryCount = 0 // Reset on success
+                        self.lastSpokenText = spoken
+                        self.matchCharacters(spoken: spoken)
                     }
-
-                    self.matchStartOffset = self.recognizedCharCount
-
-                    // Distinguish timeout errors (expected every ~60s) from real errors.
-                    // SFSpeechRecognizer timeout is error code 1110 in kAFAssistantErrorDomain,
-                    // or 216 (kAudioConverterErr_FormatNotSupported). Retry immediately for
-                    // timeouts with no retry limit; use backoff for real errors.
-                    let nsError = error as NSError
-                    let isTimeout = nsError.code == 1110 || nsError.code == 216
-
-                    if isTimeout {
-                        // Expected timeout — restart immediately, no retry limit
-                        self.retryCount = 0
-                        if self.audioEngine.isRunning {
-                            self.restartTask()
-                        } else {
-                            self.scheduleBeginRecognition(after: 0.1)
+                }
+                if let error {
+                    DispatchQueue.main.async {
+                        guard self.sessionGeneration == currentGeneration,
+                              self.recognitionGeneration == currentRecognitionGeneration else { return }
+                        // If recognitionRequest is nil, cleanup already ran (intentional cancel) — don't retry
+                        guard self.recognitionRequest != nil else { return }
+                        guard self.shouldListen && !self.shouldDismiss && !self.sourceText.isEmpty else {
+                            self.isListening = false
+                            self.isStarting = false
+                            return
                         }
-                    } else if self.retryCount < self.maxRetries {
-                        self.retryCount += 1
-                        let delay = min(Double(self.retryCount) * 0.5, 1.5)
-                        self.scheduleBeginRecognition(after: delay)
-                    } else {
-                        self.isListening = false
+
+                        self.matchStartOffset = self.recognizedCharCount
+
+                        // Distinguish timeout errors (expected every ~60s) from real errors.
+                        // SFSpeechRecognizer timeout is error code 1110 in kAFAssistantErrorDomain,
+                        // or 216 (kAudioConverterErr_FormatNotSupported). Retry immediately for
+                        // timeouts with no retry limit; use backoff for real errors.
+                        let nsError = error as NSError
+                        let isTimeout = nsError.code == 1110 || nsError.code == 216
+
+                        if isTimeout {
+                            // Expected timeout — restart immediately, no retry limit
+                            self.retryCount = 0
+                            if self.audioEngine.isRunning {
+                                self.restartTask()
+                            } else {
+                                self.scheduleBeginRecognition(after: 0.1)
+                            }
+                        } else if self.retryCount < self.maxRetries {
+                            self.retryCount += 1
+                            let delay = min(Double(self.retryCount) * 0.5, 1.5)
+                            self.scheduleBeginRecognition(after: delay)
+                        } else {
+                            self.failListening("Speech recognition stopped: \(error.localizedDescription)")
+                        }
                     }
                 }
             }
@@ -431,32 +577,51 @@ class SpeechRecognizer {
         do {
             audioEngine.prepare()
             try audioEngine.start()
+            guard shouldListen, sessionGeneration == expectedSessionGeneration else {
+                cleanupRecognition()
+                return
+            }
+            error = nil
+            isStarting = false
             isListening = true
-            startPreemptiveTimer()
+            if requiresSpeechRecognition {
+                startPreemptiveTimer()
+            }
         } catch {
             // Transient failure after a device switch — retry with longer delay
             if retryCount < maxRetries {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                self.error = "Audio engine failed: \(error.localizedDescription)"
-                isListening = false
+                failListening("Audio engine failed: \(error.localizedDescription)")
             }
         }
     }
 
-    private func restartRecognition() {
-        retryCount = 0
-        isListening = true
-        if audioEngine.isRunning {
-            restartTask()
-        } else {
-            cleanupRecognition()
-            scheduleBeginRecognition(after: 0.5)
+    private func restartRecognition(resetRetryCount: Bool = true) {
+        guard shouldListen, !sourceText.isEmpty else {
+            isListening = false
+            isStarting = false
+            return
         }
+        if resetRetryCount {
+            retryCount = 0
+        }
+        isListening = false
+        isStarting = true
+        cleanupRecognition()
+        scheduleBeginRecognition(after: 0.5)
     }
 
     // MARK: - Thread-safe buffer appending
+
+    private func recordAudioLevel(_ level: CGFloat) {
+        audioLevels.append(level)
+        if audioLevels.count > 30 {
+            audioLevels.removeFirst()
+        }
+        voiceActivityDetector.process(level: level, at: ProcessInfo.processInfo.systemUptime)
+    }
 
     private func appendBufferToRequest(_ buffer: AVAudioPCMBuffer) {
         requestLock.lock()
@@ -467,9 +632,25 @@ class SpeechRecognizer {
     // MARK: - Soft restart (task only, keeps audio engine running)
 
     private func restartTask() {
+        guard shouldListen, isListening, audioEngine.isRunning, !sourceText.isEmpty else {
+            isListening = false
+            if shouldListen, !sourceText.isEmpty {
+                cleanupRecognition()
+                scheduleBeginRecognition(after: 0.5)
+            }
+            return
+        }
+        recognitionGeneration &+= 1
+        let currentRecognitionGeneration = recognitionGeneration
         // Update match offset before restarting
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
+        // New task = fresh transcript. lastSpokenText must be cleared too:
+        // a jump taken before the first new result would otherwise anchor on
+        // the old task's transcript and trim away everything the new task
+        // ever produces.
+        spokenAnchorPrefix = ""
+        lastSpokenText = ""
 
         // Cancel any pending restart to avoid stale beginRecognition clobbering this session
         pendingRestart?.cancel()
@@ -480,6 +661,7 @@ class SpeechRecognizer {
         // between endAudio() and the new assignment.
         let newRequest = SFSpeechAudioBufferRecognitionRequest()
         newRequest.shouldReportPartialResults = true
+        newRequest.taskHint = .dictation
 
         // Add contextual strings for the remaining text
         let upcoming = String(sourceText.dropFirst(matchStartOffset))
@@ -507,8 +689,15 @@ class SpeechRecognizer {
 
         // Start new recognition task
         guard let speechRecognizer, speechRecognizer.isAvailable else {
-            error = "Speech recognizer not available"
-            isListening = false
+            // Transient unavailability — fall back to a full session restart
+            // with retries rather than going permanently deaf.
+            if retryCount < maxRetries {
+                retryCount += 1
+                scheduleBeginRecognition(after: 0.5)
+            } else {
+                // Don't leave the mic hot with no session consuming it
+                failListening("Speech recognizer is not available.")
+            }
             return
         }
 
@@ -518,7 +707,8 @@ class SpeechRecognizer {
             if let result {
                 let spoken = result.bestTranscription.formattedString
                 DispatchQueue.main.async {
-                    guard self.sessionGeneration == currentGeneration else { return }
+                    guard self.sessionGeneration == currentGeneration,
+                          self.recognitionGeneration == currentRecognitionGeneration else { return }
                     self.retryCount = 0
                     self.lastSpokenText = spoken
                     self.matchCharacters(spoken: spoken)
@@ -526,9 +716,12 @@ class SpeechRecognizer {
             }
             if let error {
                 DispatchQueue.main.async {
+                    guard self.sessionGeneration == currentGeneration,
+                          self.recognitionGeneration == currentRecognitionGeneration else { return }
                     guard self.recognitionRequest != nil else { return }
-                    guard self.isListening && !self.shouldDismiss && !self.sourceText.isEmpty else {
+                    guard self.shouldListen && !self.shouldDismiss && !self.sourceText.isEmpty else {
                         self.isListening = false
+                        self.isStarting = false
                         return
                     }
 
@@ -549,7 +742,7 @@ class SpeechRecognizer {
                         let delay = min(Double(self.retryCount) * 0.5, 1.5)
                         self.scheduleBeginRecognition(after: delay)
                     } else {
-                        self.isListening = false
+                        self.failListening("Speech recognition stopped: \(error.localizedDescription)")
                     }
                 }
             }
@@ -575,29 +768,38 @@ class SpeechRecognizer {
 
     // MARK: - Fuzzy character-level matching
 
-    private func matchCharacters(spoken: String) {
+    private func matchCharacters(spoken fullSpoken: String) {
+        // Results computed before a jump can be delivered just after it —
+        // don't match pre-jump speech against the text at the new offset.
+        guard Date().timeIntervalSince(lastJumpAt) > 0.3 else { return }
+
+        // Ignore transcript from before the most recent jump. Trim by the
+        // common prefix that survived the recognizer's revisions, but never
+        // less than the anchor length minus a small slack — a revision very
+        // early in the transcript would otherwise leak the whole pre-jump
+        // transcript back into matching.
+        var spoken = fullSpoken
+        if !spokenAnchorPrefix.isEmpty {
+            let common = zip(spokenAnchorPrefix, fullSpoken).prefix(while: { $0 == $1 }).count
+            let trimLen = min(fullSpoken.count, max(common, spokenAnchorPrefix.count - 24))
+            spoken = String(fullSpoken.dropFirst(trimLen))
+        }
+        guard !spoken.isEmpty else { return }
+
         // Strategy 1: character-level fuzzy match from the start offset
         let charResult = charLevelMatch(spoken: spoken)
 
         // Strategy 2: word-level match (handles STT word substitutions)
         let wordResult = wordLevelMatch(spoken: spoken)
 
-        // Use agreement-based selection instead of blind max().
-        // If both strategies agree within a tolerance, use the average.
-        // If they disagree wildly, use the more conservative (lower) result
-        // to avoid false-positive jumps.
-        let best: Int
-        let tolerance = 20 // characters
-        if abs(charResult - wordResult) <= tolerance {
-            best = (charResult + wordResult) / 2
-        } else {
-            best = min(charResult, wordResult)
-        }
+        // Combine the two strategies. When they agree, average; when they
+        // disagree, prefer the further (word-level) match so fast reading can
+        // catch up instead of being dragged back by the brittle character scan.
+        let best = SpeechTextAlignment.bestOffset(characterResult: charResult, wordResult: wordResult)
 
-        let newCount = matchStartOffset + best
-        guard newCount > recognizedCharCount else { return }
-
-        let candidate = min(newCount, sourceText.count)
+        let rawCandidate = min(matchStartOffset + best, sourceText.count)
+        let candidate = advancePastAnnotations(from: rawCandidate)
+        guard candidate > recognizedCharCount else { return }
 
         // Confidence gating: require 2-of-3 recent results to agree on
         // forward movement to avoid single-result false-positive jumps.
@@ -621,11 +823,24 @@ class SpeechRecognizer {
 
         // Small forward movements (< 1 word length) are always allowed
         // to keep the highlight responsive for normal reading
-        let smallStep = candidate - recognizedCharCount <= 15
-
-        if confirmed || smallStep {
+        if SpeechTextAlignment.shouldCommit(
+            characterResult: charResult,
+            wordResult: wordResult,
+            current: recognizedCharCount,
+            rawCandidate: rawCandidate,
+            candidate: candidate,
+            confirmed: confirmed
+        ) {
             recognizedCharCount = candidate
         }
+    }
+
+    private func advancePastAnnotations(from offset: Int) -> Int {
+        SpeechTextAlignment.advancePastAnnotations(
+            in: sourceText,
+            ranges: annotationRanges,
+            from: offset
+        )
     }
 
     private func charLevelMatch(spoken: String) -> Int {
@@ -641,6 +856,13 @@ class SpeechRecognizer {
         while si < src.count && ri < spk.count {
             let sc = src[si]
             let rc = spk[ri]
+
+            if sc == "[",
+               let closingIndex = src[si...].firstIndex(of: "]") {
+                si = closingIndex + 1
+                lastGoodOrigIndex = si
+                continue
+            }
 
             // Skip non-alphanumeric in source
             if !sc.isLetter && !sc.isNumber {
@@ -661,8 +883,9 @@ class SpeechRecognizer {
                 // Try to re-sync: look ahead in both strings
                 var found = false
 
-                // Skip up to 3 chars in spoken (STT inserted extra chars)
-                let maxSkipR = min(3, spk.count - ri - 1)
+                // Skip up to 5 chars in spoken (STT inserted extra chars, or
+                // fast reading outran the scan)
+                let maxSkipR = min(5, spk.count - ri - 1)
                 if maxSkipR >= 1 {
                     for skipR in 1...maxSkipR {
                         let nextRI = ri + skipR
@@ -675,8 +898,9 @@ class SpeechRecognizer {
                 }
                 if found { continue }
 
-                // Skip up to 3 chars in source (STT missed some chars)
-                let maxSkipS = min(3, src.count - si - 1)
+                // Skip up to 5 chars in source (STT missed some chars, or
+                // fast reading outran the scan)
+                let maxSkipS = min(5, src.count - si - 1)
                 if maxSkipS >= 1 {
                     for skipS in 1...maxSkipS {
                         let nextSI = si + skipS
@@ -696,6 +920,19 @@ class SpeechRecognizer {
             }
         }
 
+        while si < src.count {
+            if src[si] == "[",
+               let closingIndex = src[si...].firstIndex(of: "]") {
+                si = closingIndex + 1
+                lastGoodOrigIndex = si
+            } else if !src[si].isLetter && !src[si].isNumber {
+                si += 1
+                lastGoodOrigIndex = si
+            } else {
+                break
+            }
+        }
+
         return lastGoodOrigIndex
     }
 
@@ -708,15 +945,25 @@ class SpeechRecognizer {
     private func wordLevelMatch(spoken: String) -> Int {
         let remainingSource = String(sourceText.dropFirst(matchStartOffset))
         let sourceWords = remainingSource.split(separator: " ").map { String($0) }
-        let spokenWords = spoken.lowercased().split(separator: " ").map { String($0) }
+        let spokenWords = splitTextIntoWords(spoken.lowercased())
 
         var si = 0 // source word index
         var ri = 0 // spoken word index
         var matchedCharCount = 0
+        var isInsideAnnotation = false
 
         while si < sourceWords.count && ri < spokenWords.count {
             // Auto-skip annotation words in source (brackets, emoji)
-            if Self.isAnnotationWord(sourceWords[si]) {
+            let beginsAnnotation = sourceWords[si].hasPrefix("[")
+                && sourceWords[si...].contains(where: { $0.contains("]") })
+            let skipsAnnotation = isInsideAnnotation || beginsAnnotation || Self.isAnnotationWord(sourceWords[si])
+            if skipsAnnotation {
+                if beginsAnnotation {
+                    isInsideAnnotation = true
+                }
+                if sourceWords[si].contains("]") {
+                    isInsideAnnotation = false
+                }
                 matchedCharCount += sourceWords[si].count
                 if si < sourceWords.count - 1 { matchedCharCount += 1 }
                 si += 1
@@ -738,9 +985,10 @@ class SpeechRecognizer {
                     matchedCharCount += 1
                 }
             } else {
-                // Try skipping up to 3 spoken words (STT hallucinated words)
+                // Try skipping up to 5 spoken words (STT hallucinated words,
+                // or fast reading produced a burst)
                 var foundSpk = false
-                let maxSpkSkip = min(3, spokenWords.count - ri - 1)
+                let maxSpkSkip = min(5, spokenWords.count - ri - 1)
                 for skip in 1...max(1, maxSpkSkip) where skip <= maxSpkSkip {
                     let nextSpk = spokenWords[ri + skip].filter { $0.isLetter || $0.isNumber }
                     if srcWord == nextSpk || isFuzzyMatch(srcWord, nextSpk) {
@@ -751,9 +999,9 @@ class SpeechRecognizer {
                 }
                 if foundSpk { continue }
 
-                // Try skipping up to 3 source words (user read fast, STT missed words)
+                // Try skipping up to 5 source words (user read fast, STT missed words)
                 var foundSrc = false
-                let maxSrcSkip = min(3, sourceWords.count - si - 1)
+                let maxSrcSkip = min(5, sourceWords.count - si - 1)
                 for skip in 1...max(1, maxSrcSkip) where skip <= maxSrcSkip {
                     let nextSrc = sourceWords[si + skip].lowercased().filter { $0.isLetter || $0.isNumber }
                     if nextSrc == spkWord || isFuzzyMatch(nextSrc, spkWord) {
@@ -781,7 +1029,17 @@ class SpeechRecognizer {
         }
 
         // Auto-skip trailing annotation words at end of source
-        while si < sourceWords.count && Self.isAnnotationWord(sourceWords[si]) {
+        while si < sourceWords.count {
+            let beginsAnnotation = sourceWords[si].hasPrefix("[")
+                && sourceWords[si...].contains(where: { $0.contains("]") })
+            let skipsAnnotation = isInsideAnnotation || beginsAnnotation || Self.isAnnotationWord(sourceWords[si])
+            guard skipsAnnotation else { break }
+            if beginsAnnotation {
+                isInsideAnnotation = true
+            }
+            if sourceWords[si].contains("]") {
+                isInsideAnnotation = false
+            }
             matchedCharCount += sourceWords[si].count
             if si < sourceWords.count - 1 { matchedCharCount += 1 }
             si += 1

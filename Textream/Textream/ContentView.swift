@@ -12,7 +12,6 @@ import CoreImage.CIFilterBuiltins
 struct ContentView: View {
     @ObservedObject private var service = TextreamService.shared
     @State private var isRunning = false
-    @State private var isRecording = false
     @State private var dictation = DictationManager()
     @State private var dictationHighlightRange: NSRange? = nil
     @State private var dictationCaretPosition: Int? = nil
@@ -22,6 +21,9 @@ struct ContentView: View {
     @State private var dropAlertTitle: String = "Import Error"
     @State private var showSettings = false
     @State private var showAbout = false
+    @State private var languageSuggestion: SpeechLanguageSuggestion?
+    @State private var ignoredLanguageIdentifier: String?
+    @State private var languageDetectionTask: Task<Void, Never>?
     @FocusState private var isTextFocused: Bool
 
     private let defaultText = """
@@ -57,6 +59,89 @@ Happy presenting! [wave]
 
     private var hasAnyContent: Bool {
         service.pages.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    private var isRecording: Bool {
+        dictation.isRecording || dictation.isStarting
+    }
+
+    private func scheduleLanguageDetection(for text: String) {
+        languageDetectionTask?.cancel()
+        languageSuggestion = nil
+        let pageIndex = service.currentPageIndex
+        let localeIdentifier = NotchSettings.shared.speechLocale
+
+        languageDetectionTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 2_500_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled,
+                  service.currentPageIndex == pageIndex,
+                  service.currentPageText == text,
+                  NotchSettings.shared.speechLocale == localeIdentifier else { return }
+
+            let suggestion = SpeechLanguageDetector.suggestion(
+                for: text,
+                currentLocaleIdentifier: localeIdentifier
+            )
+            guard !Task.isCancelled,
+                  suggestion?.detectedLanguageIdentifier != ignoredLanguageIdentifier else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                languageSuggestion = suggestion
+            }
+        }
+    }
+
+    private func languageSuggestionBanner(_ suggestion: SpeechLanguageSuggestion) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "character.bubble.fill")
+                .foregroundStyle(Color.accentColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("This text looks like \(suggestion.languageName).")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Speech is currently set to \(languageLabel).")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Button("Use \(suggestion.languageName)") {
+                if isRecording {
+                    stopRecording()
+                }
+                ignoredLanguageIdentifier = nil
+                languageSuggestion = nil
+                NotchSettings.shared.speechLocale = suggestion.localeIdentifier
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("Switch speech recognition to \(suggestion.localeName)")
+
+            Button {
+                ignoredLanguageIdentifier = suggestion.detectedLanguageIdentifier
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    languageSuggestion = nil
+                }
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Dismiss language suggestion")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.accentColor.opacity(0.2))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
     }
 
     @ViewBuilder
@@ -172,7 +257,6 @@ Happy presenting! [wave]
             }
         }
         dictation.start()
-        isRecording = true
     }
 
     private func stopRecording() {
@@ -182,11 +266,15 @@ Happy presenting! [wave]
         dictation.stop()
         dictation.onTextUpdate = nil
         dictation.onNewSegment = nil
-        isRecording = false
     }
 
     private var mainContent: some View {
         VStack(spacing: 0) {
+            if let languageSuggestion {
+                languageSuggestionBanner(languageSuggestion)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             ZStack {
                 HighlightingTextEditor(
                     text: currentText,
@@ -224,7 +312,7 @@ Happy presenting! [wave]
                     Spacer()
                     ZStack {
                         // Waveform pill centered to full width
-                        if isRecording {
+                        if dictation.isRecording {
                             waveformPill
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                         }
@@ -240,13 +328,21 @@ Happy presenting! [wave]
                                     startRecording()
                                 }
                             } label: {
-                                Image(systemName: isRecording ? "pause.fill" : "mic.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(isRecording ? Color.orange : Color.red)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                                Group {
+                                    if dictation.isStarting {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: isRecording ? "pause.fill" : "mic.fill")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    }
+                                }
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(isRecording ? Color.orange : Color.red)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                             }
                             .buttonStyle(.plain)
                             .disabled(isRunning)
@@ -422,12 +518,23 @@ Happy presenting! [wave]
         } message: {
             Text(dropError ?? "")
         }
+        .alert("Microphone Unavailable", isPresented: Binding(
+            get: { dictation.error != nil },
+            set: { if !$0 { dictation.error = nil } }
+        )) {
+            Button("OK") { dictation.error = nil }
+        } message: {
+            Text(dictation.error ?? "")
+        }
         .frame(minWidth: 360, minHeight: 240)
         .background(.ultraThinMaterial)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 8) {
                     Button {
+                        if isRecording {
+                            stopRecording()
+                        }
                         service.openFile()
                     } label: {
                         HStack(spacing: 4) {
@@ -446,6 +553,9 @@ Happy presenting! [wave]
 
                     // Add page button in toolbar
                     Button {
+                        if isRecording {
+                            stopRecording()
+                        }
                         withAnimation(.easeInOut(duration: 0.2)) {
                             service.pages.append("")
                             service.currentPageIndex = service.pages.count - 1
@@ -496,6 +606,29 @@ Happy presenting! [wave]
             // Sync button state when app is re-activated (e.g. dock click)
             isRunning = service.overlayController.isShowing
         }
+        .onChange(of: service.currentPageText, initial: true) { _, text in
+            scheduleLanguageDetection(for: text)
+        }
+        .onChange(of: service.currentPageIndex) { _, _ in
+            if isRecording {
+                stopRecording()
+            }
+            ignoredLanguageIdentifier = nil
+            scheduleLanguageDetection(for: service.currentPageText)
+        }
+        .onChange(of: NotchSettings.shared.speechLocale) { _, _ in
+            if isRecording {
+                stopRecording()
+            }
+            ignoredLanguageIdentifier = nil
+            scheduleLanguageDetection(for: service.currentPageText)
+        }
+        .onDisappear {
+            languageDetectionTask?.cancel()
+            if isRecording {
+                stopRecording()
+            }
+        }
         .onAppear {
             // Set default text for the first page if empty
             if service.pages.count == 1 && service.pages[0].isEmpty {
@@ -532,6 +665,9 @@ Happy presenting! [wave]
             get: { service.currentPageIndex },
             set: { newValue in
                 if let index = newValue {
+                    if isRecording {
+                        stopRecording()
+                    }
                     withAnimation(.easeInOut(duration: 0.15)) {
                         service.currentPageIndex = index
                     }
@@ -571,6 +707,9 @@ Happy presenting! [wave]
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
             Button {
+                if isRecording {
+                    stopRecording()
+                }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     service.pages.append("")
                     service.currentPageIndex = service.pages.count - 1
@@ -591,6 +730,9 @@ Happy presenting! [wave]
 
     private func removePage(at index: Int) {
         guard service.pages.count > 1 else { return }
+        if isRecording {
+            stopRecording()
+        }
         withAnimation(.easeInOut(duration: 0.2)) {
             service.pages.remove(at: index)
             if service.currentPageIndex >= service.pages.count {
@@ -627,6 +769,9 @@ Happy presenting! [wave]
 
     private func handlePresentationDrop(url: URL) {
         guard service.confirmDiscardIfNeeded() else { return }
+        if isRecording {
+            stopRecording()
+        }
         isImporting = true
 
         DispatchQueue.global(qos: .userInitiated).async {

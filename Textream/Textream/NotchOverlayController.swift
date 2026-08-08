@@ -45,6 +45,8 @@ class OverlayContent {
 }
 
 class NotchOverlayController: NSObject {
+    private let cursorOffset: CGFloat = 8
+    private let screenEdgeMargin: CGFloat = 5
     private var panel: NSPanel?
     let speechRecognizer = SpeechRecognizer()
     let overlayContent = OverlayContent()
@@ -61,7 +63,7 @@ class NotchOverlayController: NSObject {
 
     func show(text: String, hasNextPage: Bool = false, onComplete: (() -> Void)? = nil) {
         self.onComplete = onComplete
-        self.onNextPage = { [weak self] in
+        self.onNextPage = {
             TextreamService.shared.advanceToNextPage()
         }
         self.isDismissing = false
@@ -174,21 +176,23 @@ class NotchOverlayController: NSObject {
     private func updateCursorPosition() {
         guard let panel else { return }
         let mouse = NSEvent.mouseLocation
-        let cursorOffset: CGFloat = 8
-        let x = mouse.x + cursorOffset
-        let h = panel.frame.height
-        var y = mouse.y - h
-        let w = panel.frame.width
+        guard let screen = screenUnderMouse() ?? panel.screen ?? NSScreen.main else { return }
+        let frame = cursorFollowingFrame(mouse: mouse, panelSize: panel.frame.size, screen: screen)
+        panel.setFrame(frame, display: false)
+    }
 
-        // Keep panel below the menu bar so the status bar stop button stays visible
-        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) {
-            let menuBarBottom = screen.visibleFrame.maxY
-            if y + h > menuBarBottom {
-                y = menuBarBottom - h
-            }
-        }
+    private func cursorFollowingFrame(mouse: NSPoint, panelSize: NSSize, screen: NSScreen) -> NSRect {
+        let screenFrame = screen.frame
 
-        panel.setFrame(NSRect(x: x, y: y, width: w, height: h), display: false)
+        let minimumX = screenFrame.minX + screenEdgeMargin
+        let maximumX = max(minimumX, screenFrame.maxX - panelSize.width - screenEdgeMargin)
+        let x = min(max(mouse.x + cursorOffset, minimumX), maximumX)
+
+        let minimumY = screenFrame.minY + screenEdgeMargin
+        let maximumY = max(minimumY, screen.visibleFrame.maxY - panelSize.height)
+        let y = min(max(mouse.y - panelSize.height, minimumY), maximumY)
+
+        return NSRect(origin: NSPoint(x: x, y: y), size: panelSize)
     }
 
     private func checkMouseScreen() {
@@ -272,9 +276,12 @@ class NotchOverlayController: NSObject {
         let panelHeight = settings.textAreaHeight
 
         let mouse = NSEvent.mouseLocation
-        let cursorOffset: CGFloat = 8
-        let xPosition = mouse.x + cursorOffset
-        let yPosition = mouse.y - panelHeight
+        let cursorScreen = screenUnderMouse() ?? screen
+        let initialFrame = cursorFollowingFrame(
+            mouse: mouse,
+            panelSize: NSSize(width: panelWidth, height: panelHeight),
+            screen: cursorScreen
+        )
 
         let floatingView = FloatingOverlayView(
             content: overlayContent,
@@ -285,7 +292,7 @@ class NotchOverlayController: NSObject {
         let contentView = NSHostingView(rootView: floatingView)
 
         let panel = NSPanel(
-            contentRect: NSRect(x: xPosition, y: yPosition, width: panelWidth, height: panelHeight),
+            contentRect: initialFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -906,7 +913,15 @@ struct NotchOverlayView: View {
                 .frame(width: 80, height: 24)
                 .clipped()
 
-                if listeningMode == .wordTracking {
+                if let error = speechRecognizer.error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.red.opacity(0.9))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(error)
+                } else if listeningMode == .wordTracking {
                     Text(speechRecognizer.lastSpokenText.split(separator: " ").suffix(3).joined(separator: " "))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
@@ -971,18 +986,26 @@ struct NotchOverlayView: View {
                     .buttonStyle(.plain)
                 } else {
                     Button {
-                        if speechRecognizer.isListening {
+                        if speechRecognizer.isListening || speechRecognizer.isStarting {
                             speechRecognizer.stop()
                         } else {
                             speechRecognizer.resume()
                         }
                     } label: {
-                        Image(systemName: speechRecognizer.isListening ? "mic.fill" : "mic.slash.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(speechRecognizer.isListening ? .yellow.opacity(0.8) : .white.opacity(0.6))
-                            .frame(width: 24, height: 24)
-                            .background(.white.opacity(0.15))
-                            .clipShape(Circle())
+                        Group {
+                            if speechRecognizer.isStarting {
+                                ProgressView()
+                                    .controlSize(.mini)
+                                    .tint(.white.opacity(0.8))
+                            } else {
+                                Image(systemName: speechRecognizer.isListening ? "mic.fill" : "mic.slash.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                        }
+                        .foregroundStyle(speechRecognizer.isListening ? .yellow.opacity(0.8) : .white.opacity(0.6))
+                        .frame(width: 24, height: 24)
+                        .background(.white.opacity(0.15))
+                        .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -1384,7 +1407,15 @@ struct FloatingOverlayView: View {
                 )
                 .frame(width: 160, height: 24)
 
-                if listeningMode == .wordTracking {
+                if let error = speechRecognizer.error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.red.opacity(0.9))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(error)
+                } else if listeningMode == .wordTracking {
                     Text(speechRecognizer.lastSpokenText.split(separator: " ").suffix(3).joined(separator: " "))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
@@ -1450,18 +1481,26 @@ struct FloatingOverlayView: View {
                         .buttonStyle(.plain)
                     } else {
                         Button {
-                            if speechRecognizer.isListening {
+                            if speechRecognizer.isListening || speechRecognizer.isStarting {
                                 speechRecognizer.stop()
                             } else {
                                 speechRecognizer.resume()
                             }
                         } label: {
-                            Image(systemName: speechRecognizer.isListening ? "mic.fill" : "mic.slash.fill")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(speechRecognizer.isListening ? .yellow.opacity(0.8) : .white.opacity(0.6))
-                                .frame(width: 24, height: 24)
-                                .background(.white.opacity(0.15))
-                                .clipShape(Circle())
+                            Group {
+                                if speechRecognizer.isStarting {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                        .tint(.white.opacity(0.8))
+                                } else {
+                                    Image(systemName: speechRecognizer.isListening ? "mic.fill" : "mic.slash.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                            }
+                            .foregroundStyle(speechRecognizer.isListening ? .yellow.opacity(0.8) : .white.opacity(0.6))
+                            .frame(width: 24, height: 24)
+                            .background(.white.opacity(0.15))
+                            .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
                     }

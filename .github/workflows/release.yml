@@ -38,7 +38,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Textream/Textream.xcodeproj/project.pbxproj
           git commit -m "Bump version to ${{ steps.version.outputs.number }}" || echo "No changes to commit"
-          git push origin HEAD:refs/heads/main || echo "Push skipped"
+          git push origin HEAD:refs/heads/master || echo "Push skipped"
 
   build:
     needs: version
@@ -146,17 +146,17 @@ jobs:
 
             if MacOS.version >= :tahoe
               sha256 "${SHA256_26}"
-              url "https://github.com/f/textream/releases/download/${VERSION}/Textream.dmg"
+              url "https://github.com/f/textream/releases/download/v#{version}/Textream.dmg"
             else
               sha256 "${SHA256_15}"
-              url "https://github.com/f/textream/releases/download/${VERSION}/Textream-macos15.dmg"
+              url "https://github.com/f/textream/releases/download/v#{version}/Textream-macos15.dmg"
             end
 
             name "Textream"
             desc "macOS teleprompter that highlights your script in real-time as you speak"
             homepage "https://github.com/f/textream"
 
-            depends_on macos: ">= :sequoia"
+            depends_on macos: :sequoia
 
             app "Textream.app"
 

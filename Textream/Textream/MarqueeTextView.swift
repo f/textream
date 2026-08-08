@@ -81,6 +81,9 @@ struct SpeechScrollView: View {
     let highlightedCharCount: Int
     var font: NSFont = .systemFont(ofSize: 18, weight: .semibold)
     var highlightColor: Color = .white
+    var cueColor: Color = .white
+    var cueUnreadOpacity: Double = 0.2
+    var cueReadOpacity: Double = 0.5
     var onWordTap: ((Int) -> Void)? = nil
     /// Called when user starts/stops manual scrolling in smooth mode.
     /// Bool: true = scrolling started (pause timer), false = scrolling ended (resume timer).
@@ -104,6 +107,9 @@ struct SpeechScrollView: View {
                 highlightedCharCount: highlightedCharCount,
                 font: font,
                 highlightColor: highlightColor,
+                cueColor: cueColor,
+                cueUnreadOpacity: cueUnreadOpacity,
+                cueReadOpacity: cueReadOpacity,
                 highlightWords: !smoothScroll,
                 containerWidth: geo.size.width,
                 onWordTap: { charOffset in
@@ -328,6 +334,9 @@ struct WordFlowLayout: View {
     let highlightedCharCount: Int
     let font: NSFont
     var highlightColor: Color = .white
+    var cueColor: Color = .white
+    var cueUnreadOpacity: Double = 0.2
+    var cueReadOpacity: Double = 0.5
     var highlightWords: Bool = true
     let containerWidth: CGFloat
     var onWordTap: ((Int) -> Void)? = nil
@@ -375,17 +384,25 @@ struct WordFlowLayout: View {
         return -1
     }
 
-    /// Returns true if any word in the text contains right-to-left script characters.
-    private var isRTL: Bool {
-        // Pre-compute once from the first page content during setup
-        words.contains { $0.unicodeScalars.contains { isRTLUnicodeScalar($0) } }
+    private func isRightToLeft(items: [WordItem]) -> Bool {
+        for item in items where !item.isAnnotation {
+            switch textBaseDirection(in: item.word) {
+            case .rightToLeft:
+                return true
+            case .leftToRight:
+                return false
+            case .natural:
+                continue
+            }
+        }
+        return false
     }
 
     var body: some View {
         let (items, lines) = cachedLayout()
         let nextIdx = nextWordIndex(items: items)
         let totalLines = lines.count
-        let rtl = isRTL
+        let rtl = isRightToLeft(items: items)
 
         // Estimate line height for visibility culling using actual font metrics
         let lineH = ceil(font.ascender - font.descender + font.leading) + lineSpacing
@@ -432,7 +449,7 @@ struct WordFlowLayout: View {
         // When highlighting is off (classic/silence-paused), use uniform color
         if !highlightWords {
             let uniformColor: Color = item.isAnnotation
-                ? Color.white.opacity(0.4)
+                ? cueColor.opacity(cueUnreadOpacity)
                 : highlightColor
 
             return Text(item.word + " ")
@@ -452,11 +469,11 @@ struct WordFlowLayout: View {
                 }
         }
 
-        // Annotations: italic, always dimmed
+        // Annotations: italic, dimmed with cue color
         if item.isAnnotation {
             let annotationColor: Color = isFullyLit
-                ? Color.white.opacity(0.5)
-                : Color.white.opacity(0.2)
+                ? cueColor.opacity(cueReadOpacity)
+                : cueColor.opacity(cueUnreadOpacity)
 
             return Text(item.word + " ")
                 .font(Font(font).italic())
@@ -504,8 +521,9 @@ struct WordFlowLayout: View {
     private func buildItems() -> [WordItem] {
         var items: [WordItem] = []
         var offset = 0
+        let annotationFlags = SpeechTextAlignment.annotationFlags(for: words)
         for (i, word) in words.enumerated() {
-            let isAnnotation = Self.isAnnotationWord(word)
+            let isAnnotation = annotationFlags[i] || Self.isAnnotationWord(word)
             items.append(WordItem(id: i, word: word, charOffset: offset, isAnnotation: isAnnotation))
             offset += word.count + 1 // +1 for space
         }

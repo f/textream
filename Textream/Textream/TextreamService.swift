@@ -129,7 +129,10 @@ class TextreamService: NSObject, ObservableObject {
         // Unmute after new page content is loaded
         if wasListening {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.overlayController.speechRecognizer.resume()
+                guard let recognizer = self?.overlayController.speechRecognizer,
+                      !recognizer.isListening,
+                      !recognizer.isStarting else { return }
+                recognizer.resume()
             }
         }
     }

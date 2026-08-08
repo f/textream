@@ -455,7 +455,8 @@ class NotchSettings {
 
     static let defaultWidth: CGFloat = 340
     static let defaultHeight: CGFloat = 150
-    static let defaultLocale: String = Locale.current.identifier
+    static let defaultLocale: String = SpeechLocaleSupport.closestSupportedLocale(to: Locale.current.identifier)?.identifier
+        ?? Locale.current.identifier
 
     static let minWidth: CGFloat = 310
     static let maxWidth: CGFloat = 500
@@ -467,7 +468,9 @@ class NotchSettings {
         let savedHeight = UserDefaults.standard.double(forKey: "textAreaHeight")
         self.notchWidth = savedWidth > 0 ? CGFloat(savedWidth) : Self.defaultWidth
         self.textAreaHeight = savedHeight > 0 ? CGFloat(savedHeight) : Self.defaultHeight
-        self.speechLocale = UserDefaults.standard.string(forKey: "speechLocale") ?? Self.defaultLocale
+        let preferredSpeechLocale = UserDefaults.standard.string(forKey: "speechLocale") ?? Self.defaultLocale
+        self.speechLocale = SpeechLocaleSupport.closestSupportedLocale(to: preferredSpeechLocale)?.identifier
+            ?? Self.defaultLocale
         self.fontSizePreset = FontSizePreset(rawValue: UserDefaults.standard.string(forKey: "fontSizePreset") ?? "") ?? .lg
         self.fontFamilyPreset = FontFamilyPreset(rawValue: UserDefaults.standard.string(forKey: "fontFamilyPreset") ?? "") ?? .sans
         self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white

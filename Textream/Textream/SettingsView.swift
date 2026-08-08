@@ -105,12 +105,33 @@ class NotchPreviewController {
     private func cursorFrame(for panel: NSPanel, settings: NotchSettings) -> NSRect {
         let mouse = NSEvent.mouseLocation
         let cursorOffset: CGFloat = 8
+        let screenEdgeMargin: CGFloat = 5
+        let floatingTopPadding: CGFloat = 14
+        let floatingVerticalOffset: CGFloat = 60
         let maxWidth = panel.frame.width
         let notchWidth = settings.notchWidth
         let panelHeight = panel.frame.height
+        let visibleHeight = floatingTopPadding + settings.textAreaHeight
+        let horizontalInset = (maxWidth - notchWidth) / 2
 
-        let panelX = mouse.x + cursorOffset - (maxWidth - notchWidth) / 2
-        let panelY = mouse.y + 60 - panelHeight
+        var visibleLeft = mouse.x + cursorOffset
+        var visibleBottom = mouse.y - visibleHeight
+
+        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) })
+            ?? panel.screen
+            ?? NSScreen.main {
+            let screenFrame = screen.frame
+            let minimumVisibleLeft = screenFrame.minX + screenEdgeMargin
+            let maximumVisibleLeft = max(
+                minimumVisibleLeft,
+                screenFrame.maxX - notchWidth - screenEdgeMargin
+            )
+            visibleLeft = min(max(visibleLeft, minimumVisibleLeft), maximumVisibleLeft)
+            visibleBottom = max(visibleBottom, screenFrame.minY + screenEdgeMargin)
+        }
+
+        let panelX = visibleLeft - horizontalInset
+        let panelY = visibleBottom - (panelHeight - floatingVerticalOffset - visibleHeight)
         return NSRect(x: panelX, y: panelY, width: maxWidth, height: panelHeight)
     }
 
