@@ -40,16 +40,6 @@ brew install f/textream/textream
 
 > Requires **macOS 15 Sequoia** or later. Works on Apple Silicon and Intel.
 
-### First launch
-
-Since Textream is distributed outside the Mac App Store, macOS may block it on first open. Run this once in Terminal:
-
-```bash
-xattr -cr /Applications/Textream.app
-```
-
-Then right-click the app → **Open**. After the first launch, macOS remembers your choice.
-
 ## Features
 
 ### Guidance Modes
