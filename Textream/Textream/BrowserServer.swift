@@ -425,16 +425,33 @@ class BrowserServer {
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
 
+        // Any letter or digit, in any script. An explicit range list silently
+        // demotes every unlisted script (Hebrew, Arabic, Greek, Thai…) to an
+        // annotation, so those words render as dim cues and never highlight.
+        const WORDY=/[\\p{L}\\p{N}]/u;
+
+        // Scripts written right-to-left
+        const RTL_CHAR=/[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}\\p{Script=Adlam}]/gu;
+
         // Detect annotation words: [bracket] or emoji-only (no letters/digits)
         function isAnnotation(w){
           if(w.startsWith('[')&&w.endsWith(']'))return true;
-          return!/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(w);
+          return!WORDY.test(w);
         }
 
         // Count letters+digits in a word
         function letterCount(w){
-          let n=0;for(const ch of w)if(/[a-zA-Z0-9\\u00C0-\\u024F\\u0400-\\u04FF\\u3000-\\u9FFF\\uAC00-\\uD7AF]/.test(ch))n++;
+          let n=0;for(const ch of w)if(WORDY.test(ch))n++;
           return Math.max(1,n);
+        }
+
+        // Base direction for the script: whichever side has more letters wins, so
+        // a Hebrew script opening with a Latin product name still reads right-to-left.
+        function baseDirection(words){
+          const s=words.join(' ');
+          const rtl=(s.match(RTL_CHAR)||[]).length;
+          const letters=(s.match(/\\p{L}/gu)||[]).length;
+          return rtl>letters-rtl?'rtl':'ltr';
         }
 
         /* ---- connection ---- */
@@ -476,6 +493,11 @@ class BrowserServer {
           const wordKey=words.length+'|'+(words[0]||'')+'|'+(words[words.length-1]||'');
           if(wordKey!==prevWordKey){
             c.innerHTML='';
+            // Let the browser's bidi engine order the line; it keeps embedded
+            // left-to-right runs (names, numbers) in reading order.
+            const dir=baseDirection(words);
+            c.setAttribute('dir',dir);
+            c.style.textAlign=dir==='rtl'?'right':'left';
             let cp=0;
             for(let i=0;i<words.length;i++){
               const wd=words[i],ann=isAnnotation(wd);

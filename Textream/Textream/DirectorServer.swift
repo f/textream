@@ -419,9 +419,9 @@ class DirectorServer {
 
         <div id="editor-wrap">
           <div id="editor-container">
-            <div id="read-text"></div>
+            <div id="read-text" dir="auto"></div>
             <div id="read-divider"></div>
-            <div id="edit-text" contenteditable="true" data-placeholder="Type or paste your script here…" spellcheck="false"></div>
+            <div id="edit-text" dir="auto" contenteditable="true" data-placeholder="Type or paste your script here…" spellcheck="false"></div>
           </div>
         </div>
 

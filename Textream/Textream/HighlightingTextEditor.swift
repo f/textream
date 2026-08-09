@@ -62,8 +62,6 @@ struct HighlightingTextEditor: NSViewRepresentable {
         textView.string = text
         context.coordinator.applyHighlighting(textView)
 
-        updateWritingDirection(textView, text: text)
-
         return scrollView
     }
 
@@ -76,7 +74,6 @@ struct HighlightingTextEditor: NSViewRepresentable {
             textView.selectedRanges = selectedRanges
             context.coordinator.applyHighlighting(textView)
         }
-        updateWritingDirection(textView, text: text)
 
         // Apply bump highlight on newly dictated range
         if let range = highlightRange, range.location + range.length <= textView.string.count {
@@ -94,16 +91,32 @@ struct HighlightingTextEditor: NSViewRepresentable {
         }
     }
 
-    /// Set the text view's base writing direction based on the content's script.
-    private func updateWritingDirection(_ textView: NSTextView, text: String) {
-        switch textBaseDirection(in: text) {
+    /// Sets the text view's base writing direction from the content's script and
+    /// returns the matching paragraph style.
+    ///
+    /// The style has to be re-applied as part of highlighting: `applyHighlighting`
+    /// resets every attribute over the full range, so a paragraph style set only
+    /// here is wiped on the next keystroke and the text jumps back to left-aligned.
+    @discardableResult
+    fileprivate func updateWritingDirection(_ textView: NSTextView, text: String) -> NSParagraphStyle {
+        let direction = dominantBaseDirection(in: text)
+
+        let style = NSMutableParagraphStyle()
+        switch direction {
         case .rightToLeft:
             textView.baseWritingDirection = .rightToLeft
+            style.baseWritingDirection = .rightToLeft
+            style.alignment = .right
         case .leftToRight:
             textView.baseWritingDirection = .leftToRight
+            style.baseWritingDirection = .leftToRight
+            style.alignment = .left
         case .natural:
             textView.baseWritingDirection = .natural
+            style.baseWritingDirection = .natural
+            style.alignment = .natural
         }
+        return style
     }
 
     class Coordinator: NSObject, NSTextViewDelegate {
@@ -122,7 +135,6 @@ struct HighlightingTextEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
-            parent.updateWritingDirection(textView, text: textView.string)
             applyHighlighting(textView)
         }
 
@@ -163,12 +175,17 @@ struct HighlightingTextEditor: NSViewRepresentable {
             // Preserve selection
             let selectedRanges = textView.selectedRanges
 
+            // Resolve the writing direction before editing so the paragraph style
+            // survives the attribute reset below.
+            let paragraphStyle = parent.updateWritingDirection(textView, text: text)
+
             textStorage.beginEditing()
 
             // Reset to default style
             let defaultAttributes: [NSAttributedString.Key: Any] = [
                 .font: parent.font,
-                .foregroundColor: NSColor.labelColor
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraphStyle
             ]
             textStorage.setAttributes(defaultAttributes, range: fullRange)
 
@@ -184,6 +201,10 @@ struct HighlightingTextEditor: NSViewRepresentable {
             }
 
             textStorage.endEditing()
+
+            // Keep newly typed text in the same direction as the rest of the page
+            textView.defaultParagraphStyle = paragraphStyle
+            textView.typingAttributes = defaultAttributes
 
             // Restore selection
             textView.selectedRanges = selectedRanges

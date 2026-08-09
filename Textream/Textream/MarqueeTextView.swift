@@ -352,22 +352,34 @@ struct WordFlowLayout: View {
         return ratio > 1.5 ? 2 : 8
     }
 
+    /// Width of the gap rendered between two words on a line.
+    private var spaceWidth: CGFloat {
+        (" " as NSString).size(withAttributes: [.font: font]).width
+    }
+
     // Simple layout cache to avoid re-measuring words on every highlight update
     private static var _cacheKey: String = ""
     private static var _cachedItems: [WordItem] = []
-    private static var _cachedLines: [[WordItem]] = []
+    private static var _cachedLines: [[BidiOrderedWord<WordItem>]] = []
+    private static var _cachedIsRTL: Bool = false
 
-    private func cachedLayout() -> ([WordItem], [[WordItem]]) {
+    private func cachedLayout() -> ([WordItem], [[BidiOrderedWord<WordItem>]], Bool) {
         let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))"
         if key == Self._cacheKey {
-            return (Self._cachedItems, Self._cachedLines)
+            return (Self._cachedItems, Self._cachedLines, Self._cachedIsRTL)
         }
         let items = buildItems()
-        let lines = buildLines(items: items)
+        let rtl = isRightToLeft(items: items)
+        // Reorder each line once here rather than per redraw — the visual order
+        // only changes when the words or the wrap width change.
+        let lines = buildLines(items: items).map { line in
+            bidiVisualOrder(line, baseIsRightToLeft: rtl) { wordDirectionClass($0.word) }
+        }
         Self._cacheKey = key
         Self._cachedItems = items
         Self._cachedLines = lines
-        return (items, lines)
+        Self._cachedIsRTL = rtl
+        return (items, lines, rtl)
     }
 
     // Find the index of the next word to read (first non-fully-lit, non-annotation word)
@@ -384,25 +396,28 @@ struct WordFlowLayout: View {
         return -1
     }
 
+    /// Base direction for the page, taken from whichever script dominates the
+    /// script's own words. Cues like `[pause]` are excluded so an English cue
+    /// can't flip a Hebrew script left-to-right.
     private func isRightToLeft(items: [WordItem]) -> Bool {
+        var rightToLeftCount = 0
+        var leftToRightCount = 0
+
         for item in items where !item.isAnnotation {
-            switch textBaseDirection(in: item.word) {
-            case .rightToLeft:
-                return true
-            case .leftToRight:
-                return false
-            case .natural:
-                continue
+            switch wordDirectionClass(item.word) {
+            case .rightToLeft: rightToLeftCount += 1
+            case .leftToRight: leftToRightCount += 1
+            case .neutral: continue
             }
         }
-        return false
+
+        return rightToLeftCount > leftToRightCount
     }
 
     var body: some View {
-        let (items, lines) = cachedLayout()
+        let (items, lines, rtl) = cachedLayout()
         let nextIdx = nextWordIndex(items: items)
         let totalLines = lines.count
-        let rtl = isRightToLeft(items: items)
 
         // Estimate line height for visibility culling using actual font metrics
         let lineH = ceil(font.ascender - font.descender + font.leading) + lineSpacing
@@ -413,21 +428,28 @@ struct WordFlowLayout: View {
         let startLine = canCull ? max(0, min(totalLines, Int(floor((-scrollOffset - buffer) / lineH)))) : 0
         let endLine = canCull ? max(startLine, min(totalLines, Int(ceil((viewportHeight - scrollOffset + buffer) / lineH)))) : totalLines
 
-        // For RTL scripts (Arabic, Hebrew, Persian, Urdu), flip the layout direction
-        // so words within each line flow right-to-left instead of left-to-right.
+        // For RTL scripts (Arabic, Hebrew, Persian, Urdu) each line is pre-ordered
+        // into visual order by `cachedLayout`, so the stack itself always runs
+        // left-to-right and only the page alignment flips.
         VStack(alignment: rtl ? .trailing : .leading, spacing: lineSpacing) {
             if startLine > 0 {
                 Color.clear.frame(height: CGFloat(startLine) * lineH)
             }
 
             ForEach(startLine..<endLine, id: \.self) { lineIdx in
-                HStack(spacing: 0) {
-                    ForEach(lines[lineIdx], id: \.id) { item in
-                        wordView(for: item, isNextWord: item.id == nextIdx)
-                            .id(item.id)
+                // Words are spaced by the stack rather than by a trailing space in
+                // each `Text`: text layout trims trailing whitespace, which in RTL
+                // collapses every gap and runs the whole line together.
+                HStack(spacing: spaceWidth) {
+                    ForEach(lines[lineIdx], id: \.element.id) { ordered in
+                        wordView(
+                            for: ordered.element,
+                            isNextWord: ordered.element.id == nextIdx,
+                            isRightToLeft: ordered.isRightToLeft
+                        )
+                        .id(ordered.element.id)
                     }
                 }
-                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
             }
 
             if endLine < totalLines {
@@ -438,13 +460,14 @@ struct WordFlowLayout: View {
         .coordinateSpace(name: "flowLayout")
     }
 
-    private func wordView(for item: WordItem, isNextWord: Bool) -> some View {
+    private func wordView(for item: WordItem, isNextWord: Bool, isRightToLeft: Bool) -> some View {
         let wordLen = item.word.count
         let charsIntoWord = highlightedCharCount - item.charOffset
         let litCount = max(0, min(wordLen, charsIntoWord))
         let letterCount = max(1, item.word.filter { $0.isLetter || $0.isNumber }.count)
         let isFullyLit = litCount >= letterCount
         let isCurrentWord = isNextWord || (charsIntoWord >= 0 && !isFullyLit)
+        let display = directionIsolated(item.word, isRightToLeft: isRightToLeft)
 
         // When highlighting is off (classic/silence-paused), use uniform color
         if !highlightWords {
@@ -452,7 +475,7 @@ struct WordFlowLayout: View {
                 ? cueColor.opacity(cueUnreadOpacity)
                 : highlightColor
 
-            return Text(item.word + " ")
+            return Text(display)
                 .font(item.isAnnotation ? Font(font).italic() : Font(font))
                 .foregroundStyle(uniformColor)
                 .background(
@@ -475,7 +498,7 @@ struct WordFlowLayout: View {
                 ? cueColor.opacity(cueReadOpacity)
                 : cueColor.opacity(cueUnreadOpacity)
 
-            return Text(item.word + " ")
+            return Text(display)
                 .font(Font(font).italic())
                 .foregroundStyle(annotationColor)
                 .background(
@@ -500,7 +523,7 @@ struct WordFlowLayout: View {
         // Base color for the whole word
         let wordColor: Color = isFullyLit ? highlightColor.opacity(0.3) : dimColor
 
-        return Text(item.word + " ")
+        return Text(display)
             .font(Font(font))
             .foregroundStyle(wordColor)
             .underline(isCurrentWord, color: wordColor)
