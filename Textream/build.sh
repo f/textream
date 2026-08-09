@@ -11,6 +11,7 @@ OUTPUT_DIR="$BUILD_DIR/universal"
 OUTPUT_APP="$OUTPUT_DIR/$APP_NAME"
 DMG_NAME="Textream.dmg"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
+DEVELOPER_ID_ENTITLEMENTS="$PROJECT_DIR/Textream/Textream-DeveloperID.entitlements"
 
 echo "🧹 Cleaning previous build…"
 rm -rf "$BUILD_DIR"
@@ -27,6 +28,8 @@ xcodebuild archive \
   ONLY_ACTIVE_ARCH=NO \
   SKIP_INSTALL=NO \
   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
   -quiet
 
 echo "🔨 Building for Intel (x86_64)…"
@@ -40,6 +43,8 @@ xcodebuild archive \
   ONLY_ACTIVE_ARCH=NO \
   SKIP_INSTALL=NO \
   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
   -quiet
 
 ARM_APP="$ARCHIVE_ARM/Products/Applications/$APP_NAME"
@@ -55,9 +60,27 @@ find "$ARM_APP" -type f | while read -r arm_file; do
   out_file="$OUTPUT_APP$rel"
 
   if [ -f "$x86_file" ] && file "$arm_file" | grep -q "Mach-O"; then
-    lipo -create "$arm_file" "$x86_file" -output "$out_file" 2>/dev/null || true
+    lipo -create "$arm_file" "$x86_file" -output "$out_file"
+    lipo "$out_file" -verify_arch arm64 x86_64
   fi
 done
+
+if [ -n "${SIGNING_IDENTITY:-}" ]; then
+  echo "🖋️  Signing universal app with Developer ID…"
+  codesign \
+    --force \
+    --sign "$SIGNING_IDENTITY" \
+    --options runtime \
+    --timestamp \
+    --generate-entitlement-der \
+    --entitlements "$DEVELOPER_ID_ENTITLEMENTS" \
+    "$OUTPUT_APP"
+
+  codesign --verify --deep --strict --verbose=2 "$OUTPUT_APP"
+else
+  echo "⚠️  SIGNING_IDENTITY is not set; creating an ad-hoc signed local build."
+  codesign --force --sign - "$OUTPUT_APP"
+fi
 
 echo "📦 Creating DMG…"
 rm -f "$DMG_PATH"
@@ -76,6 +99,18 @@ hdiutil create \
   -format UDZO \
   "$DMG_PATH" \
   -quiet
+
+if [ -n "${SIGNING_IDENTITY:-}" ]; then
+  echo "🖋️  Signing DMG with Developer ID…"
+  codesign \
+    --force \
+    --sign "$SIGNING_IDENTITY" \
+    --timestamp \
+    --identifier dev.fka.textream.dmg \
+    "$DMG_PATH"
+
+  codesign --verify --strict --verbose=2 "$DMG_PATH"
+fi
 
 rm -rf "$DMG_STAGING"
 

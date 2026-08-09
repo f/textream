@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: textream-release
+  cancel-in-progress: false
+
 jobs:
   version:
     runs-on: macos-15
@@ -18,6 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get version from tag
@@ -38,7 +43,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Textream/Textream.xcodeproj/project.pbxproj
           git commit -m "Bump version to ${{ steps.version.outputs.number }}" || echo "No changes to commit"
-          git push origin HEAD:refs/heads/master || echo "Push skipped"
+          git push origin HEAD:refs/heads/master
 
   build:
     needs: version
@@ -66,6 +71,44 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ matrix.xcode }}
 
+      - name: Import Developer ID certificate
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
+          INTERMEDIATE_PATH="$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          KEYCHAIN_PATH="$RUNNER_TEMP/textream-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          chmod 600 "$CERTIFICATE_PATH"
+          curl --fail --silent --show-error \
+            https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer \
+            --output "$INTERMEDIATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$INTERMEDIATE_PATH" -k "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$DEVELOPER_ID_P12_PASSWORD" \
+            -f pkcs12 \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | awk '/Developer ID Application:/{print $2; exit}')"
+          test -n "$SIGNING_IDENTITY"
+
+          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
       - name: Build universal app
         working-directory: Textream
         run: |
@@ -76,11 +119,89 @@ jobs:
         if: matrix.suffix != ''
         run: mv Textream/build/release/Textream.dmg Textream/build/release/Textream${{ matrix.suffix }}.dmg
 
+      - name: Notarize and validate DMG
+        env:
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          DMG_PATH="Textream/build/release/Textream${{ matrix.suffix }}.dmg"
+          NOTARY_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          NOTARY_RESULT_PATH="$RUNNER_TEMP/notary-result.json"
+          NOTARY_LOG_PATH="$RUNNER_TEMP/notary-log.json"
+
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$NOTARY_KEY_PATH"
+          chmod 600 "$NOTARY_KEY_PATH"
+
+          set +e
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait \
+            --timeout 30m \
+            --output-format json > "$NOTARY_RESULT_PATH"
+          NOTARY_EXIT="$?"
+          set -e
+          cat "$NOTARY_RESULT_PATH"
+
+          SUBMISSION_ID="$(plutil -extract id raw -o - "$NOTARY_RESULT_PATH" 2>/dev/null || true)"
+          STATUS="$(plutil -extract status raw -o - "$NOTARY_RESULT_PATH" 2>/dev/null || true)"
+          if [ -n "$SUBMISSION_ID" ]; then
+            xcrun notarytool log "$SUBMISSION_ID" "$NOTARY_LOG_PATH" \
+              --key "$NOTARY_KEY_PATH" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER_ID" || true
+            if [ -f "$NOTARY_LOG_PATH" ]; then
+              cat "$NOTARY_LOG_PATH"
+            fi
+          fi
+          if [ "$NOTARY_EXIT" -ne 0 ] || [ "$STATUS" != "Accepted" ]; then
+            exit 1
+          fi
+
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+          hdiutil verify "$DMG_PATH"
+          codesign --verify --strict --verbose=2 "$DMG_PATH"
+          spctl --assess \
+            --type open \
+            --context context:primary-signature \
+            --verbose=4 \
+            "$DMG_PATH"
+
+          MOUNT_DIR="$(mktemp -d)"
+          cleanup_mount() {
+            hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true
+            rmdir "$MOUNT_DIR" 2>/dev/null || true
+          }
+          trap cleanup_mount EXIT
+          hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_DIR" -quiet
+          codesign --verify --deep --strict --verbose=2 "$MOUNT_DIR/Textream.app"
+          spctl --assess --type execute --verbose=4 "$MOUNT_DIR/Textream.app"
+          hdiutil detach "$MOUNT_DIR" -quiet
+          rmdir "$MOUNT_DIR"
+          trap - EXIT
+
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: dmg${{ matrix.suffix }}
           path: Textream/build/release/Textream${{ matrix.suffix }}.dmg
+
+      - name: Remove signing credentials
+        if: always()
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        run: |
+          security delete-keychain \
+            "$RUNNER_TEMP/textream-signing.keychain-db" 2>/dev/null || true
+          rm -f \
+            "$RUNNER_TEMP/developer-id.p12" \
+            "$RUNNER_TEMP/DeveloperIDG2CA.cer" \
+            "$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8" \
+            "$RUNNER_TEMP/notary-result.json" \
+            "$RUNNER_TEMP/notary-log.json"
 
   release:
     needs: [version, build]
@@ -110,13 +231,7 @@ jobs:
 
             1. Download the DMG for your macOS version
             2. Open the DMG and drag **Textream** to Applications
-            3. Since the app is not notarized, macOS may block it on first launch. Run the following command in Terminal to fix this:
-
-            ```
-            xattr -cr /Applications/Textream.app
-            ```
-
-            Then open Textream normally.
+            3. Open Textream normally. The app is signed and notarized by Apple.
 
             Or install via Homebrew:
 
@@ -144,35 +259,33 @@ jobs:
           cask "textream" do
             version "${VERSION_NUM}"
 
-            if MacOS.version >= :tahoe
-              sha256 "${SHA256_26}"
-              url "https://github.com/f/textream/releases/download/v#{version}/Textream.dmg"
-            else
+            on_sequoia do
               sha256 "${SHA256_15}"
               url "https://github.com/f/textream/releases/download/v#{version}/Textream-macos15.dmg"
             end
 
+            on_tahoe :or_newer do
+              sha256 "${SHA256_26}"
+              url "https://github.com/f/textream/releases/download/v#{version}/Textream.dmg"
+            end
+
             name "Textream"
-            desc "macOS teleprompter that highlights your script in real-time as you speak"
+            desc "Teleprompter that highlights scripts in real time as you speak"
             homepage "https://github.com/f/textream"
 
             depends_on macos: :sequoia
 
             app "Textream.app"
 
-            postflight do
-              system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Textream.app"]
-            end
-
             zap trash: [
-              "~/Library/Preferences/dev.fka.Textream.plist",
-              "~/Library/Saved Application State/dev.fka.Textream.savedState",
+              "~/Library/Preferences/dev.fka.textream.plist",
+              "~/Library/Saved Application State/dev.fka.textream.savedState",
             ]
           end
           CASKEOF
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
+          git add Casks/textream.rb
           git commit -m "Update Textream to ${VERSION}"
           git push
