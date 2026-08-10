@@ -46,10 +46,20 @@ enum PresentationNotesExtractor {
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
+        // Copy the security-scoped document into Textream's own temporary
+        // directory before handing it to a child process. This keeps PPTX
+        // import reliable inside the Mac App Store sandbox.
+        let localArchive = tempDir.appendingPathComponent("presentation.pptx")
+        do {
+            try fileManager.copyItem(at: url, to: localArchive)
+        } catch {
+            throw ExtractionError.extractionFailed("Could not read PPTX file.")
+        }
+
         // Unzip using Process
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", "-q", url.path, "-d", tempDir.path]
+        process.arguments = ["-o", "-q", localArchive.path, "-d", tempDir.path]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
