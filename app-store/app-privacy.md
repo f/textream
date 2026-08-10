@@ -6,7 +6,7 @@ This is a working draft for the App Store Connect questionnaire, not a completed
 
 - **Does this app collect data from this app?** No.
 - **Is any data used to track users?** No.
-- **Privacy Policy URL:** https://blog.fka.dev/textream/privacy.html
+- **Privacy Policy URL:** https://textream.net/privacy.html
 
 These proposed answers are based on the following build assumptions:
 

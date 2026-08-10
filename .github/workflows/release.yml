@@ -271,7 +271,7 @@ jobs:
 
             name "Textream"
             desc "Teleprompter that highlights scripts in real time as you speak"
-            homepage "https://github.com/f/textream"
+            homepage "https://textream.net/"
 
             depends_on macos: :sequoia
 
