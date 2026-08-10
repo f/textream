@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Privacy Policy — Textream</title>
+  <meta name="description" content="How Textream handles scripts, microphone audio, speech recognition, local-network features, and app settings.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0c;
+      --surface: #1c1c1e;
+      --surface2: #242428;
+      --text: #f5f5f7;
+      --muted: #a1a1a8;
+      --quiet: #6e6e76;
+      --line: rgba(255, 255, 255, 0.08);
+      --accent1: #7c6aff;
+      --accent2: #4f8bff;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% -15%, rgba(124, 106, 255, 0.15), transparent 42rem),
+        var(--bg);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: #8eb4ff; }
+    a:hover { color: #b9ceff; }
+
+    .shell {
+      width: min(100% - 40px, 880px);
+      margin: 0 auto;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      color: var(--text);
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      background: linear-gradient(145deg, #29292d, #111114);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand-mark span {
+      font-size: 21px;
+      font-weight: 850;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .nav-links { display: flex; gap: 18px; }
+    .nav-links a { color: var(--muted); font-size: 14px; text-decoration: none; }
+    .nav-links a:hover { color: var(--text); }
+
+    header { padding: 92px 0 56px; }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: #9dbbff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 700px;
+      margin: 0 0 22px;
+      font-size: clamp(42px, 8vw, 72px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+
+    .lede {
+      max-width: 700px;
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(18px, 3vw, 22px);
+      line-height: 1.55;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 10px 0 72px;
+    }
+
+    .summary article {
+      min-height: 148px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(155deg, rgba(42, 42, 47, 0.94), rgba(23, 23, 26, 0.94));
+    }
+
+    .summary strong { display: block; margin-bottom: 8px; font-size: 15px; }
+    .summary p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+    main { padding-bottom: 84px; }
+
+    section {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 42px;
+      padding: 34px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 2px 0 0;
+      font-size: 17px;
+      line-height: 1.35;
+      letter-spacing: -0.015em;
+    }
+
+    .copy p { margin: 0 0 16px; color: #c8c8ce; }
+    .copy p:last-child { margin-bottom: 0; }
+    .copy ul { margin: 0; padding-left: 20px; color: #c8c8ce; }
+    .copy li + li { margin-top: 9px; }
+    .copy strong { color: var(--text); }
+
+    .note {
+      padding: 18px 20px;
+      border: 1px solid rgba(124, 106, 255, 0.22);
+      border-radius: 14px;
+      background: rgba(124, 106, 255, 0.07);
+      color: #d8d4ff;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 30px 0 42px;
+      border-top: 1px solid var(--line);
+      color: var(--quiet);
+      font-size: 13px;
+    }
+
+    footer p { margin: 0; }
+    footer a { color: var(--muted); text-decoration: none; }
+
+    @media (max-width: 700px) {
+      .summary { grid-template-columns: 1fr; }
+      .summary article { min-height: 0; }
+      section { grid-template-columns: 1fr; gap: 14px; }
+      header { padding-top: 64px; }
+      .nav-links a:first-child { display: none; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav aria-label="Primary navigation">
+      <a class="brand" href="./" aria-label="Textream home">
+        <span class="brand-mark" aria-hidden="true"><span>T</span></span>
+        Textream
+      </a>
+      <div class="nav-links">
+        <a href="https://github.com/f/textream">GitHub</a>
+        <a href="support.html">Support</a>
+      </div>
+    </nav>
+
+    <header>
+      <p class="eyebrow">Privacy policy · Updated August 10, 2026</p>
+      <h1>Privacy, without fine print.</h1>
+      <p class="lede">Textream does not require an account and its developer does not operate a service that receives your scripts. A few macOS and optional network features deserve a clear explanation.</p>
+    </header>
+
+    <div class="summary" aria-label="Privacy summary">
+      <article>
+        <strong>Your scripts are yours</strong>
+        <p>Textream keeps working text and preferences on your Mac. You choose where saved script files live.</p>
+      </article>
+      <article>
+        <strong>No ads or analytics</strong>
+        <p>The app has no advertising, behavioral tracking, analytics SDK, or Textream account.</p>
+      </article>
+      <article>
+        <strong>You control the microphone</strong>
+        <p>Voice-guided modes run only after you grant permission. You can revoke access in macOS Settings.</p>
+      </article>
+    </div>
+
+    <main>
+      <section>
+        <h2>Information Textream collects</h2>
+        <div class="copy">
+          <p>The Textream developer does not collect personal data through the app. Textream has no developer-operated account system, analytics service, advertising system, or cloud storage service.</p>
+          <p>This describes collection by Textream and its developer. Apple, GitHub, your network provider, or another service you choose to use may process connection or device information under their own policies.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Microphone and speech recognition</h2>
+        <div class="copy">
+          <p>Word Tracking and Voice-Activated modes use microphone access when you start them. Word Tracking uses Apple’s speech-recognition framework to match spoken words to your script.</p>
+          <p><strong>Speech recognition is not guaranteed to stay on-device.</strong> Depending on your Mac, language, macOS version, and service availability, macOS may process speech locally or send microphone audio to Apple for recognition. Textream’s developer does not receive that audio or the recognition result.</p>
+          <p>You can use Classic mode without microphone or speech-recognition access. You can also change permissions at any time in System Settings → Privacy &amp; Security.</p>
+          <p>Apple describes its handling of data in the <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a>.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Scripts, files, and settings</h2>
+        <div class="copy">
+          <p>Textream stores editor content and preferences locally on your Mac. When you save a <code>.textream</code> file, import PowerPoint notes, or open another document, the file is handled locally and remains in a location you control.</p>
+          <p>Textream does not upload those files to a Textream server. You can remove saved scripts using Finder. Removing the app does not necessarily remove preferences that macOS keeps for it.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Remote and Director modes</h2>
+        <div class="copy">
+          <p>Remote Connection and Director Mode are off until you enable them. When enabled, Textream starts a server on your Mac so another device on the local network can view teleprompter state or control the script.</p>
+          <ul>
+            <li>Connected devices may receive script text, reading position, and display state.</li>
+            <li>Director Mode lets a connected device send or edit script text.</li>
+            <li>These features use local HTTP and WebSocket connections that are not end-to-end encrypted.</li>
+          </ul>
+          <p class="note">Use these modes only on a network and with devices you trust. Turn them off when you are finished, and do not share the connection address or QR code publicly.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Other network connections</h2>
+        <div class="copy">
+          <p>In a Mac App Store build, updates are delivered by Apple. A version installed directly from GitHub or Homebrew may contact GitHub to check whether a newer release exists. GitHub may receive standard connection information such as an IP address; see the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>.</p>
+          <p>If you follow a link from Textream to a website, that site handles the resulting connection under its own policy.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Screen sharing</h2>
+        <div class="copy">
+          <p>The “Hide from Screen Sharing” setting asks macOS to exclude Textream’s teleprompter overlay from screen captures. It does not control other apps, cameras, external capture hardware, or content outside Textream. Confirm your recording or meeting setup before relying on it.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Retention and deletion</h2>
+        <div class="copy">
+          <p>Because the developer does not receive your scripts or maintain a Textream account, there is no Textream server copy to retain or delete. You control saved scripts on your Mac and can delete them whenever you choose.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes and contact</h2>
+        <div class="copy">
+          <p>If Textream’s data practices change, this page will be updated along with its effective date.</p>
+          <p>For a privacy question or support request, visit <a href="support.html">Textream Support</a> or <a href="https://github.com/f/textream/issues/new">open a GitHub issue</a>. Do not include private scripts, credentials, or other sensitive information in a public issue.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2026 Fatih Kadir Akin</p>
+      <p><a href="./">Textream</a> · <a href="support.html">Support</a> · <a href="https://github.com/f/textream">Source</a></p>
+    </footer>
+  </div>
+</body>
+</html>

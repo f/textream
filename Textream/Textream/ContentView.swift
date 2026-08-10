@@ -852,6 +852,21 @@ struct AboutView: View {
                     .clipShape(Capsule())
                 }
 
+                Link(destination: URL(string: "https://blog.fka.dev/textream/privacy.html")!) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "hand.raised.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Privacy")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+
+                #if !APP_STORE
                 Link(destination: URL(string: "https://donate.stripe.com/aFa8wO4NF2S96jDfn4dMI09")!) {
                     HStack(spacing: 5) {
                         Image(systemName: "heart.fill")
@@ -866,6 +881,7 @@ struct AboutView: View {
                     .background(Color.pink.opacity(0.1))
                     .clipShape(Capsule())
                 }
+                #endif
             }
 
             Divider().padding(.horizontal, 20)

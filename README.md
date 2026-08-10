@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#building-from-source">Build</a>
+  <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#building-from-source">Build</a> · <a href="https://blog.fka.dev/textream/privacy.html">Privacy</a>
 </p>
 
 <p align="center">
@@ -46,7 +46,7 @@ brew install textream
 
 | Mode | Description | Microphone |
 |---|---|---|
-| **Word Tracking** (default) | On-device speech recognition highlights each word as you say it. No cloud, no latency, works offline. Supports dozens of languages. | Required |
+| **Word Tracking** (default) | macOS speech recognition highlights each word as you say it. Depending on your Mac, language, and system availability, recognition may happen on-device or Apple may process microphone audio. | Required |
 | **Classic** | Auto-scrolls at a constant speed. No microphone needed. | Not needed |
 | **Voice-Activated** | Scrolls while you speak, pauses when you're silent or muted. Perfect for natural pacing. | Required |
 
@@ -111,7 +111,7 @@ View your teleprompter on **any device** — phone, tablet, or another computer 
 - **Real-time sync** — Words highlight, waveform animates, and progress updates in real time over WebSocket.
 - **No app needed** — Works in any modern browser. No installation required on the remote device.
 - **Configurable port** — Default port 7373, adjustable in advanced settings.
-- **Fully local** — All traffic stays on your local network. Nothing leaves your Wi-Fi.
+- **Direct local connection** — Textream does not relay Remote Connection traffic through a developer server. Enable it only on a local network and with devices you trust.
 
 ### Director Mode
 
@@ -138,7 +138,7 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 - **Tap to jump** — Tap any word in the overlay to jump the tracker to that position.
 - **Pause & resume** — Go off-script, take a break, come back. The tracker picks up where you left off.
 - **Mute / unmute** — Toggle the microphone on or off from the overlay in any mode.
-- **Completely private** — All processing happens on-device. No accounts, no tracking, no data leaves your Mac.
+- **Private by design** — No accounts, ads, analytics, or Textream-operated cloud service. Scripts and settings stay under your control. In Word Tracking mode, macOS speech recognition may send microphone audio to Apple for processing; see the [privacy policy](https://blog.fka.dev/textream/privacy.html).
 - **Auto update checker** — Checks GitHub Releases for new versions on launch and from the Textream menu.
 - **Open source** — MIT licensed. Contributions welcome.
 
@@ -185,7 +185,7 @@ Textream/
     ├── TextreamApp.swift              # App entry point, deep link handling
     ├── ContentView.swift              # Main text editor UI + About view
     ├── TextreamService.swift          # Service layer, URL scheme handling
-    ├── SpeechRecognizer.swift         # On-device speech recognition engine
+    ├── SpeechRecognizer.swift         # macOS speech recognition integration
     ├── NotchOverlayController.swift   # Dynamic Island + floating overlay
     ├── ExternalDisplayController.swift # Sidecar / external display output
     ├── NotchSettings.swift            # User preferences and presets
@@ -331,5 +331,6 @@ MIT
 
 <p align="center">
   Original idea by <a href="https://x.com/semihdev">Semih Kışlar</a> — thanks to him!<br>
-  Made by <a href="https://fka.dev">Fatih Kadir Akin</a>
+  Made by <a href="https://fka.dev">Fatih Kadir Akin</a><br>
+  <a href="https://blog.fka.dev/textream/privacy.html">Privacy</a> · <a href="https://blog.fka.dev/textream/support.html">Support</a>
 </p>
