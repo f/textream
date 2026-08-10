@@ -236,7 +236,7 @@ jobs:
             Or install via Homebrew:
 
             ```
-            brew install f/textream/textream
+            brew install textream
             ```
 
       - name: Compute DMG SHA256

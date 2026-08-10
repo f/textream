@@ -35,7 +35,7 @@ Paste your script, hit play, and start speaking. When you're done, the overlay c
 Or install with Homebrew:
 
 ```bash
-brew install f/textream/textream
+brew install textream
 ```
 
 > Requires **macOS 15 Sequoia** or later. Works on Apple Silicon and Intel.
