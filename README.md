@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#building-from-source">Build</a> · <a href="https://blog.fka.dev/textream/privacy.html">Privacy</a>
+  <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#building-from-source">Build</a> · <a href="https://textream.net/privacy.html">Privacy</a>
 </p>
 
 <p align="center">
@@ -138,7 +138,7 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 - **Tap to jump** — Tap any word in the overlay to jump the tracker to that position.
 - **Pause & resume** — Go off-script, take a break, come back. The tracker picks up where you left off.
 - **Mute / unmute** — Toggle the microphone on or off from the overlay in any mode.
-- **Private by design** — No accounts, ads, analytics, or Textream-operated cloud service. Scripts and settings stay under your control. In Word Tracking mode, macOS speech recognition may send microphone audio to Apple for processing; see the [privacy policy](https://blog.fka.dev/textream/privacy.html).
+- **Private by design** — No accounts, ads, analytics, or Textream-operated cloud service. Scripts and settings stay under your control. In Word Tracking mode, macOS speech recognition may send microphone audio to Apple for processing; see the [privacy policy](https://textream.net/privacy.html).
 - **Auto update checker** — Checks GitHub Releases for new versions on launch and from the Textream menu.
 - **Open source** — MIT licensed. Contributions welcome.
 
@@ -332,5 +332,5 @@ MIT
 <p align="center">
   Original idea by <a href="https://x.com/semihdev">Semih Kışlar</a> — thanks to him!<br>
   Made by <a href="https://fka.dev">Fatih Kadir Akin</a><br>
-  <a href="https://blog.fka.dev/textream/privacy.html">Privacy</a> · <a href="https://blog.fka.dev/textream/support.html">Support</a>
+  <a href="https://textream.net/privacy.html">Privacy</a> · <a href="https://textream.net/support.html">Support</a>
 </p>

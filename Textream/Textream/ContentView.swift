@@ -852,7 +852,7 @@ struct AboutView: View {
                     .clipShape(Capsule())
                 }
 
-                Link(destination: URL(string: "https://blog.fka.dev/textream/privacy.html")!) {
+                Link(destination: URL(string: "https://textream.net/privacy.html")!) {
                     HStack(spacing: 5) {
                         Image(systemName: "hand.raised.fill")
                             .font(.system(size: 11, weight: .semibold))
