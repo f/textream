@@ -35,8 +35,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             TextreamService.shared.hideMainWindow()
         }
 
-        // Silent update check on launch
+        #if !APP_STORE
+        // Direct-download builds check GitHub for updates. App Store builds are
+        // updated exclusively through the App Store.
         UpdateChecker.shared.checkForUpdates(silent: true)
+        #endif
 
         // Start browser server if enabled
         TextreamService.shared.updateBrowserServer()
@@ -135,10 +138,12 @@ struct TextreamApp: App {
                 Button("About Textream") {
                     NotificationCenter.default.post(name: .openAbout, object: nil)
                 }
+                #if !APP_STORE
                 Divider()
                 Button("Check for Updates…") {
                     UpdateChecker.shared.checkForUpdates()
                 }
+                #endif
             }
             CommandGroup(after: .appSettings) {
                 Button("Settings…") {

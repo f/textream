@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Support — Textream</title>
+  <meta name="description" content="Setup help, troubleshooting, and support for the Textream teleprompter app for macOS.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0c;
+      --surface: #1c1c1e;
+      --surface2: #28282c;
+      --text: #f5f5f7;
+      --muted: #a1a1a8;
+      --quiet: #6e6e76;
+      --line: rgba(255, 255, 255, 0.08);
+      --accent1: #7c6aff;
+      --accent2: #4f8bff;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% -15%, rgba(79, 139, 255, 0.15), transparent 42rem),
+        var(--bg);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: #8eb4ff; }
+    a:hover { color: #b9ceff; }
+
+    .shell {
+      width: min(100% - 40px, 920px);
+      margin: 0 auto;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      color: var(--text);
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      background: linear-gradient(145deg, #29292d, #111114);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand-mark span {
+      font-size: 21px;
+      font-weight: 850;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .nav-links { display: flex; gap: 18px; }
+    .nav-links a { color: var(--muted); font-size: 14px; text-decoration: none; }
+    .nav-links a:hover { color: var(--text); }
+
+    header { padding: 92px 0 54px; }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: #9dbbff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 720px;
+      margin: 0 0 22px;
+      font-size: clamp(42px, 8vw, 72px);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
+
+    .lede {
+      max-width: 660px;
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(18px, 3vw, 22px);
+      line-height: 1.55;
+    }
+
+    .primary-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 30px;
+      padding: 13px 20px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      box-shadow: 0 12px 36px rgba(79, 139, 255, 0.22);
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .primary-action:hover {
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 16px 44px rgba(79, 139, 255, 0.3);
+    }
+
+    .before-posting {
+      margin: 18px 0 68px;
+      padding: 24px 26px;
+      border: 1px solid rgba(124, 106, 255, 0.22);
+      border-radius: 18px;
+      background: rgba(124, 106, 255, 0.07);
+    }
+
+    .before-posting h2 { margin: 0 0 11px; font-size: 17px; }
+    .before-posting p { margin: 0; color: #cbc8eb; }
+
+    .troubleshooting { padding-bottom: 78px; }
+    .troubleshooting > h2 { margin: 0 0 24px; font-size: 28px; letter-spacing: -0.025em; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      padding: 25px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(155deg, rgba(42, 42, 47, 0.94), rgba(23, 23, 26, 0.94));
+    }
+
+    .card .number {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      margin-bottom: 18px;
+      border-radius: 9px;
+      background: rgba(79, 139, 255, 0.12);
+      color: #9dbbff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .card h3 { margin: 0 0 9px; font-size: 17px; letter-spacing: -0.015em; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .card p + p { margin-top: 12px; }
+
+    .details {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 42px;
+      padding: 34px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .details h2 { margin: 2px 0 0; font-size: 17px; line-height: 1.35; }
+    .details p { margin: 0 0 14px; color: #c8c8ce; }
+    .details ul { margin: 0; padding-left: 20px; color: #c8c8ce; }
+    .details li + li { margin-top: 8px; }
+
+    code {
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: #d5d5db;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.88em;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 30px 0 42px;
+      border-top: 1px solid var(--line);
+      color: var(--quiet);
+      font-size: 13px;
+    }
+
+    footer p { margin: 0; }
+    footer a { color: var(--muted); text-decoration: none; }
+
+    @media (max-width: 700px) {
+      header { padding-top: 64px; }
+      .grid { grid-template-columns: 1fr; }
+      .details { grid-template-columns: 1fr; gap: 14px; }
+      .nav-links a:first-child { display: none; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav aria-label="Primary navigation">
+      <a class="brand" href="./" aria-label="Textream home">
+        <span class="brand-mark" aria-hidden="true"><span>T</span></span>
+        Textream
+      </a>
+      <div class="nav-links">
+        <a href="https://github.com/f/textream">GitHub</a>
+        <a href="privacy.html">Privacy</a>
+      </div>
+    </nav>
+
+    <header>
+      <p class="eyebrow">Textream support</p>
+      <h1>Let’s get you back on script.</h1>
+      <p class="lede">Find quick fixes for permissions, overlays, local-network connections, and document imports. If the problem persists, report it in the open-source project.</p>
+      <a class="primary-action" href="https://github.com/f/textream/issues/new">Open a support issue <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <aside class="before-posting">
+      <h2>Before posting publicly</h2>
+      <p>Remove private scripts, credentials, QR codes, local IP addresses, and personal details from screenshots or logs. Textream support does not need your script to diagnose most problems.</p>
+    </aside>
+
+    <main>
+      <section class="troubleshooting">
+        <h2>Quick fixes</h2>
+        <div class="grid">
+          <article class="card">
+            <span class="number">01</span>
+            <h3>Word tracking does not start</h3>
+            <p>Open System Settings → Privacy &amp; Security and allow Textream under both Microphone and Speech Recognition. Quit and reopen Textream after changing permissions.</p>
+          </article>
+          <article class="card">
+            <span class="number">02</span>
+            <h3>The overlay is on the wrong screen</h3>
+            <p>Open Textream Settings → Teleprompter. Choose Follow Mouse to move between displays, or Fixed Display to keep the overlay on one screen.</p>
+          </article>
+          <article class="card">
+            <span class="number">03</span>
+            <h3>Remote or Director Mode will not connect</h3>
+            <p>Put both devices on the same trusted network, enable the mode in Settings, and open the address shown by Textream. If prompted, allow incoming connections in the macOS firewall.</p>
+          </article>
+          <article class="card">
+            <span class="number">04</span>
+            <h3>PowerPoint notes do not import</h3>
+            <p>Use a <code>.pptx</code> file that contains presenter notes. For Keynote or Google Slides, export to PowerPoint first, then import the exported file.</p>
+          </article>
+          <article class="card">
+            <span class="number">05</span>
+            <h3>The overlay appears in a recording</h3>
+            <p>Turn on Hide from Screen Sharing in Teleprompter settings before recording. Then make a short test recording: capture apps and external hardware do not all behave the same way.</p>
+          </article>
+          <article class="card">
+            <span class="number">06</span>
+            <h3>Textream will not update</h3>
+            <p>For a Mac App Store installation, update it there. If installed with Homebrew, run <code>brew upgrade textream</code>. Direct downloads are published on GitHub Releases.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="details">
+        <h2>What to include</h2>
+        <div>
+          <p>A useful report includes:</p>
+          <ul>
+            <li>your macOS and Textream versions;</li>
+            <li>your Mac model and whether it uses Apple silicon or Intel;</li>
+            <li>the guidance and overlay modes you selected;</li>
+            <li>steps that reproduce the problem;</li>
+            <li>what you expected and what happened instead.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="details">
+        <h2>Where to ask</h2>
+        <div>
+          <p>Search <a href="https://github.com/f/textream/issues">existing GitHub issues</a> first. If you do not find a match, <a href="https://github.com/f/textream/issues/new">open a new issue</a>.</p>
+          <p>Textream is a free, open-source project. Support is provided on a best-effort basis; there is no guaranteed response time.</p>
+        </div>
+      </section>
+
+      <section class="details">
+        <h2>Privacy</h2>
+        <div>
+          <p>Read the <a href="privacy.html">Textream Privacy Policy</a> for details about microphone access, Apple speech recognition, saved scripts, and optional local-network features.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2026 Fatih Kadir Akin</p>
+      <p><a href="./">Textream</a> · <a href="privacy.html">Privacy</a> · <a href="https://github.com/f/textream">Source</a></p>
+    </footer>
+  </div>
+</body>
+</html>
