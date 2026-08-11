@@ -30,7 +30,9 @@ Paste your script, hit play, and start speaking. When you're done, the overlay c
 
 ## Download
 
-**[Download the latest .dmg from Releases](https://github.com/f/textream/releases/latest)**
+**[Download Textream from the Mac App Store](https://apps.apple.com/app/textream/id6800061488)**
+
+Or **[download the latest .dmg from GitHub Releases](https://github.com/f/textream/releases/latest)**.
 
 Or install with Homebrew:
 
