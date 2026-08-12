@@ -350,6 +350,11 @@ class NotchOverlayController: NSObject {
 
         let xPosition = screenFrame.midX - panelWidth / 2
         let yPosition = screenFrame.midY - panelHeight / 2 + 100
+        let defaultFrame = NSRect(x: xPosition, y: yPosition, width: panelWidth, height: panelHeight)
+
+        // The panel opens at the size and position the window was last left at, so
+        // the content lays out against its final height right away
+        let initialFrame = restorableFloatingFrame(settings.floatingWindowFrame) ?? defaultFrame
 
         let floatingView = FloatingOverlayView(
             content: overlayContent,
@@ -359,7 +364,7 @@ class NotchOverlayController: NSObject {
         let contentView = NSHostingView(rootView: floatingView)
 
         let panel = NSPanel(
-            contentRect: NSRect(x: xPosition, y: yPosition, width: panelWidth, height: panelHeight),
+            contentRect: initialFrame,
             styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
@@ -379,7 +384,43 @@ class NotchOverlayController: NSObject {
         panel.orderFrontRegardless()
         self.panel = panel
 
+        // Observed after the panel is on screen so the notifications posted while
+        // it is first placed are not mistaken for user moves
+        observeFloatingFrame(panel)
+
         installKeyMonitor()
+    }
+
+    /// The saved size is restored as-is, but the origin is nudged back onto the
+    /// display so no edge ends up past it. The overlay draws above the menu bar,
+    /// so the full screen frame is used and the window can sit flush with the top
+    /// of the display. A frame whose center no longer lands on a connected display
+    /// is discarded, so the window cannot return off-screen after a monitor is
+    /// disconnected.
+    private func restorableFloatingFrame(_ frame: NSRect?) -> NSRect? {
+        guard var frame = frame, frame.width > 0, frame.height > 0 else { return nil }
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(center, $0.frame, false) }) else { return nil }
+
+        // Windows larger than the display keep their size and overflow the bottom
+        // right, so the top edge stays within reach.
+        let bounds = screen.frame
+        frame.origin.x = frame.width >= bounds.width
+            ? bounds.minX
+            : min(max(frame.minX, bounds.minX), bounds.maxX - frame.width)
+        frame.origin.y = min(max(frame.minY, bounds.minY), bounds.maxY - frame.height)
+        return frame
+    }
+
+    private func observeFloatingFrame(_ panel: NSPanel) {
+        for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification] {
+            NotificationCenter.default.publisher(for: name, object: panel)
+                .sink { notification in
+                    guard let window = notification.object as? NSWindow else { return }
+                    NotchSettings.shared.floatingWindowFrame = window.frame
+                }
+                .store(in: &cancellables)
+        }
     }
 
     func dismiss() {
