@@ -33,9 +33,9 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "number=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Update app version in Xcode project
+      - name: Update macOS app version in Xcode project
         run: |
-          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ steps.version.outputs.number }};/g" Textream/Textream.xcodeproj/project.pbxproj
+          ruby .github/set-macos-marketing-version.rb "${{ steps.version.outputs.number }}"
 
       - name: Commit version bump
         run: |
@@ -64,9 +64,9 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Update app version
+      - name: Update macOS app version
         run: |
-          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ needs.version.outputs.number }};/g" Textream/Textream.xcodeproj/project.pbxproj
+          ruby .github/set-macos-marketing-version.rb "${{ needs.version.outputs.number }}"
 
       - name: Select Xcode
         run: sudo xcode-select -s ${{ matrix.xcode }}

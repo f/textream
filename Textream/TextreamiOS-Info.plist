@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Textream uses the camera to preview and record your teleprompter videos.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Textream uses the microphone to record video audio, detect when you speak, and follow your script.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Textream saves completed videos to your Photos library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Textream shows only the videos you recorded with Textream from your Photos library.</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Textream uses Apple Speech Recognition to follow and highlight the words you read aloud.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>OpenDyslexic3-Regular.ttf</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>

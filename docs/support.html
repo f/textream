@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <title>Support — Textream</title>
-  <meta name="description" content="Setup help, troubleshooting, and support for the Textream teleprompter app for macOS.">
+  <meta name="description" content="Setup help, troubleshooting, and support for the Textream teleprompter on macOS and iOS.">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -240,7 +240,7 @@
     <header>
       <p class="eyebrow">Textream support</p>
       <h1>Let’s get you back on script.</h1>
-      <p class="lede">Find quick fixes for permissions, overlays, local-network connections, and document imports. If the problem persists, report it in the open-source project.</p>
+      <p class="lede">Find quick fixes for permissions, overlays, iPhone recordings, local-network connections, and document imports. If the problem persists, report it in the open-source project.</p>
       <a class="primary-action" href="https://github.com/f/textream/issues/new">Open a support issue <span aria-hidden="true">↗</span></a>
     </header>
 
@@ -256,7 +256,7 @@
           <article class="card">
             <span class="number">01</span>
             <h3>Word tracking does not start</h3>
-            <p>Open System Settings → Privacy &amp; Security and allow Textream under both Microphone and Speech Recognition. Quit and reopen Textream after changing permissions.</p>
+            <p>Allow Textream under both Microphone and Speech Recognition in the device’s Privacy &amp; Security settings. Quit and reopen Textream after changing permissions.</p>
           </article>
           <article class="card">
             <span class="number">02</span>
@@ -283,6 +283,17 @@
             <h3>Textream will not update</h3>
             <p>For a Mac App Store installation, update it there. If installed with Homebrew, run <code>brew upgrade textream</code>. Direct downloads are published on GitHub Releases.</p>
           </article>
+          <article class="card">
+            <span class="number">07</span>
+            <h3>The iPhone camera or record button is unavailable</h3>
+            <p>Record mode needs Camera, Microphone, and Photos add-only permission. Check each permission in iOS Settings, then reopen the prompter. Camera capture is not available in iOS Simulator, so use a physical iPhone or iPad to test preview, front/back switching, microphone audio, recording, and Photos saving.</p>
+          </article>
+          <article class="card">
+            <span class="number">08</span>
+            <h3>A recording did not appear in Photos</h3>
+            <p>Confirm Textream can add to Photos in iOS Settings, then tap <strong>Retry Save</strong> in the current or next Record session. Textream keeps the pending recording in local app storage after a failed save and removes that pending copy once the retry succeeds. Use <strong>Discard Recording</strong> only if you no longer need it.</p>
+            <p>The thumbnail beside the record button opens Textream’s saved-recordings gallery. The first time you open it, allow Photos read and write access. This access is requested separately from add-only saving, and the gallery filters the library to videos Textream recorded. Tap <strong>Select</strong> to select one or more videos, then use <strong>Delete from Photos</strong>; Photos will ask you to confirm the deletion.</p>
+          </article>
         </div>
       </section>
 
@@ -291,9 +302,9 @@
         <div>
           <p>A useful report includes:</p>
           <ul>
-            <li>your macOS and Textream versions;</li>
-            <li>your Mac model and whether it uses Apple silicon or Intel;</li>
-            <li>the guidance and overlay modes you selected;</li>
+            <li>your macOS or iOS version and Textream version;</li>
+            <li>your Mac, iPhone, or iPad model, or the exact Simulator device;</li>
+            <li>the guidance, session, and overlay modes you selected;</li>
             <li>steps that reproduce the problem;</li>
             <li>what you expected and what happened instead.</li>
           </ul>
@@ -312,7 +323,7 @@
       <section class="details">
         <h2>Privacy</h2>
         <div>
-          <p>Read the <a href="privacy.html">Textream Privacy Policy</a> for details about microphone access, Apple speech recognition, saved scripts, and optional local-network features.</p>
+          <p>Read the <a href="privacy.html">Textream Privacy Policy</a> for details about camera and microphone access, Apple speech recognition, Photos saving, saved scripts, and optional local-network features.</p>
         </div>
       </section>
     </main>

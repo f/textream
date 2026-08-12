@@ -1,0 +1,24 @@
+Textream requires no account, purchase, subscription, demo credentials, or developer-operated service. All features can be reviewed with the included sample script.
+
+Test without permissions:
+1. Launch Textream.
+2. Leave Session set to Read, choose Auto under Follow Mode, and keep the camera toggle off.
+3. Tap Start Prompter. Classic auto-scroll starts without Camera, Microphone, Speech Recognition, or Photos permission.
+4. Swipe left or right to change speed, swipe vertically to move manually, then tap Close.
+
+Test Word Tracking:
+1. On the main screen, choose Follow under Follow Mode and tap Start Prompter.
+2. Grant Microphone and Speech Recognition access.
+3. Read the sample script aloud. Textream follows and highlights the spoken words. Apple Speech Recognition may require network availability for the selected language.
+
+Test recording on a physical iPhone or iPad:
+1. Choose Record and tap Open Camera.
+2. Grant Camera, Microphone, and Photos add-only access.
+3. Use the camera-switch control if desired, then tap the red record button. Tap the square stop control to finish.
+4. Wait for “Saved to Photos.” The on-screen teleprompter is not composited into the saved video.
+5. Tap the thumbnail to open Recordings. The first gallery visit separately requests Photos read/write access because the gallery can play, trim, and delete recordings. It filters Photos using identifiers saved when Textream creates a video; unrelated library items are not shown.
+6. Open a recording and tap Edit to use the public system video trimmer. Saving creates an edited copy and leaves the original unchanged. Select enables multi-selection and deletion from Photos.
+
+If saving to Photos fails, Textream keeps the pending movie in app-local storage and presents Retry Save and Discard Recording.
+
+The iOS Simulator can review the editor, teleprompter, orientation, and no-permission Classic flow, but Apple does not provide camera capture hardware there. A physical device is required to review camera preview, camera switching, microphone recording, and Photos saving.

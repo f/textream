@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <title>Privacy Policy — Textream</title>
-  <meta name="description" content="How Textream handles scripts, microphone audio, speech recognition, local-network features, and app settings.">
+  <meta name="description" content="How Textream handles scripts, camera recordings, microphone audio, speech recognition, Photos saving, local-network features, and app settings.">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -199,15 +199,15 @@
     </nav>
 
     <header>
-      <p class="eyebrow">Privacy policy · Updated August 10, 2026</p>
+      <p class="eyebrow">Privacy policy · Updated August 12, 2026</p>
       <h1>Privacy, without fine print.</h1>
-      <p class="lede">Textream does not require an account and its developer does not operate a service that receives your scripts. A few macOS and optional network features deserve a clear explanation.</p>
+      <p class="lede">Textream does not require an account and its developer does not operate a service that receives your scripts, recordings, or settings. A few macOS, iOS, and optional network features deserve a clear explanation.</p>
     </header>
 
     <div class="summary" aria-label="Privacy summary">
       <article>
         <strong>Your scripts are yours</strong>
-        <p>Textream keeps working text and preferences on your Mac. You choose where saved script files live.</p>
+        <p>Textream keeps working text and preferences on your device. On Mac, you choose where saved script files live.</p>
       </article>
       <article>
         <strong>No ads or analytics</strong>
@@ -215,7 +215,7 @@
       </article>
       <article>
         <strong>You control the microphone</strong>
-        <p>Voice-guided modes run only after you grant permission. You can revoke access in macOS Settings.</p>
+        <p>Voice-guided modes and iPhone video recording run only after you grant permission. You can revoke access in system privacy settings.</p>
       </article>
     </div>
 
@@ -231,18 +231,29 @@
       <section>
         <h2>Microphone and speech recognition</h2>
         <div class="copy">
-          <p>Word Tracking and Voice-Activated modes use microphone access when you start them. Word Tracking uses Apple’s speech-recognition framework to match spoken words to your script.</p>
-          <p><strong>Speech recognition is not guaranteed to stay on-device.</strong> Depending on your Mac, language, macOS version, and service availability, macOS may process speech locally or send microphone audio to Apple for recognition. Textream’s developer does not receive that audio or the recognition result.</p>
-          <p>You can use Classic mode without microphone or speech-recognition access. You can also change permissions at any time in System Settings → Privacy &amp; Security.</p>
+          <p>Word Tracking and Voice-Activated modes use microphone access when you start them. Word Tracking uses Apple’s speech-recognition framework to match spoken words to your script. On iPhone and iPad, Record mode also includes microphone audio in the saved camera video.</p>
+          <p><strong>Speech recognition is not guaranteed to stay on-device.</strong> Depending on your device, language, operating-system version, and service availability, Apple’s operating system may process speech locally or send microphone audio to Apple for recognition. Textream’s developer does not receive that audio or the recognition result.</p>
+          <p>You can use Classic mode in a Read session without microphone or speech-recognition access. Record mode still needs microphone access for the video’s audio. You can change permissions at any time in the device’s Privacy &amp; Security settings.</p>
           <p>Apple describes its handling of data in the <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a>.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>iPhone and iPad camera recordings</h2>
+        <div class="copy">
+          <p>The iOS companion requests camera access only when you choose to show the camera or use Record mode. Read mode can run with the camera off. Record mode captures the selected front or back camera together with microphone audio.</p>
+          <p>The translucent teleprompter is a presenter-only overlay. It appears on your screen while recording but is not composited into the saved video.</p>
+          <p>When you stop recording, Textream uses Photos <strong>add-only</strong> access to create a video in your Photos library. Add-only access lets Textream save the new recording without browsing, importing, or reading your existing photo library.</p>
+          <p>Textream remembers the Photos asset identifiers of recordings it creates. If you tap the saved-recording thumbnail, Textream separately requests Photos read and write access and uses those identifiers to show only recordings saved by Textream. This access also lets you select and delete those recordings from Photos inside Textream. It does not request library access merely to record or save a video, and it does not add unrelated library items to this gallery.</p>
+          <p>The recording is first kept in Textream’s local app storage and excluded from device backups. After a successful Photos save, Textream removes that pending copy. If saving fails, Textream keeps the pending copy locally and offers <strong>Retry Save</strong> or <strong>Discard Recording</strong> in the current or next Record session.</p>
         </div>
       </section>
 
       <section>
         <h2>Scripts, files, and settings</h2>
         <div class="copy">
-          <p>Textream stores editor content and preferences locally on your Mac. When you save a <code>.textream</code> file, import PowerPoint notes, or open another document, the file is handled locally and remains in a location you control.</p>
-          <p>Textream does not upload those files to a Textream server. You can remove saved scripts using Finder. Removing the app does not necessarily remove preferences that macOS keeps for it.</p>
+          <p>Textream stores editor content and preferences locally on your device. On Mac, when you save a <code>.textream</code> file, import PowerPoint notes, or open another document, the file is handled locally and remains in a location you control.</p>
+          <p>Textream does not upload those files to a Textream server. You can remove saved Mac scripts using Finder. Removing the app does not necessarily remove preferences that the operating system keeps for it.</p>
         </div>
       </section>
 
@@ -277,7 +288,8 @@
       <section>
         <h2>Retention and deletion</h2>
         <div class="copy">
-          <p>Because the developer does not receive your scripts or maintain a Textream account, there is no Textream server copy to retain or delete. You control saved scripts on your Mac and can delete them whenever you choose.</p>
+          <p>Because the developer does not receive your scripts or recordings and does not maintain a Textream account, there is no Textream server copy to retain or delete. You control saved scripts on your Mac and saved videos in Photos and can delete Textream recordings either in Photos or from Textream’s recordings gallery.</p>
+          <p>An iOS recording that could not be added to Photos remains in Textream’s local app storage for retry until you save it, explicitly discard it, or delete Textream. A successful retry removes the pending app copy. Deleting Textream removes its app storage, but does not delete videos already saved to Photos.</p>
         </div>
       </section>
 

@@ -1,0 +1,1 @@
+script,autoscroll,camera,video,presenter,speech,podcast,creator,reading,recording,cue

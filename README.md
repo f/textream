@@ -5,7 +5,7 @@
 <h1 align="center">Textream</h1>
 
 <p align="center">
-  <strong>A free macOS teleprompter with real-time word tracking, classic auto-scroll, and voice-activated scrolling.</strong>
+  <strong>A free teleprompter for Mac, iPhone, and iPad.</strong>
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#building-from-source">Build</a> · <a href="https://textream.net/privacy.html">Privacy</a>
+  <a href="#download">Download</a> · <a href="#ios-26-companion">iPhone &amp; iPad</a> · <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#building-from-source">Build</a> · <a href="https://textream.net/privacy.html">Privacy</a>
 </p>
 
 <p align="center">
@@ -24,13 +24,13 @@
 
 ## What is Textream?
 
-Textream is a free, open-source macOS app that guides you through your script with three modes: **word tracking** (highlights each word as you say it), **classic** (constant-speed auto-scroll), and **voice-activated** (scrolls while you speak, pauses when you're silent). It displays your text in a sleek **Dynamic Island-style overlay** at the top of your screen, a **draggable floating window**, or **fullscreen on a Sidecar iPad** — visible only to you, invisible to your audience.
+Textream is a free, open-source teleprompter that guides you through your script with three modes: **word tracking** (highlights each word as you say it), **classic** (constant-speed auto-scroll), and **voice-activated** (scrolls while you speak, pauses when you're silent). The Mac app displays your text in a sleek **Dynamic Island-style overlay**, a **draggable floating window**, or **fullscreen on a Sidecar iPad**. The iPhone and iPad app adds near-camera reading and presenter-only camera recording.
 
 Paste your script, hit play, and start speaking. When you're done, the overlay closes automatically.
 
 ## Download
 
-**[Download Textream from the Mac App Store](https://apps.apple.com/app/textream/id6800061488)**
+**[Download Textream from the App Store](https://apps.apple.com/app/textream/id6800061488)** for Mac, iPhone, and iPad.
 
 Or **[download the latest .dmg from GitHub Releases](https://github.com/f/textream/releases/latest)**.
 
@@ -41,6 +41,20 @@ brew install textream
 ```
 
 > Requires **macOS 15 Sequoia** or later. Works on Apple Silicon and Intel.
+
+## iOS 26 Companion
+
+The Textream companion for iPhone and iPad is part of the same universal App Store listing as the Mac app.
+
+- **Portrait and landscape** — A fullscreen teleprompter layout adapts to both orientations.
+- **Eye-contact reading position** — The active line sits just below the front camera by default, or can be centered in Prompter Settings.
+- **The same three guidance modes** — Word Tracking, Classic auto-scroll, and Voice-Activated scrolling use the same behavior as the Mac app.
+- **Optional camera while reading** — Read mode works as a distraction-free teleprompter, or you can show and hide the camera behind the prompt.
+- **Selfie video recording** — Record mode captures camera video and microphone audio, starts with the front camera, and lets you switch between front and back cameras before recording.
+- **Saved to Photos** — Completed recordings are added to Photos and appear in an adaptive Textream recordings gallery, where you can play, select, and delete them. If a save fails, Textream keeps a pending local copy and offers retry or discard controls in the current or next Record session.
+- **Presenter-only prompt** — The translucent scrolling prompt is visible on screen while you record, but it is not burned into the saved video.
+- **Matching fonts** — Sans, Serif, Mono, and OpenDyslexic are available on both platforms.
+- **Liquid Glass** — Controls use the native iOS 26 Liquid Glass appearance.
 
 ## Features
 
@@ -163,9 +177,18 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 
 ### Requirements
 
+For the macOS app:
+
 - macOS 15+
 - Xcode 16+
-- Swift 5.0+
+
+For the iOS companion:
+
+- Xcode 26+
+- The iOS 26 SDK and an installed iOS 26 Simulator runtime
+- A physical iPhone or iPad to verify camera, microphone, recording, and Photos saving; Simulator can verify the interface and orientation layouts but does not provide camera recording hardware
+
+The macOS target uses Swift 5 language mode. The new iOS target uses Swift 6 with complete concurrency checking.
 
 ### Build
 
@@ -175,7 +198,7 @@ cd textream/Textream
 open Textream.xcodeproj
 ```
 
-Build and run with ⌘R in Xcode.
+Choose the **Textream** scheme for macOS or **TextreamiOS** for iOS, select a compatible destination, then build and run with ⌘R in Xcode. The **TextreamiOS** scheme also includes the iOS unit tests.
 
 ### Project structure
 
@@ -183,21 +206,25 @@ Build and run with ⌘R in Xcode.
 Textream/
 ├── Textream.xcodeproj
 ├── Info.plist
-└── Textream/
-    ├── TextreamApp.swift              # App entry point, deep link handling
-    ├── ContentView.swift              # Main text editor UI + About view
-    ├── TextreamService.swift          # Service layer, URL scheme handling
-    ├── SpeechRecognizer.swift         # macOS speech recognition integration
-    ├── NotchOverlayController.swift   # Dynamic Island + floating overlay
-    ├── ExternalDisplayController.swift # Sidecar / external display output
-    ├── NotchSettings.swift            # User preferences and presets
-    ├── SettingsView.swift             # Tabbed settings UI
-    ├── MarqueeTextView.swift          # Word flow layout and highlighting
-    ├── BrowserServer.swift            # Remote connection HTTP + WebSocket server
-    ├── DirectorServer.swift           # Director mode HTTP + WebSocket server
-    ├── PresentationNotesExtractor.swift # PPTX presenter notes extraction
-    ├── UpdateChecker.swift            # GitHub release update checker
-    └── Assets.xcassets/               # App icon and colors
+├── Textream/                         # macOS app
+│   ├── TextreamApp.swift              # App entry point, deep link handling
+│   ├── ContentView.swift              # Main text editor UI + About view
+│   ├── TextreamService.swift          # Service layer, URL scheme handling
+│   ├── SpeechRecognizer.swift         # macOS speech recognition integration
+│   ├── NotchOverlayController.swift   # Dynamic Island + floating overlay
+│   ├── ExternalDisplayController.swift # Sidecar / external display output
+│   ├── NotchSettings.swift            # User preferences and presets
+│   ├── SettingsView.swift             # Tabbed settings UI
+│   ├── MarqueeTextView.swift          # Word flow layout and highlighting
+│   ├── BrowserServer.swift            # Remote connection HTTP + WebSocket server
+│   ├── DirectorServer.swift           # Director mode HTTP + WebSocket server
+│   ├── PresentationNotesExtractor.swift # PPTX presenter notes extraction
+│   ├── UpdateChecker.swift            # GitHub release update checker
+│   └── Assets.xcassets/               # macOS app icon and colors
+├── TextreamiOS-Info.plist             # iOS permissions and orientations
+├── TextreamiOS/                       # iOS app, capture, speech, models, and views
+│   └── Resources/                     # iOS assets and OpenDyslexic font
+└── TextreamiOSTests/                  # iOS prompt and matching tests
 ```
 
 ## URL Scheme
