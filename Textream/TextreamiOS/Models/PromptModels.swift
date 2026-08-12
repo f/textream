@@ -86,6 +86,69 @@ enum PromptReadingPosition: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum PromptMirrorAxis: String, CaseIterable, Identifiable, Codable {
+    case horizontal
+    case vertical
+    case both
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .horizontal: "Horizontal"
+        case .vertical: "Vertical"
+        case .both: "Both"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .horizontal: "Flips left to right for standard teleprompter glass."
+        case .vertical: "Flips top to bottom."
+        case .both: "Flips both axes."
+        }
+    }
+
+    var scaleX: CGFloat {
+        switch self {
+        case .horizontal, .both: -1
+        case .vertical: 1
+        }
+    }
+
+    var scaleY: CGFloat {
+        switch self {
+        case .vertical, .both: -1
+        case .horizontal: 1
+        }
+    }
+}
+
+struct PromptMirrorPresentation {
+    static func isActive(
+        enabled: Bool,
+        sessionMode: SessionMode,
+        viewportSize: CGSize
+    ) -> Bool {
+        enabled
+            && sessionMode == .read
+            && viewportSize.width > viewportSize.height
+    }
+
+    /// SwiftUI's negative horizontal scale also reverses the UIKit view's
+    /// local pan coordinates. Convert that content-space translation back to
+    /// the direction of the user's gesture on the physical device so swiping
+    /// right always increases speed.
+    static func deviceHorizontalTranslation(
+        from contentTranslation: CGFloat,
+        isActive: Bool,
+        axis: PromptMirrorAxis
+    ) -> CGFloat {
+        guard isActive else { return contentTranslation }
+        return contentTranslation * axis.scaleX
+    }
+}
+
 enum PromptFontFamily: String, CaseIterable, Identifiable, Codable {
     case sans
     case serif
@@ -216,6 +279,8 @@ struct PromptSessionConfiguration: Equatable {
     let sessionMode: SessionMode
     let cameraEnabled: Bool
     let followMode: FollowMode
+    let mirrorEnabled: Bool
+    let mirrorAxis: PromptMirrorAxis
     let readingPosition: PromptReadingPosition
     let scrollSpeed: Double
     let fontFamily: PromptFontFamily
@@ -232,4 +297,18 @@ struct PromptSessionConfiguration: Equatable {
     /// Classic recording still captures microphone audio in the movie, but it
     /// does not need per-buffer speech or level processing.
     var audioAnalysisEnabled: Bool { followMode.requiresMicrophone }
+}
+
+struct PromptDisplaySettings: Equatable {
+    var mirrorEnabled: Bool
+    var mirrorAxis: PromptMirrorAxis
+    var readingPosition: PromptReadingPosition
+    var fontSize: PromptFontSize
+
+    init(configuration: PromptSessionConfiguration) {
+        mirrorEnabled = configuration.mirrorEnabled
+        mirrorAxis = configuration.mirrorAxis
+        readingPosition = configuration.readingPosition
+        fontSize = configuration.fontSize
+    }
 }

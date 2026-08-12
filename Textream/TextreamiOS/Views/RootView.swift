@@ -67,9 +67,18 @@ struct RootView: View {
             )
         }
         .fullScreenCover(isPresented: $model.isShowingSession) {
-            PromptSessionView(configuration: model.configuration()) { speed in
-                model.scrollSpeed = speed
-            }
+            PromptSessionView(
+                configuration: model.configuration(),
+                onScrollSpeedChanged: { speed in
+                    model.scrollSpeed = speed
+                },
+                onDisplaySettingsChanged: { settings in
+                    model.mirrorEnabled = settings.mirrorEnabled
+                    model.mirrorAxis = settings.mirrorAxis
+                    model.readingPosition = settings.readingPosition
+                    model.fontSize = settings.fontSize
+                }
+            )
         }
         .onChange(of: model.sessionMode) { _, mode in
             if mode == .record { model.cameraEnabled = true }
@@ -286,6 +295,38 @@ struct RootView: View {
             .tint(.indigo)
             .accessibilityIdentifier("cameraToggle")
 
+            if model.sessionMode == .read {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(isOn: $model.mirrorEnabled) {
+                        Label(
+                            "Mirror in landscape",
+                            systemImage: "arrow.left.and.right"
+                        )
+                        .font(.subheadline.weight(.medium))
+                    }
+                    .tint(.indigo)
+                    .accessibilityIdentifier("mirrorModeToggle")
+
+                    if model.mirrorEnabled {
+                        Picker("Mirror axis", selection: $model.mirrorAxis) {
+                            ForEach(PromptMirrorAxis.allCases) { axis in
+                                Text(axis.label).tag(axis)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("mirrorAxisPicker")
+
+                        Text("Rotate to landscape for teleprompter glass. Prompt controls stay readable on the device.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -333,8 +374,8 @@ struct RootView: View {
             model.startSession()
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: model.sessionMode == .record ? "camera.fill" : "play.fill")
-                Text(model.sessionMode == .record ? "Open Camera" : "Start Prompter")
+                Image(systemName: startSessionIcon)
+                Text(startSessionLabel)
             }
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: RootFloatingActionLayout.buttonMinimumHeight)
@@ -343,6 +384,16 @@ struct RootView: View {
         .tint(.indigo)
         .disabled(!model.canStart)
         .accessibilityIdentifier("startSessionButton")
+    }
+
+    private var startSessionIcon: String {
+        if model.sessionMode == .record { return "camera.fill" }
+        return model.mirrorEnabled ? "arrow.left.and.right" : "play.fill"
+    }
+
+    private var startSessionLabel: String {
+        if model.sessionMode == .record { return "Open Camera" }
+        return model.mirrorEnabled ? "Start Mirror Mode" : "Start Prompter"
     }
 
     @ViewBuilder

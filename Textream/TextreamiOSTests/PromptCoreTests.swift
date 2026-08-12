@@ -529,7 +529,7 @@ struct PromptCoreTests {
 
     @MainActor
     @Test
-    func languageSuggestionCoordinatorRejectsStaleResultsAndRemembersDismissal() async {
+    func languageSuggestionCoordinatorRejectsStaleResultsAndRemembersDismissal() async throws {
         actor Stub {
             func suggestion(for text: String) async -> SpeechLanguageSuggestion? {
                 if text == "old" {
@@ -552,17 +552,21 @@ struct PromptCoreTests {
         coordinator.schedule(text: "old", currentLocaleIdentifier: "en-US")
         await Task.yield()
         coordinator.schedule(text: "new", currentLocaleIdentifier: "en-US")
-        try? await Task.sleep(for: .milliseconds(80))
+        for _ in 0..<100 where coordinator.suggestion == nil {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         #expect(coordinator.suggestion?.localeIdentifier == "tr-TR")
 
-        let suggestion = coordinator.suggestion!
+        let suggestion = try #require(coordinator.suggestion)
         coordinator.dismiss(suggestion)
         coordinator.schedule(text: "new", currentLocaleIdentifier: "en-US")
         try? await Task.sleep(for: .milliseconds(10))
         #expect(coordinator.suggestion == nil)
 
         coordinator.reset(text: "new", currentLocaleIdentifier: "en-US")
-        try? await Task.sleep(for: .milliseconds(10))
+        for _ in 0..<100 where coordinator.suggestion == nil {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         #expect(coordinator.useSuggestedLocale() == "tr-TR")
         #expect(coordinator.suggestion == nil)
     }
@@ -1671,6 +1675,95 @@ struct PromptCoreTests {
     }
 
     @Test
+    func mirrorAxesMatchTheMacTeleprompterTransforms() {
+        #expect(PromptMirrorAxis.horizontal.scaleX == -1)
+        #expect(PromptMirrorAxis.horizontal.scaleY == 1)
+        #expect(PromptMirrorAxis.vertical.scaleX == 1)
+        #expect(PromptMirrorAxis.vertical.scaleY == -1)
+        #expect(PromptMirrorAxis.both.scaleX == -1)
+        #expect(PromptMirrorAxis.both.scaleY == -1)
+        #expect(
+            PromptMirrorAxis.allCases.map(\.rawValue)
+                == ["horizontal", "vertical", "both"]
+        )
+    }
+
+    @Test
+    func mirrorPresentationRequiresAnEnabledLandscapeReadSession() {
+        let landscape = CGSize(width: 844, height: 390)
+        let portrait = CGSize(width: 390, height: 844)
+        let square = CGSize(width: 500, height: 500)
+
+        #expect(
+            PromptMirrorPresentation.isActive(
+                enabled: true,
+                sessionMode: .read,
+                viewportSize: landscape
+            )
+        )
+        #expect(
+            !PromptMirrorPresentation.isActive(
+                enabled: false,
+                sessionMode: .read,
+                viewportSize: landscape
+            )
+        )
+        #expect(
+            !PromptMirrorPresentation.isActive(
+                enabled: true,
+                sessionMode: .read,
+                viewportSize: portrait
+            )
+        )
+        #expect(
+            !PromptMirrorPresentation.isActive(
+                enabled: true,
+                sessionMode: .read,
+                viewportSize: square
+            )
+        )
+        #expect(
+            !PromptMirrorPresentation.isActive(
+                enabled: true,
+                sessionMode: .record,
+                viewportSize: landscape
+            )
+        )
+    }
+
+    @Test
+    func mirrorPresentationKeepsSpeedSwipesInThePhysicalDeviceDirection() {
+        #expect(
+            PromptMirrorPresentation.deviceHorizontalTranslation(
+                from: 120,
+                isActive: false,
+                axis: .horizontal
+            ) == 120
+        )
+        #expect(
+            PromptMirrorPresentation.deviceHorizontalTranslation(
+                from: -120,
+                isActive: true,
+                axis: .horizontal
+            ) == 120
+        )
+        #expect(
+            PromptMirrorPresentation.deviceHorizontalTranslation(
+                from: -120,
+                isActive: true,
+                axis: .both
+            ) == 120
+        )
+        #expect(
+            PromptMirrorPresentation.deviceHorizontalTranslation(
+                from: 120,
+                isActive: true,
+                axis: .vertical
+            ) == 120
+        )
+    }
+
+    @Test
     func readModeCanRunWithoutCameraOrMicrophone() {
         let configuration = makeConfiguration(sessionMode: .read, cameraEnabled: false, followMode: .classic)
 
@@ -1724,10 +1817,14 @@ struct PromptCoreTests {
 
         let first = AppModel(defaults: defaults)
         #expect(first.readingPosition == .nearCamera)
+        #expect(!first.mirrorEnabled)
+        #expect(first.mirrorAxis == .horizontal)
         first.script = "A saved script"
         first.sessionMode = .record
         first.cameraEnabled = true
         first.followMode = .voiceActivated
+        first.mirrorEnabled = true
+        first.mirrorAxis = .both
         first.readingPosition = .center
         first.scrollSpeed = 5.5
         first.fontFamily = .dyslexia
@@ -1738,6 +1835,8 @@ struct PromptCoreTests {
         #expect(restored.sessionMode == .record)
         #expect(restored.cameraEnabled)
         #expect(restored.followMode == .voiceActivated)
+        #expect(restored.mirrorEnabled)
+        #expect(restored.mirrorAxis == .both)
         #expect(restored.readingPosition == .center)
         #expect(restored.scrollSpeed == 5.5)
         #expect(restored.fontFamily == .dyslexia)
@@ -1755,13 +1854,56 @@ struct PromptCoreTests {
         model.script = editedScript
         model.fontFamily = .dyslexia
         model.fontSize = .xl
+        model.mirrorEnabled = true
+        model.mirrorAxis = .vertical
 
         let configuration = model.configuration()
 
         #expect(configuration.script == editedScript)
         #expect(configuration.fontFamily == .dyslexia)
         #expect(configuration.fontSize == .xl)
+        #expect(configuration.mirrorEnabled)
+        #expect(configuration.mirrorAxis == .vertical)
         #expect(defaults.string(forKey: "ios.script") == editedScript)
+    }
+
+    @Test
+    func liveDisplaySettingsStartFromTheSessionConfiguration() {
+        let configuration = makeConfiguration(
+            sessionMode: .read,
+            cameraEnabled: false,
+            followMode: .classic,
+            mirrorEnabled: true,
+            mirrorAxis: .vertical,
+            readingPosition: .center,
+            fontSize: .xl
+        )
+
+        let settings = PromptDisplaySettings(configuration: configuration)
+
+        #expect(settings.mirrorEnabled)
+        #expect(settings.mirrorAxis == .vertical)
+        #expect(settings.readingPosition == .center)
+        #expect(settings.fontSize == .xl)
+    }
+
+    @MainActor
+    @Test
+    func sessionSettingsClampLiveScrollSpeedToTheSupportedRange() {
+        let controller = PromptSessionController(
+            configuration: makeConfiguration(
+                sessionMode: .read,
+                cameraEnabled: false,
+                followMode: .classic
+            )
+        )
+
+        controller.setScrollSpeed(99)
+        #expect(controller.scrollSpeed == PromptScrollSpeedAdjustment.maximumSpeed)
+
+        controller.setScrollSpeed(-1)
+        #expect(controller.scrollSpeed == PromptScrollSpeedAdjustment.minimumSpeed)
+        controller.shutdown()
     }
 
     @MainActor
@@ -1807,17 +1949,23 @@ struct PromptCoreTests {
     private func makeConfiguration(
         sessionMode: SessionMode,
         cameraEnabled: Bool,
-        followMode: FollowMode
+        followMode: FollowMode,
+        mirrorEnabled: Bool = false,
+        mirrorAxis: PromptMirrorAxis = .horizontal,
+        readingPosition: PromptReadingPosition = .nearCamera,
+        fontSize: PromptFontSize = .lg
     ) -> PromptSessionConfiguration {
         PromptSessionConfiguration(
             script: "One two three",
             sessionMode: sessionMode,
             cameraEnabled: cameraEnabled,
             followMode: followMode,
-            readingPosition: .nearCamera,
+            mirrorEnabled: mirrorEnabled,
+            mirrorAxis: mirrorAxis,
+            readingPosition: readingPosition,
             scrollSpeed: 3,
             fontFamily: .sans,
-            fontSize: .lg,
+            fontSize: fontSize,
             textColor: .white,
             cueColor: .white,
             cueBrightness: .dim,

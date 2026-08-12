@@ -10,6 +10,30 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
+                    Toggle("Mirror prompt in landscape", isOn: $model.mirrorEnabled)
+                        .tint(.indigo)
+                        .accessibilityIdentifier("settingsMirrorModeToggle")
+
+                    if model.mirrorEnabled {
+                        Picker("Axis", selection: $model.mirrorAxis) {
+                            ForEach(PromptMirrorAxis.allCases) { axis in
+                                Text(axis.label).tag(axis)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("settingsMirrorAxisPicker")
+
+                        Text(model.mirrorAxis.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Mirror mode")
+                } footer: {
+                    Text("Available in a landscape Read session. The prompt is pre-flipped for use with teleprompter glass.")
+                }
+
+                Section {
                     Picker("Reading position", selection: $model.readingPosition) {
                         ForEach(PromptReadingPosition.allCases) { position in
                             Text(position.label).tag(position)

@@ -144,6 +144,8 @@ struct TextreamiOSApp: App {
             sessionMode: .read,
             cameraEnabled: false,
             followMode: .classic,
+            mirrorEnabled: true,
+            mirrorAxis: .horizontal,
             readingPosition: .nearCamera,
             scrollSpeed: 0.5,
             fontFamily: .sans,

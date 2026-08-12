@@ -6,6 +6,7 @@ struct PromptSessionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var controller: PromptSessionController
+    @State private var displaySettings: PromptDisplaySettings
     @State private var isClosing = false
     @State private var isConfirmingDiscard = false
     @State private var isShowingSavedRecordings = false
@@ -14,21 +15,35 @@ struct PromptSessionView: View {
     @State private var bottomControlOverlayHeight: CGFloat = 0
     @State private var idleTimerOwner = UUID()
     @State private var isPromptSessionVisible = false
+    @State private var isShowingMirrorSettings = false
+    @State private var showsSessionControls = true
     private let onScrollSpeedChanged: (Double) -> Void
+    private let onDisplaySettingsChanged: (PromptDisplaySettings) -> Void
 
     init(
         configuration: PromptSessionConfiguration,
-        onScrollSpeedChanged: @escaping (Double) -> Void = { _ in }
+        onScrollSpeedChanged: @escaping (Double) -> Void = { _ in },
+        onDisplaySettingsChanged: @escaping (PromptDisplaySettings) -> Void = { _ in }
     ) {
         self.onScrollSpeedChanged = onScrollSpeedChanged
+        self.onDisplaySettingsChanged = onDisplaySettingsChanged
         _controller = State(initialValue: PromptSessionController(configuration: configuration))
+        _displaySettings = State(
+            initialValue: PromptDisplaySettings(configuration: configuration)
+        )
     }
 
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
+            let isMirrorActive = PromptMirrorPresentation.isActive(
+                enabled: displaySettings.mirrorEnabled,
+                sessionMode: controller.configuration.sessionMode,
+                viewportSize: geometry.size
+            )
             ZStack {
                 stageBackground
+                    .accessibilityHidden(isShowingMirrorSettings)
 
                 if controller.showsCamera {
                     Color.black.opacity(controller.configuration.overlayOpacity)
@@ -49,7 +64,7 @@ struct PromptSessionView: View {
                     wordTracking: controller.configuration.followMode == .wordTracking,
                     continuousWordProgress: controller.continuousWordProgress,
                     allowsHorizontalSpeedAdjustment: controller.canAdjustScrollSpeed,
-                    readingPosition: controller.configuration.readingPosition,
+                    readingPosition: displaySettings.readingPosition,
                     topOverlayClearance: max(
                         geometry.safeAreaInsets.top,
                         closeControlMaxY
@@ -67,7 +82,11 @@ struct PromptSessionView: View {
                     onSpeedAdjustmentBegan: controller.beginScrollSpeedAdjustment,
                     onSpeedAdjustmentChanged: { translation, width in
                         controller.updateScrollSpeedAdjustment(
-                            horizontalTranslation: translation,
+                            horizontalTranslation: PromptMirrorPresentation.deviceHorizontalTranslation(
+                                from: translation,
+                                isActive: isMirrorActive,
+                                axis: displaySettings.mirrorAxis
+                            ),
                             viewWidth: width
                         )
                     },
@@ -75,7 +94,13 @@ struct PromptSessionView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
+                .scaleEffect(
+                    x: isMirrorActive ? displaySettings.mirrorAxis.scaleX : 1,
+                    y: isMirrorActive ? displaySettings.mirrorAxis.scaleY : 1
+                )
                 .mask(verticalFade)
+                .accessibilityHidden(isShowingMirrorSettings)
+                .accessibilityIdentifier("promptText")
                 .zIndex(0)
 
                 if controller.isAdjustingScrollSpeed {
@@ -84,28 +109,89 @@ struct PromptSessionView: View {
                         .zIndex(2)
                 }
 
-                VStack(spacing: 0) {
-                    Spacer()
+                if showsSessionControls {
+                    VStack(spacing: 0) {
+                        Spacer()
 
-                    bottomControls(isLandscape: isLandscape)
-                        .padding(.leading, max(18, geometry.safeAreaInsets.leading + 18))
-                        .padding(.trailing, max(18, geometry.safeAreaInsets.trailing + 18))
-                        .padding(.bottom, geometry.safeAreaInsets.bottom + 10)
-                        .background {
-                            GeometryReader { controlsGeometry in
-                                Color.clear.preference(
-                                    key: BottomControlOverlayHeightKey.self,
-                                    value: controlsGeometry.size.height
-                                )
+                        bottomControls(isLandscape: isLandscape)
+                            .padding(.leading, max(18, geometry.safeAreaInsets.leading + 18))
+                            .padding(.trailing, max(18, geometry.safeAreaInsets.trailing + 18))
+                            .padding(.bottom, geometry.safeAreaInsets.bottom + 10)
+                            .background {
+                                GeometryReader { controlsGeometry in
+                                    Color.clear.preference(
+                                        key: BottomControlOverlayHeightKey.self,
+                                        value: controlsGeometry.size.height
+                                    )
+                                }
                             }
-                        }
+                    }
+                    .transition(.opacity)
+                    .accessibilityHidden(isShowingMirrorSettings)
+                    .zIndex(3)
                 }
-                .zIndex(3)
+
+                if isShowingMirrorSettings {
+                    Color.black.opacity(0.24)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.snappy) { isShowingMirrorSettings = false }
+                        }
+                        .accessibilityHidden(true)
+                        .zIndex(4)
+
+                    MirrorSessionSettingsPanel(
+                        settings: $displaySettings,
+                        scrollSpeed: Binding(
+                            get: { controller.scrollSpeed },
+                            set: { speed in
+                                controller.setScrollSpeed(speed)
+                                onScrollSpeedChanged(controller.scrollSpeed)
+                            }
+                        ),
+                        canAdjustScrollSpeed: controller.canAdjustScrollSpeed,
+                        isLandscape: isLandscape,
+                        showsSessionControls: $showsSessionControls,
+                        onClose: {
+                            withAnimation(.snappy) { isShowingMirrorSettings = false }
+                        }
+                    )
+                    .frame(
+                        width: min(
+                            isLandscape ? 680 : 360,
+                            max(
+                                280,
+                                geometry.size.width
+                                    - geometry.safeAreaInsets.leading
+                                    - geometry.safeAreaInsets.trailing
+                                    - 32
+                            )
+                        )
+                    )
+                    .frame(
+                        maxHeight: max(
+                            180,
+                            geometry.size.height
+                                - geometry.safeAreaInsets.top
+                                - geometry.safeAreaInsets.bottom
+                                - 76
+                        )
+                    )
+                    .padding(.top, max(58, geometry.safeAreaInsets.top + 48))
+                    .padding(.trailing, max(16, geometry.safeAreaInsets.trailing + 12))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .transition(.scale(scale: 0.94, anchor: .topTrailing).combined(with: .opacity))
+                    .zIndex(5)
+                }
 
                 VStack(spacing: 0) {
                     HStack {
                         closeButton
                         Spacer(minLength: 0)
+                        if controller.configuration.sessionMode == .read {
+                            mirrorSettingsButton(isMirrorActive: isMirrorActive)
+                        }
                     }
                     .frame(height: 44)
                     .padding(.top, 8)
@@ -123,7 +209,7 @@ struct PromptSessionView: View {
                     Spacer(minLength: 0)
                 }
                 .ignoresSafeArea(edges: .top)
-                .zIndex(4)
+                .zIndex(6)
             }
             .coordinateSpace(name: "promptSessionStage")
             .onPreferenceChange(BottomControlOverlayHeightKey.self) { height in
@@ -139,6 +225,12 @@ struct PromptSessionView: View {
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
+        .onChange(of: displaySettings) { _, settings in
+            onDisplaySettingsChanged(settings)
+        }
+        .onChange(of: showsSessionControls) { _, isVisible in
+            if !isVisible { bottomControlOverlayHeight = 0 }
+        }
         .onAppear {
             isPromptSessionVisible = true
             updateIdleTimer(for: scenePhase)
@@ -153,6 +245,7 @@ struct PromptSessionView: View {
         }
         .onDisappear {
             finishScrollSpeedAdjustment()
+            isShowingMirrorSettings = false
             if !isShowingSavedRecordings {
                 isPromptSessionVisible = false
                 PromptSessionIdleTimerCoordinator.shared.release(owner: idleTimerOwner)
@@ -244,6 +337,34 @@ struct PromptSessionView: View {
         .disabled(isClosing)
         .accessibilityLabel("Close")
         .accessibilityIdentifier("closeSessionButton")
+        .accessibilityHidden(isShowingMirrorSettings)
+    }
+
+    private func mirrorSettingsButton(isMirrorActive: Bool) -> some View {
+        Button {
+            withAnimation(.snappy) { isShowingMirrorSettings.toggle() }
+        } label: {
+            Image(systemName: "arrow.left.and.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .glassEffect(
+                    .regular
+                        .tint(
+                            (isShowingMirrorSettings || isMirrorActive)
+                                ? Color.indigo.opacity(0.32)
+                                : Color.black.opacity(0.12)
+                        )
+                        .interactive(),
+                    in: .circle
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Mirror settings")
+        .accessibilityValue(isMirrorActive ? "Mirror active" : "Mirror inactive")
+        .accessibilityIdentifier("mirrorSessionSettingsButton")
     }
 
     private func bottomControls(isLandscape: Bool) -> some View {
@@ -508,7 +629,7 @@ struct PromptSessionView: View {
     }
 
     private func responsiveFontSize(isLandscape: Bool) -> CGFloat {
-        controller.configuration.fontSize.pointSize * (isLandscape ? 0.86 : 1)
+        displaySettings.fontSize.pointSize * (isLandscape ? 0.86 : 1)
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -561,6 +682,172 @@ struct PromptSessionView: View {
         #else
         "Camera unavailable"
         #endif
+    }
+}
+
+private struct MirrorSessionSettingsPanel: View {
+    @Binding var settings: PromptDisplaySettings
+    let scrollSpeed: Binding<Double>
+    let canAdjustScrollSpeed: Bool
+    let isLandscape: Bool
+    @Binding var showsSessionControls: Bool
+    let onClose: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                panelHeader
+
+                if isLandscape {
+                    HStack(alignment: .top, spacing: 16) {
+                        mirrorControls
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                        Divider()
+
+                        readingControls
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                } else {
+                    mirrorControls
+                    Divider()
+                    readingControls
+                }
+            }
+            .padding(16)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .background(.black.opacity(0.48), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .glassEffect(
+            .regular.tint(.black.opacity(0.36)),
+            in: .rect(cornerRadius: 24)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(.white.opacity(0.14), lineWidth: 1)
+        }
+        .accessibilityAddTraits(.isModal)
+        .accessibilityIdentifier("mirrorSessionSettingsPanel")
+    }
+
+    private var panelHeader: some View {
+        HStack(spacing: 10) {
+            Label("Mirror settings", systemImage: "arrow.left.and.right")
+                .font(.headline)
+
+            Spacer(minLength: 8)
+
+            Text(isLandscape ? "LANDSCAPE" : "ROTATE")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(isLandscape ? Color.green : Color.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.white.opacity(0.08), in: Capsule())
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .frame(width: 32, height: 32)
+                    .background(.white.opacity(0.08), in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close mirror settings")
+            .accessibilityIdentifier("closeMirrorSettingsButton")
+        }
+    }
+
+    private var mirrorControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("Mirror prompt", isOn: $settings.mirrorEnabled)
+                .font(.subheadline.weight(.semibold))
+                .tint(.indigo)
+                .accessibilityIdentifier("sessionMirrorToggle")
+
+            if settings.mirrorEnabled {
+                VStack(alignment: .leading, spacing: 6) {
+                    settingLabel("MIRROR AXIS")
+
+                    Picker("Mirror axis", selection: $settings.mirrorAxis) {
+                        ForEach(PromptMirrorAxis.allCases) { axis in
+                            Text(axis.label).tag(axis)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("sessionMirrorAxisPicker")
+
+                    Text(
+                        isLandscape
+                            ? settings.mirrorAxis.description
+                            : "Rotate the device to landscape to activate mirroring."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var readingControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                settingLabel("READING POSITION")
+
+                Picker("Reading position", selection: $settings.readingPosition) {
+                    ForEach(PromptReadingPosition.allCases) { position in
+                        Text(position.label).tag(position)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("sessionReadingPositionPicker")
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                settingLabel("TEXT SIZE")
+
+                Picker("Text size", selection: $settings.fontSize) {
+                    ForEach(PromptFontSize.allCases) { size in
+                        Text(size.label).tag(size)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("sessionFontSizePicker")
+            }
+
+            if canAdjustScrollSpeed {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        settingLabel("SCROLL SPEED")
+                        Spacer()
+                        Text(String(format: "%.1f words/s", scrollSpeed.wrappedValue))
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Slider(
+                        value: scrollSpeed,
+                        in: PromptScrollSpeedAdjustment.minimumSpeed...PromptScrollSpeedAdjustment.maximumSpeed,
+                        step: PromptScrollSpeedAdjustment.speedStep
+                    )
+                    .tint(.indigo)
+                    .accessibilityIdentifier("sessionScrollSpeedSlider")
+                }
+            }
+
+            Toggle("Show playback controls", isOn: $showsSessionControls)
+                .font(.subheadline.weight(.semibold))
+                .tint(.indigo)
+                .accessibilityIdentifier("sessionControlsToggle")
+        }
+    }
+
+    private func settingLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.secondary)
     }
 }
 

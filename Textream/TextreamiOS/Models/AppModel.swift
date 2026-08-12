@@ -10,6 +10,8 @@ final class AppModel {
         static let sessionMode = "ios.sessionMode"
         static let cameraEnabled = "ios.cameraEnabled"
         static let followMode = "ios.followMode"
+        static let mirrorEnabled = "ios.mirrorEnabled"
+        static let mirrorAxis = "ios.mirrorAxis"
         static let readingPosition = "ios.readingPosition"
         static let scrollSpeed = "ios.scrollSpeed"
         static let fontFamily = "ios.fontFamily"
@@ -27,6 +29,8 @@ final class AppModel {
     var sessionMode: SessionMode { didSet { defaults.set(sessionMode.rawValue, forKey: Key.sessionMode) } }
     var cameraEnabled: Bool { didSet { defaults.set(cameraEnabled, forKey: Key.cameraEnabled) } }
     var followMode: FollowMode { didSet { defaults.set(followMode.rawValue, forKey: Key.followMode) } }
+    var mirrorEnabled: Bool { didSet { defaults.set(mirrorEnabled, forKey: Key.mirrorEnabled) } }
+    var mirrorAxis: PromptMirrorAxis { didSet { defaults.set(mirrorAxis.rawValue, forKey: Key.mirrorAxis) } }
     var readingPosition: PromptReadingPosition {
         didSet { defaults.set(readingPosition.rawValue, forKey: Key.readingPosition) }
     }
@@ -51,6 +55,10 @@ final class AppModel {
         cameraEnabled = restoredSessionMode == .record
             || (defaults.object(forKey: Key.cameraEnabled) as? Bool ?? false)
         followMode = FollowMode(rawValue: defaults.string(forKey: Key.followMode) ?? "") ?? .wordTracking
+        mirrorEnabled = defaults.object(forKey: Key.mirrorEnabled) as? Bool ?? false
+        mirrorAxis = PromptMirrorAxis(
+            rawValue: defaults.string(forKey: Key.mirrorAxis) ?? ""
+        ) ?? .horizontal
         readingPosition = PromptReadingPosition(
             rawValue: defaults.string(forKey: Key.readingPosition) ?? ""
         ) ?? .nearCamera
@@ -91,6 +99,8 @@ final class AppModel {
             sessionMode: sessionMode,
             cameraEnabled: cameraEnabled,
             followMode: followMode,
+            mirrorEnabled: mirrorEnabled,
+            mirrorAxis: mirrorAxis,
             readingPosition: readingPosition,
             scrollSpeed: scrollSpeed,
             fontFamily: fontFamily,

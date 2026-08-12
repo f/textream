@@ -269,6 +269,14 @@ final class PromptSessionController {
         )
     }
 
+    func setScrollSpeed(_ speed: Double) {
+        scrollSpeed = min(
+            PromptScrollSpeedAdjustment.maximumSpeed,
+            max(PromptScrollSpeedAdjustment.minimumSpeed, speed)
+        )
+        scrollSpeedAtGestureStart = scrollSpeed
+    }
+
     func finishScrollSpeedAdjustment() {
         isAdjustingScrollSpeed = false
     }

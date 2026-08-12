@@ -47,6 +47,7 @@ brew install textream
 The Textream companion for iPhone and iPad is part of the same universal App Store listing as the Mac app.
 
 - **Portrait and landscape** — A fullscreen teleprompter layout adapts to both orientations.
+- **Mirror mode for teleprompter glass** — Read mode can flip the prompt horizontally, vertically, or on both axes whenever the device is in landscape. The prompt controls stay readable, and a compact ↔ button opens live mirror, position, text-size, speed, and playback-control settings.
 - **Eye-contact reading position** — The active line sits just below the front camera by default, or can be centered in Prompter Settings.
 - **The same three guidance modes** — Word Tracking, Classic auto-scroll, and Voice-Activated scrolling use the same behavior as the Mac app.
 - **Optional camera while reading** — Read mode works as a distraction-free teleprompter, or you can show and hide the camera behind the prompt.
@@ -199,6 +200,25 @@ open Textream.xcodeproj
 ```
 
 Choose the **Textream** scheme for macOS or **TextreamiOS** for iOS, select a compatible destination, then build and run with ⌘R in Xcode. The **TextreamiOS** scheme also includes the iOS unit tests.
+
+### Install on an iPhone or iPad with Xcode
+
+You can install and try the development build on your own device with [a personal Apple Account](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices); a paid Apple Developer Program membership is not required for local testing.
+
+1. Install Xcode 26 or later, clone this repository, and open `Textream/Textream.xcodeproj`.
+2. In **Xcode → Settings → Accounts**, add your Apple Account.
+3. Connect your unlocked iPhone or iPad to the Mac. Trust the computer if the device asks, then wait for it to appear in Xcode's run-destination menu.
+4. Select the **Textream** project, select the **TextreamiOS** target, and open **Signing & Capabilities**.
+5. Leave **Automatically manage signing** enabled and choose your personal team. If Xcode reports that `dev.fka.textream` is unavailable, change the bundle identifier to a unique value such as `com.yourname.textream.dev`.
+6. Select the **TextreamiOS** scheme and your connected device in the Xcode toolbar, then press **⌘R** or choose **Product → Run**.
+7. If prompted, enable [**Developer Mode**](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device) on the device in **Settings → Privacy & Security → Developer Mode**, restart the device, confirm Developer Mode after restart, and run the app from Xcode again.
+8. Accept the camera, microphone, speech-recognition, and Photos permissions only for the features you want to test.
+
+This installs a development-signed build directly from your Mac; it does not publish anything to the App Store or TestFlight.
+
+To try mirror mode, choose **Read**, enable **Mirror in landscape**, select an axis, and start the prompter. Rotate the device to landscape and use the small **↔** button at the top right to adjust mirror axis, reading position, text size, scroll speed, or hide the playback controls while the prompt is running.
+
+Run the iOS test suite with **Product → Test** or **⌘U**. Camera capture, microphone input, recording, and Photos saving should be verified on a physical device because Simulator doesn't provide the same hardware behavior.
 
 ### Project structure
 
