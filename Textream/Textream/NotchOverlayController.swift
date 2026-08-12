@@ -1202,6 +1202,118 @@ struct GlassEffectView: NSViewRepresentable {
     }
 }
 
+// MARK: - Floating Window Chrome
+
+/// Starts a window drag from anywhere it is placed. The floating panel is
+/// borderless, and its SwiftUI hosting view consumes the mouse events that
+/// `isMovableByWindowBackground` would otherwise act on, so the drag has to be
+/// started explicitly.
+struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { DragView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class DragView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
+        }
+
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .openHand)
+        }
+    }
+}
+
+/// Height of the drag bar at the top of the floating window.
+private let windowDragBarHeight: CGFloat = 14
+
+/// Shows the standard frame resize cursors along the side and bottom edges of
+/// the borderless floating panel, which has no title bar to provide them. The
+/// top edge is left to the drag bar, so the side bands stop below it.
+///
+/// Tracking areas are used rather than cursor rects because the panel is a
+/// non-activating panel that never becomes key, and cursor rects only apply to
+/// the key window. Hit testing is declined so the window keeps handling the
+/// resize itself and the content underneath stays interactive.
+struct WindowResizeCursorArea: NSViewRepresentable {
+    var thickness: CGFloat = 6
+    var topInset: CGFloat = 0
+
+    func makeNSView(context: Context) -> NSView {
+        BorderView(thickness: thickness, topInset: topInset)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class BorderView: NSView {
+        private let thickness: CGFloat
+        private let topInset: CGFloat
+        private var cursors: [NSCursor] = []
+
+        init(thickness: CGFloat, topInset: CGFloat) {
+            self.thickness = thickness
+            self.topInset = topInset
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            for area in trackingAreas {
+                removeTrackingArea(area)
+            }
+
+            // AppKit view coordinates put the origin at the bottom left, so the
+            // drag bar at the top of the window is trimmed off the side bands.
+            let edge = thickness
+            let width = bounds.width
+            let sideHeight = bounds.height - topInset - edge
+            guard width > edge * 2, sideHeight > 0 else { return }
+
+            let regions: [(NSRect, NSCursor.FrameResizePosition)] = [
+                (NSRect(x: 0, y: 0, width: edge, height: edge), .bottomLeft),
+                (NSRect(x: width - edge, y: 0, width: edge, height: edge), .bottomRight),
+                (NSRect(x: edge, y: 0, width: width - edge * 2, height: edge), .bottom),
+                (NSRect(x: 0, y: edge, width: edge, height: sideHeight), .left),
+                (NSRect(x: width - edge, y: edge, width: edge, height: sideHeight), .right)
+            ]
+
+            cursors = regions.map { NSCursor.frameResize(position: $0.1, directions: .all) }
+            for (index, region) in regions.enumerated() {
+                addTrackingArea(NSTrackingArea(
+                    rect: region.0,
+                    options: [.activeAlways, .mouseEnteredAndExited, .cursorUpdate],
+                    owner: self,
+                    userInfo: ["index": index]
+                ))
+            }
+        }
+
+        private func cursor(for event: NSEvent) -> NSCursor? {
+            guard let index = event.trackingArea?.userInfo?["index"] as? Int,
+                  cursors.indices.contains(index) else { return nil }
+            return cursors[index]
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            cursor(for: event)?.set()
+        }
+
+        override func cursorUpdate(with event: NSEvent) {
+            cursor(for: event)?.set()
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            NSCursor.arrow.set()
+        }
+    }
+}
+
 // MARK: - Floating Overlay View
 
 struct FloatingOverlayView: View {
@@ -1282,6 +1394,11 @@ struct FloatingOverlayView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Follow-cursor panels ignore mouse events and reposition themselves
+            if !followingCursor {
+                windowDragBar
+            }
+
             if content.showPagePicker {
                 floatingPagePickerView
             } else if isDone && (listeningMode == .wordTracking || hasNextPage) {
@@ -1314,6 +1431,11 @@ struct FloatingOverlayView: View {
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            if !followingCursor {
+                WindowResizeCursorArea(topInset: windowDragBarHeight)
+            }
+        }
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.9)
         .onAppear {
@@ -1366,6 +1488,19 @@ struct FloatingOverlayView: View {
         .onChange(of: content.totalCharCount) { _, _ in
             timerWordProgress = 0
         }
+    }
+
+    /// Grab area for moving the window, styled after the resize handle in the
+    /// pinned overlay so the two read as the same kind of control.
+    private var windowDragBar: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 36, height: 4)
+            WindowDragArea()
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: windowDragBarHeight)
     }
 
     private var floatingPrompterView: some View {
