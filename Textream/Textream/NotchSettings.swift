@@ -411,6 +411,12 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(showElapsedTime, forKey: "showElapsedTime") }
     }
 
+    /// When on, the teleprompter keeps the line breaks and paragraph gaps from
+    /// the script; when off, text is reflowed to fit the width (legacy behavior).
+    var preserveLineBreaks: Bool {
+        didSet { UserDefaults.standard.set(preserveLineBreaks, forKey: "preserveLineBreaks") }
+    }
+
     var selectedMicUID: String {
         didSet { UserDefaults.standard.set(selectedMicUID, forKey: "selectedMicUID") }
     }
@@ -496,6 +502,7 @@ class NotchSettings {
         self.scrollSpeed = savedSpeed > 0 ? savedSpeed : 3
         self.hideFromScreenShare = UserDefaults.standard.object(forKey: "hideFromScreenShare") as? Bool ?? true
         self.showElapsedTime = UserDefaults.standard.object(forKey: "showElapsedTime") as? Bool ?? true
+        self.preserveLineBreaks = UserDefaults.standard.object(forKey: "preserveLineBreaks") as? Bool ?? true
         self.selectedMicUID = UserDefaults.standard.string(forKey: "selectedMicUID") ?? ""
         self.autoNextPage = UserDefaults.standard.object(forKey: "autoNextPage") as? Bool ?? false
         let savedDelay = UserDefaults.standard.integer(forKey: "autoNextPageDelay")

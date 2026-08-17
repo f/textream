@@ -22,38 +22,90 @@ extension Unicode.Scalar {
     }
 }
 
-/// Splits text into display-ready words. CJK characters (Chinese, Japanese, Korean)
-/// are split into individual characters so the flow layout can wrap them properly.
-func splitTextIntoWords(_ text: String) -> [String] {
-    let tokens = text.replacingOccurrences(of: "\n", with: " ")
-        .split(omittingEmptySubsequences: true, whereSeparator: { $0.isWhitespace })
-        .map { String($0) }
-
+/// Splits a single whitespace-free token into display words. CJK characters
+/// (Chinese, Japanese, Korean) are split into individual characters so the flow
+/// layout can wrap them properly; runs of non-CJK characters stay grouped.
+private func splitTokenCJK(_ token: String) -> [String] {
+    guard token.unicodeScalars.contains(where: { $0.isCJK }) else {
+        return [token]
+    }
     var result: [String] = []
-    for token in tokens {
-        guard token.unicodeScalars.contains(where: { $0.isCJK }) else {
-            result.append(token)
-            continue
-        }
-        // Token contains CJK characters — split each CJK char individually;
-        // consecutive non-CJK chars (e.g. Latin letters, digits) stay grouped.
-        var buffer = ""
-        for char in token {
-            if char.unicodeScalars.first.map({ $0.isCJK }) == true {
-                if !buffer.isEmpty {
-                    result.append(buffer)
-                    buffer = ""
-                }
-                result.append(String(char))
-            } else {
-                buffer.append(char)
+    var buffer = ""
+    for char in token {
+        if char.unicodeScalars.first.map({ $0.isCJK }) == true {
+            if !buffer.isEmpty {
+                result.append(buffer)
+                buffer = ""
             }
-        }
-        if !buffer.isEmpty {
-            result.append(buffer)
+            result.append(String(char))
+        } else {
+            buffer.append(char)
         }
     }
+    if !buffer.isEmpty {
+        result.append(buffer)
+    }
     return result
+}
+
+/// The result of tokenizing script text for the teleprompter: the flat word
+/// array plus the hard line breaks that were present in the source.
+struct TokenizedText {
+    /// Display-ready words (same tokens `splitTextIntoWords` produces).
+    let words: [String]
+    /// Maps a word index to the number of newlines that appeared immediately
+    /// before it in the source text. `1` means "start a new line here", `2+`
+    /// additionally inserts blank lines (a paragraph gap). Word 0 is never a key.
+    let breaksBefore: [Int: Int]
+}
+
+/// Tokenizes script text while remembering the author's hard line breaks so the
+/// teleprompter can lay the text out exactly as it appears in the editor.
+///
+/// Word tokenization is identical to `splitTextIntoWords`: whitespace-separated,
+/// with CJK characters split per-glyph. In addition, each run of whitespace
+/// between two words is inspected for newlines, and their count is attached to
+/// the word that follows.
+func tokenizeText(_ text: String) -> TokenizedText {
+    var words: [String] = []
+    var breaksBefore: [Int: Int] = [:]
+
+    var current = ""            // non-whitespace run being accumulated
+    var pendingNewlines = 0     // newlines seen in the gap before the next word
+    var sawWord = false         // ignore leading whitespace/newlines
+
+    func flush() {
+        guard !current.isEmpty else { return }
+        let subWords = splitTokenCJK(current)
+        if sawWord && pendingNewlines > 0 {
+            breaksBefore[words.count] = pendingNewlines
+        }
+        words.append(contentsOf: subWords)
+        sawWord = true
+        pendingNewlines = 0
+        current = ""
+    }
+
+    for char in text {
+        if char.isWhitespace {
+            flush()
+            if char == "\n" { pendingNewlines += 1 }
+        } else {
+            current.append(char)
+        }
+    }
+    flush()
+
+    return TokenizedText(words: words, breaksBefore: breaksBefore)
+}
+
+/// Splits text into display-ready words. CJK characters (Chinese, Japanese, Korean)
+/// are split into individual characters so the flow layout can wrap them properly.
+///
+/// Line breaks are flattened into spaces here; callers that need to preserve the
+/// author's line breaks (the teleprompter layout) use `tokenizeText` instead.
+func splitTextIntoWords(_ text: String) -> [String] {
+    tokenizeText(text).words
 }
 
 // MARK: - Data
@@ -78,6 +130,9 @@ struct WordYPreferenceKey: PreferenceKey {
 
 struct SpeechScrollView: View {
     let words: [String]
+    /// Hard line breaks from the source text (word index -> newline count),
+    /// forwarded to the flow layout so the teleprompter mirrors the editor.
+    var lineBreaks: [Int: Int] = [:]
     let highlightedCharCount: Int
     var font: NSFont = .systemFont(ofSize: 18, weight: .semibold)
     var highlightColor: Color = .white
@@ -104,6 +159,7 @@ struct SpeechScrollView: View {
         GeometryReader { geo in
             WordFlowLayout(
                 words: words,
+                lineBreaks: lineBreaks,
                 highlightedCharCount: highlightedCharCount,
                 font: font,
                 highlightColor: highlightColor,
@@ -331,6 +387,9 @@ struct SpeechScrollView: View {
 
 struct WordFlowLayout: View {
     let words: [String]
+    /// Hard line breaks from the source text: word index -> number of newlines
+    /// immediately before that word. Drives forced line breaks and blank lines.
+    var lineBreaks: [Int: Int] = [:]
     let highlightedCharCount: Int
     let font: NSFont
     var highlightColor: Color = .white
@@ -352,13 +411,30 @@ struct WordFlowLayout: View {
         return ratio > 1.5 ? 2 : 8
     }
 
+    // Height of one text line's content (excluding inter-line spacing). Used to
+    // give blank lines the same pitch as text lines.
+    private var emptyLineHeight: CGFloat {
+        ceil(font.ascender - font.descender + font.leading)
+    }
+
+    // Order-independent signature of the hard line breaks so the layout cache
+    // invalidates when the break structure changes even if the words are identical
+    // (e.g. "a b" vs "a\nb" tokenize to the same words).
+    private var lineBreaksSignature: Int {
+        var hash = lineBreaks.count
+        for (k, v) in lineBreaks {
+            hash = hash &+ (k &* 100_003) &+ (v &* 31)
+        }
+        return hash
+    }
+
     // Simple layout cache to avoid re-measuring words on every highlight update
     private static var _cacheKey: String = ""
     private static var _cachedItems: [WordItem] = []
     private static var _cachedLines: [[WordItem]] = []
 
     private func cachedLayout() -> ([WordItem], [[WordItem]]) {
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))"
+        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))|\(lineBreaksSignature)"
         if key == Self._cacheKey {
             return (Self._cachedItems, Self._cachedLines)
         }
@@ -421,10 +497,16 @@ struct WordFlowLayout: View {
             }
 
             ForEach(startLine..<endLine, id: \.self) { lineIdx in
-                HStack(spacing: 0) {
-                    ForEach(lines[lineIdx], id: \.id) { item in
-                        wordView(for: item, isNextWord: item.id == nextIdx)
-                            .id(item.id)
+                let line = lines[lineIdx]
+                if line.isEmpty {
+                    // Blank line preserved from the source text (paragraph gap)
+                    Color.clear.frame(height: emptyLineHeight)
+                } else {
+                    HStack(spacing: 0) {
+                        ForEach(line, id: \.id) { item in
+                            wordView(for: item, isNextWord: item.id == nextIdx)
+                                .id(item.id)
+                        }
                     }
                 }
                 .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
@@ -545,6 +627,16 @@ struct WordFlowLayout: View {
         let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
 
         for item in items {
+            // Honor the author's hard line breaks from the source text. One
+            // appended line per newline: the last becomes this word's fresh
+            // line; any extra ones stay blank (paragraph gaps).
+            if let newlines = lineBreaks[item.id], newlines > 0 {
+                for _ in 0..<newlines {
+                    lines.append([])
+                }
+                currentLineWidth = 0
+            }
+
             let wordWidth = (item.word as NSString).size(withAttributes: [.font: font]).width + spaceWidth
             if currentLineWidth + wordWidth > containerWidth && !lines[lines.count - 1].isEmpty {
                 lines.append([])

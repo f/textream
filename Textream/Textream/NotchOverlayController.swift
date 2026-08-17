@@ -33,8 +33,20 @@ class NotchFrameTracker {
 @Observable
 class OverlayContent {
     var words: [String] = []
+    /// Hard line breaks from the source text: word index -> number of newlines
+    /// immediately before that word. Lets the teleprompter mirror the editor's
+    /// line breaks and paragraph gaps instead of reflowing purely by width.
+    var lineBreaks: [Int: Int] = [:]
     var totalCharCount: Int = 0
     var hasNextPage: Bool = false
+
+    /// Populate `words`, `lineBreaks`, and `totalCharCount` from raw script text.
+    func apply(text: String) {
+        let tokenized = tokenizeText(text)
+        words = tokenized.words
+        lineBreaks = tokenized.breaksBefore
+        totalCharCount = tokenized.words.joined(separator: " ").count
+    }
 
     // Page picker
     var pageCount: Int = 1
@@ -71,9 +83,7 @@ class NotchOverlayController: NSObject {
         observeDismiss()
 
         // Populate overlay content
-        let normalized = splitTextIntoWords(text)
-        overlayContent.words = normalized
-        overlayContent.totalCharCount = normalized.joined(separator: " ").count
+        overlayContent.apply(text: text)
         overlayContent.hasNextPage = hasNextPage
 
         let settings = NotchSettings.shared
@@ -122,16 +132,13 @@ class NotchOverlayController: NSObject {
     }
 
     func updateContent(text: String, hasNextPage: Bool) {
-        let normalized = splitTextIntoWords(text)
-
         // Fully reset speech state for new page
         speechRecognizer.recognizedCharCount = 0
         speechRecognizer.shouldDismiss = false
         speechRecognizer.shouldAdvancePage = false
         speechRecognizer.lastSpokenText = ""
 
-        overlayContent.words = normalized
-        overlayContent.totalCharCount = normalized.joined(separator: " ").count
+        overlayContent.apply(text: text)
         overlayContent.hasNextPage = hasNextPage
 
         let settings = NotchSettings.shared
@@ -638,6 +645,9 @@ struct NotchOverlayView: View {
     var frameTracker: NotchFrameTracker
 
     private var words: [String] { content.words }
+    private var lineBreaks: [Int: Int] {
+        NotchSettings.shared.preserveLineBreaks ? content.lineBreaks : [:]
+    }
     private var totalCharCount: Int { content.totalCharCount }
     private var hasNextPage: Bool { content.hasNextPage }
 
@@ -875,6 +885,7 @@ struct NotchOverlayView: View {
         VStack(spacing: 0) {
             SpeechScrollView(
                 words: words,
+                lineBreaks: lineBreaks,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
@@ -1211,6 +1222,9 @@ struct FloatingOverlayView: View {
     var followingCursor: Bool = false
 
     private var words: [String] { content.words }
+    private var lineBreaks: [Int: Int] {
+        NotchSettings.shared.preserveLineBreaks ? content.lineBreaks : [:]
+    }
     private var totalCharCount: Int { content.totalCharCount }
     private var hasNextPage: Bool { content.hasNextPage }
 
@@ -1372,6 +1386,7 @@ struct FloatingOverlayView: View {
         VStack(spacing: 0) {
             SpeechScrollView(
                 words: words,
+                lineBreaks: lineBreaks,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
