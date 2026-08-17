@@ -56,6 +56,35 @@ func splitTextIntoWords(_ text: String) -> [String] {
     return result
 }
 
+/// Computes hard line breaks from the original text, keyed by word index.
+/// Returns word indices (matching the array from `splitTextIntoWords`) after
+/// which the layout should start a new line, and the subset also followed by
+/// a blank line (paragraph break). The words array itself stays unchanged so
+/// character offsets used for speech tracking are unaffected.
+func lineBreakIndices(_ text: String) -> (breaksAfter: Set<Int>, blankLineAfter: Set<Int>) {
+    var breaksAfter: Set<Int> = []
+    var blankLineAfter: Set<Int> = []
+    var wordCount = 0
+    var lastContentWordIndex: Int? = nil
+    var sawBlankLine = false
+
+    for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        let lineWords = splitTextIntoWords(String(line))
+        if lineWords.isEmpty {
+            sawBlankLine = true
+            continue
+        }
+        if let idx = lastContentWordIndex {
+            breaksAfter.insert(idx)
+            if sawBlankLine { blankLineAfter.insert(idx) }
+        }
+        wordCount += lineWords.count
+        lastContentWordIndex = wordCount - 1
+        sawBlankLine = false
+    }
+    return (breaksAfter, blankLineAfter)
+}
+
 // MARK: - Data
 
 struct WordItem: Identifiable {
@@ -78,6 +107,10 @@ struct WordYPreferenceKey: PreferenceKey {
 
 struct SpeechScrollView: View {
     let words: [String]
+    /// Word indices after which the source text had a hard line break.
+    var lineBreaksAfter: Set<Int> = []
+    /// Subset of `lineBreaksAfter` followed by a blank line (paragraph break).
+    var blankLineAfter: Set<Int> = []
     let highlightedCharCount: Int
     var font: NSFont = .systemFont(ofSize: 18, weight: .semibold)
     var highlightColor: Color = .white
@@ -104,6 +137,8 @@ struct SpeechScrollView: View {
         GeometryReader { geo in
             WordFlowLayout(
                 words: words,
+                lineBreaksAfter: lineBreaksAfter,
+                blankLineAfter: blankLineAfter,
                 highlightedCharCount: highlightedCharCount,
                 font: font,
                 highlightColor: highlightColor,
@@ -331,6 +366,8 @@ struct SpeechScrollView: View {
 
 struct WordFlowLayout: View {
     let words: [String]
+    var lineBreaksAfter: Set<Int> = []
+    var blankLineAfter: Set<Int> = []
     let highlightedCharCount: Int
     let font: NSFont
     var highlightColor: Color = .white
@@ -358,7 +395,7 @@ struct WordFlowLayout: View {
     private static var _cachedLines: [[WordItem]] = []
 
     private func cachedLayout() -> ([WordItem], [[WordItem]]) {
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))"
+        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))|\(lineBreaksAfter.hashValue)|\(blankLineAfter.hashValue)"
         if key == Self._cacheKey {
             return (Self._cachedItems, Self._cachedLines)
         }
@@ -421,10 +458,16 @@ struct WordFlowLayout: View {
             }
 
             ForEach(startLine..<endLine, id: \.self) { lineIdx in
-                HStack(spacing: 0) {
-                    ForEach(lines[lineIdx], id: \.id) { item in
-                        wordView(for: item, isNextWord: item.id == nextIdx)
-                            .id(item.id)
+                if lines[lineIdx].isEmpty {
+                    // Blank line (paragraph break) — same height as a text line
+                    // so the visibility-culling math stays uniform
+                    Color.clear.frame(height: lineH - lineSpacing)
+                } else {
+                    HStack(spacing: 0) {
+                        ForEach(lines[lineIdx], id: \.id) { item in
+                            wordView(for: item, isNextWord: item.id == nextIdx)
+                                .id(item.id)
+                        }
                     }
                 }
                 .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
@@ -552,6 +595,16 @@ struct WordFlowLayout: View {
             }
             lines[lines.count - 1].append(item)
             currentLineWidth += wordWidth
+
+            // Hard break from the source text: start a new line, with an
+            // empty spacer line for paragraph breaks
+            if lineBreaksAfter.contains(item.id) {
+                if blankLineAfter.contains(item.id) {
+                    lines.append([])
+                }
+                lines.append([])
+                currentLineWidth = 0
+            }
         }
         return lines
     }

@@ -54,10 +54,13 @@ class TextreamService: NSObject, ObservableObject {
 
         // Also show on external display if configured (same parsing as overlay)
         let words = splitTextIntoWords(trimmed)
+        let (breaksAfter, blankAfter) = lineBreakIndices(trimmed)
         let totalCharCount = words.joined(separator: " ").count
         externalDisplayController.show(
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
+            lineBreaksAfter: breaksAfter,
+            blankLineAfter: blankAfter,
             totalCharCount: totalCharCount,
             hasNextPage: hasNextPage
         )
@@ -114,7 +117,10 @@ class TextreamService: NSObject, ObservableObject {
 
         // Also update external display content in-place
         let words = splitTextIntoWords(trimmed)
+        let (breaksAfter, blankAfter) = lineBreakIndices(trimmed)
         externalDisplayController.overlayContent.words = words
+        externalDisplayController.overlayContent.lineBreaksAfter = breaksAfter
+        externalDisplayController.overlayContent.blankLineAfter = blankAfter
         externalDisplayController.overlayContent.totalCharCount = words.joined(separator: " ").count
         externalDisplayController.overlayContent.hasNextPage = hasNextPage
 
@@ -378,9 +384,12 @@ class TextreamService: NSObject, ObservableObject {
         )
 
         // Also show on external display & browser if configured
+        let (breaksAfter, blankAfter) = lineBreakIndices(trimmed)
         externalDisplayController.show(
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
+            lineBreaksAfter: breaksAfter,
+            blankLineAfter: blankAfter,
             totalCharCount: totalCharCount,
             hasNextPage: false
         )
@@ -408,7 +417,10 @@ class TextreamService: NSObject, ObservableObject {
         let totalCharCount = words.joined(separator: " ").count
 
         // Update overlay content without resetting speech progress
+        let (breaksAfter, blankAfter) = lineBreakIndices(trimmed)
         overlayController.overlayContent.words = words
+        overlayController.overlayContent.lineBreaksAfter = breaksAfter
+        overlayController.overlayContent.blankLineAfter = blankAfter
         overlayController.overlayContent.totalCharCount = totalCharCount
         overlayController.overlayContent.hasNextPage = false
 
