@@ -948,6 +948,17 @@ struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.primary.opacity(0.04))
                     )
+
+                    Toggle(isOn: $settings.fullscreenTopAnchor) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Lock Text to Top")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Anchor the current line near the top of the screen instead of the center.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
                 }
 
                 Divider()
@@ -1064,6 +1075,17 @@ struct SettingsView: View {
                     onRefresh: { refreshScreens() },
                     emptyMessage: "No external displays detected. Connect a display or enable Sidecar."
                 )
+
+                Toggle(isOn: $settings.fullscreenTopAnchor) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Lock Text to Top")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Anchor the current line near the top of the screen instead of the center.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
             }
             Spacer()
         }
@@ -1130,6 +1152,18 @@ struct SettingsView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.accentColor.opacity(0.08))
                 )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Remote Text Size")
+                        .font(.system(size: 13, weight: .medium))
+                    Picker("", selection: $settings.browserFontSizePreset) {
+                        ForEach(BrowserFontSizePreset.allCases) { preset in
+                            Text(preset.label).tag(preset)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
 
                 DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
                     VStack(alignment: .leading, spacing: 10) {
@@ -1413,6 +1447,7 @@ struct SettingsView: View {
         settings.overlayTransparencyOpacity = 0.85
         settings.followCursorWhenUndocked = false
         settings.fullscreenScreenID = 0
+        settings.fullscreenTopAnchor = false
         settings.externalDisplayMode = .off
         settings.externalScreenID = 0
         settings.mirrorAxis = .horizontal
@@ -1424,6 +1459,7 @@ struct SettingsView: View {
         settings.autoNextPageDelay = 3
         settings.browserServerEnabled = false
         settings.browserServerPort = 7373
+        settings.browserFontSizePreset = .lg
         settings.directorModeEnabled = false
         settings.directorServerPort = 7575
     }

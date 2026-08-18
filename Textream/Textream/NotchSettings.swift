@@ -165,6 +165,41 @@ enum CueBrightness: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Browser Font Size Preset
+
+enum BrowserFontSizePreset: String, CaseIterable, Identifiable {
+    case sm, md, lg, xl
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .sm: return "SM"
+        case .md: return "MD"
+        case .lg: return "LG"
+        case .xl: return "XL"
+        }
+    }
+
+    var cssClamp: String {
+        switch self {
+        case .sm: return "clamp(24px,calc(100vw / 22),48px)"
+        case .md: return "clamp(32px,calc(100vw / 18),54px)"
+        case .lg: return "clamp(40px,calc(100vw / 14),60px)"
+        case .xl: return "clamp(48px,calc(100vw / 12),64px)"
+        }
+    }
+
+    var mobileCssClamp: String {
+        switch self {
+        case .sm: return "clamp(18px,calc(100vw / 16),36px)"
+        case .md: return "clamp(22px,calc(100vw / 13),42px)"
+        case .lg: return "clamp(28px,calc(100vw / 10),48px)"
+        case .xl: return "clamp(34px,calc(100vw / 8),56px)"
+        }
+    }
+}
+
 // MARK: - Overlay Mode
 
 enum OverlayMode: String, CaseIterable, Identifiable {
@@ -427,6 +462,10 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(Int(fullscreenScreenID), forKey: "fullscreenScreenID") }
     }
 
+    var fullscreenTopAnchor: Bool {
+        didSet { UserDefaults.standard.set(fullscreenTopAnchor, forKey: "fullscreenTopAnchor") }
+    }
+
     var browserServerEnabled: Bool {
         didSet {
             UserDefaults.standard.set(browserServerEnabled, forKey: "browserServerEnabled")
@@ -436,6 +475,10 @@ class NotchSettings {
 
     var browserServerPort: UInt16 {
         didSet { UserDefaults.standard.set(Int(browserServerPort), forKey: "browserServerPort") }
+    }
+
+    var browserFontSizePreset: BrowserFontSizePreset {
+        didSet { UserDefaults.standard.set(browserFontSizePreset.rawValue, forKey: "browserFontSizePreset") }
     }
 
     var directorModeEnabled: Bool {
@@ -502,9 +545,11 @@ class NotchSettings {
         self.autoNextPageDelay = savedDelay > 0 ? savedDelay : 3
         let savedFullscreenScreenID = UserDefaults.standard.integer(forKey: "fullscreenScreenID")
         self.fullscreenScreenID = UInt32(savedFullscreenScreenID)
+        self.fullscreenTopAnchor = UserDefaults.standard.object(forKey: "fullscreenTopAnchor") as? Bool ?? false
         self.browserServerEnabled = UserDefaults.standard.object(forKey: "browserServerEnabled") as? Bool ?? false
         let savedPort = UserDefaults.standard.integer(forKey: "browserServerPort")
         self.browserServerPort = savedPort > 0 ? UInt16(savedPort) : 7373
+        self.browserFontSizePreset = BrowserFontSizePreset(rawValue: UserDefaults.standard.string(forKey: "browserFontSizePreset") ?? "") ?? .lg
         self.directorModeEnabled = UserDefaults.standard.object(forKey: "directorModeEnabled") as? Bool ?? false
         let savedDirectorPort = UserDefaults.standard.integer(forKey: "directorServerPort")
         self.directorServerPort = savedDirectorPort > 0 ? UInt16(savedDirectorPort) : 7575

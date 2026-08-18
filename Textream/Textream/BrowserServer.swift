@@ -337,9 +337,9 @@ class BrowserServer {
           -webkit-overflow-scrolling:touch;scroll-behavior:smooth}
         #prompter::-webkit-scrollbar{display:none}
 
-        /* Text: match ExternalDisplayView font sizing: max(48, min(96, width/14)) */
+        /* Text: browser remote font sizing from BrowserFontSizePreset */
         #text-container{
-          font-size:clamp(48px,calc(100vw / 14),96px);
+          font-size:\(NotchSettings.shared.browserFontSizePreset.cssClamp);
           font-weight:600;line-height:1.4;word-wrap:break-word}
         .w{display:inline;transition:color .12s ease}
         .w.ann{font-style:italic}
@@ -377,7 +377,7 @@ class BrowserServer {
           #prompter{padding:16px 5%}
           #bar{padding:10px 5% 20px}
           #waveform{width:160px;height:28px}
-          #text-container{font-size:clamp(28px,calc(100vw / 10),60px)}
+          #text-container{font-size:\(NotchSettings.shared.browserFontSizePreset.mobileCssClamp)}
         }
         </style>
         </head>
