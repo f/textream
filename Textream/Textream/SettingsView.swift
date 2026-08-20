@@ -160,7 +160,9 @@ struct NotchPreviewContent: View {
     @Bindable var settings: NotchSettings
     let menuBarHeight: CGFloat
 
-    private static let loremWords = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor [pause] incididunt ut labore et dolore magna aliqua Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt".split(separator: " ").map(String.init)
+    private static let loremText = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor [pause] incididunt ut labore et dolore magna aliqua\nUt enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur\nExcepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt"
+    private static let loremWords = splitTextIntoWords(loremText)
+    private static let paragraphBreaks = paragraphBreakWordIndices(in: loremText)
 
     private let highlightedCount = 42
     @State private var previewWordProgress: Double = 0
@@ -242,7 +244,11 @@ struct NotchPreviewContent: View {
                         cueReadOpacity: settings.cueBrightness.readOpacity,
                         smoothScroll: settings.listeningMode != .wordTracking,
                         smoothWordProgress: previewWordProgress,
-                        isListening: settings.listeningMode != .wordTracking
+                        isListening: settings.listeningMode != .wordTracking,
+                        readingPosition: settings.readingPosition,
+                        paragraphBreakBeforeWordIndices: settings.showParagraphDividers
+                            ? Self.paragraphBreaks
+                            : []
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -952,6 +958,65 @@ struct SettingsView: View {
 
                 Divider()
 
+                // Reading Experience
+                Text("Reading Experience")
+                    .font(.system(size: 13, weight: .semibold))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Reading Position")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Picker("", selection: $settings.readingPosition) {
+                            ForEach(ReadingPosition.allCases) { position in
+                                Text(position.label).tag(position)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 190)
+                    }
+
+                    Text("Near Top keeps the previous line visible above the active line.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Toggle(isOn: $settings.showParagraphDividers) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Paragraph Dividers")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Start a new row and draw a subtle divider at source line breaks.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Toggle(isOn: $settings.showLastSpokenWords) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Last Spoken Words")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Display recently recognized words while using Word Tracking.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Toggle(isOn: $settings.keepScreenAwake) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep Screen Awake")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Prevent display and system sleep while the teleprompter is active.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Divider()
+
                 // Options
                 Toggle(isOn: $settings.showElapsedTime) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -1419,6 +1484,10 @@ struct SettingsView: View {
         settings.listeningMode = .wordTracking
         settings.scrollSpeed = 3
         settings.showElapsedTime = true
+        settings.keepScreenAwake = false
+        settings.readingPosition = .centered
+        settings.showParagraphDividers = false
+        settings.showLastSpokenWords = true
         settings.selectedMicUID = ""
         settings.autoNextPage = false
         settings.autoNextPageDelay = 3

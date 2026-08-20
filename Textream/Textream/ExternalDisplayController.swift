@@ -29,7 +29,13 @@ class ExternalDisplayController {
         return screens.first
     }
 
-    func show(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int, hasNextPage: Bool = false) {
+    func show(
+        speechRecognizer: SpeechRecognizer,
+        words: [String],
+        totalCharCount: Int,
+        paragraphBreakBeforeWordIndices: Set<Int> = [],
+        hasNextPage: Bool = false
+    ) {
         let settings = NotchSettings.shared
         guard settings.externalDisplayMode != .off else { return }
         guard let screen = targetScreen() else { return }
@@ -37,6 +43,7 @@ class ExternalDisplayController {
         dismiss()
 
         overlayContent.words = words
+        overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakBeforeWordIndices
         overlayContent.totalCharCount = totalCharCount
         overlayContent.hasNextPage = hasNextPage
 
@@ -243,7 +250,11 @@ struct ExternalDisplayView: View {
                     },
                     smoothScroll: listeningMode != .wordTracking,
                     smoothWordProgress: timerWordProgress,
-                    isListening: isEffectivelyListening
+                    isListening: isEffectivelyListening,
+                    readingPosition: NotchSettings.shared.readingPosition,
+                    paragraphBreakBeforeWordIndices: NotchSettings.shared.showParagraphDividers
+                        ? content.paragraphBreakBeforeWordIndices
+                        : []
                 )
                 .padding(.horizontal, hPad)
 
@@ -258,7 +269,8 @@ struct ExternalDisplayView: View {
                     )
                     .frame(width: 240, height: 32)
 
-                    if listeningMode == .wordTracking {
+                    if listeningMode == .wordTracking,
+                       NotchSettings.shared.showLastSpokenWords {
                         Text(speechRecognizer.lastSpokenText.split(separator: " ").suffix(5).joined(separator: " "))
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))

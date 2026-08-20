@@ -313,6 +313,21 @@ enum ListeningMode: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Reading Position
+
+enum ReadingPosition: String, CaseIterable, Identifiable {
+    case centered, nearTop
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .centered: return "Centered"
+        case .nearTop:  return "Near Top"
+        }
+    }
+}
+
 // MARK: - Settings
 
 @Observable
@@ -411,6 +426,22 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(showElapsedTime, forKey: "showElapsedTime") }
     }
 
+    var keepScreenAwake: Bool {
+        didSet { UserDefaults.standard.set(keepScreenAwake, forKey: "keepScreenAwake") }
+    }
+
+    var readingPosition: ReadingPosition {
+        didSet { UserDefaults.standard.set(readingPosition.rawValue, forKey: "readingPosition") }
+    }
+
+    var showParagraphDividers: Bool {
+        didSet { UserDefaults.standard.set(showParagraphDividers, forKey: "showParagraphDividers") }
+    }
+
+    var showLastSpokenWords: Bool {
+        didSet { UserDefaults.standard.set(showLastSpokenWords, forKey: "showLastSpokenWords") }
+    }
+
     var selectedMicUID: String {
         didSet { UserDefaults.standard.set(selectedMicUID, forKey: "selectedMicUID") }
     }
@@ -496,6 +527,10 @@ class NotchSettings {
         self.scrollSpeed = savedSpeed > 0 ? savedSpeed : 3
         self.hideFromScreenShare = UserDefaults.standard.object(forKey: "hideFromScreenShare") as? Bool ?? true
         self.showElapsedTime = UserDefaults.standard.object(forKey: "showElapsedTime") as? Bool ?? true
+        self.keepScreenAwake = UserDefaults.standard.object(forKey: "keepScreenAwake") as? Bool ?? false
+        self.readingPosition = ReadingPosition(rawValue: UserDefaults.standard.string(forKey: "readingPosition") ?? "") ?? .centered
+        self.showParagraphDividers = UserDefaults.standard.object(forKey: "showParagraphDividers") as? Bool ?? false
+        self.showLastSpokenWords = UserDefaults.standard.object(forKey: "showLastSpokenWords") as? Bool ?? true
         self.selectedMicUID = UserDefaults.standard.string(forKey: "selectedMicUID") ?? ""
         self.autoNextPage = UserDefaults.standard.object(forKey: "autoNextPage") as? Bool ?? false
         let savedDelay = UserDefaults.standard.integer(forKey: "autoNextPageDelay")
