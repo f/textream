@@ -118,11 +118,7 @@ class NotchOverlayController: NSObject {
             showStopButton(on: screen)
         }
 
-        if settings.keepScreenAwake {
-            beginKeepAwakeActivity()
-        } else {
-            endKeepAwakeActivity()
-        }
+        updateKeepAwakeActivity(enabled: settings.keepScreenAwake)
 
         // Word tracking & silence-paused need the microphone; classic does not
         if settings.listeningMode != .classic {
@@ -511,6 +507,14 @@ class NotchOverlayController: NSObject {
         guard let keepAwakeActivity else { return }
         ProcessInfo.processInfo.endActivity(keepAwakeActivity)
         self.keepAwakeActivity = nil
+    }
+
+    func updateKeepAwakeActivity(enabled: Bool) {
+        if enabled && isShowing {
+            beginKeepAwakeActivity()
+        } else {
+            endKeepAwakeActivity()
+        }
     }
 
     var isShowing: Bool {

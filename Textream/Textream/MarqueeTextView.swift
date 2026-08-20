@@ -143,6 +143,7 @@ struct SpeechScrollView: View {
     @State private var allowsNextBackwardTrackingUpdate = false
     @State private var hasAppliedTrackingTarget = false
     @State private var anchoredLayoutWidth: CGFloat = 0
+    @State private var anchoredParagraphBreakBeforeWordIndices: Set<Int> = []
 
     var body: some View {
         GeometryReader { geo in
@@ -176,16 +177,20 @@ struct SpeechScrollView: View {
             .onPreferenceChange(WordYPreferenceKey.self) { positions in
                 let wasEmpty = wordYPositions.isEmpty
                 let widthChanged = abs(anchoredLayoutWidth - geo.size.width) > 0.5
-                if widthChanged {
-                    stableTopLineCenter = nil
-                    stableLineAdvance = nil
+                let paragraphLayoutChanged = anchoredParagraphBreakBeforeWordIndices
+                    != paragraphBreakBeforeWordIndices
+                if widthChanged || paragraphLayoutChanged {
                     hasAppliedTrackingTarget = false
                 }
                 captureStableLineMetrics(from: positions)
                 wordYPositions = positions
-                // Re-anchor after a page switch or a width-driven text reflow.
-                if (wasEmpty || widthChanged) && !positions.isEmpty {
+                // Re-anchor after a page switch or any live layout reflow. Keep
+                // the stable vertical metrics during width changes: the visible
+                // preference values may be culled from the middle of the text.
+                if (wasEmpty || widthChanged || paragraphLayoutChanged),
+                   !positions.isEmpty {
                     anchoredLayoutWidth = geo.size.width
+                    anchoredParagraphBreakBeforeWordIndices = paragraphBreakBeforeWordIndices
                     recalculateTracking(containerHeight: containerHeight)
                 }
             }
@@ -228,6 +233,7 @@ struct SpeechScrollView: View {
                 allowsNextBackwardTrackingUpdate = false
                 hasAppliedTrackingTarget = false
                 anchoredLayoutWidth = 0
+                anchoredParagraphBreakBeforeWordIndices = []
             }
             .onChange(of: readingPosition) { _, _ in
                 manualOffset = 0

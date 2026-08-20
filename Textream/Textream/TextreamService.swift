@@ -443,6 +443,10 @@ class TextreamService: NSObject, ObservableObject {
         directorIsReading = false
     }
 
+    func updateKeepAwakeActivity(enabled: Bool) {
+        overlayController.updateKeepAwakeActivity(enabled: enabled)
+    }
+
     // macOS Services handler
     @objc func readInTextream(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string) else {

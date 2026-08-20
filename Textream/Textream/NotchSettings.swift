@@ -427,7 +427,10 @@ class NotchSettings {
     }
 
     var keepScreenAwake: Bool {
-        didSet { UserDefaults.standard.set(keepScreenAwake, forKey: "keepScreenAwake") }
+        didSet {
+            UserDefaults.standard.set(keepScreenAwake, forKey: "keepScreenAwake")
+            TextreamService.shared.updateKeepAwakeActivity(enabled: keepScreenAwake)
+        }
     }
 
     var readingPosition: ReadingPosition {
