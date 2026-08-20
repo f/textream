@@ -142,6 +142,7 @@ struct SpeechScrollView: View {
     @State private var stableLineAdvance: CGFloat?
     @State private var allowsNextBackwardTrackingUpdate = false
     @State private var hasAppliedTrackingTarget = false
+    @State private var anchoredLayoutWidth: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -174,10 +175,17 @@ struct SpeechScrollView: View {
             )
             .onPreferenceChange(WordYPreferenceKey.self) { positions in
                 let wasEmpty = wordYPositions.isEmpty
+                let widthChanged = abs(anchoredLayoutWidth - geo.size.width) > 0.5
+                if widthChanged {
+                    stableTopLineCenter = nil
+                    stableLineAdvance = nil
+                    hasAppliedTrackingTarget = false
+                }
                 captureStableLineMetrics(from: positions)
                 wordYPositions = positions
-                // After a page switch, wordYPositions was cleared — recenter once new positions arrive
-                if wasEmpty && !positions.isEmpty {
+                // Re-anchor after a page switch or a width-driven text reflow.
+                if (wasEmpty || widthChanged) && !positions.isEmpty {
+                    anchoredLayoutWidth = geo.size.width
                     recalculateTracking(containerHeight: containerHeight)
                 }
             }
@@ -219,6 +227,7 @@ struct SpeechScrollView: View {
                 stableLineAdvance = nil
                 allowsNextBackwardTrackingUpdate = false
                 hasAppliedTrackingTarget = false
+                anchoredLayoutWidth = 0
             }
             .onChange(of: readingPosition) { _, _ in
                 manualOffset = 0
