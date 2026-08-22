@@ -360,6 +360,23 @@ class BrowserServer {
           background:#facc15;opacity:0;transition:opacity .2s}
         #mic-dot.on{opacity:1}
 
+        /* Mirror control — sits above every screen so the rig can be set up
+           before the prompter starts, and stays unflipped when mirroring. */
+        #mirror-btn{position:fixed;top:12px;right:12px;z-index:10;
+          height:36px;padding:0 12px;border-radius:18px;border:0;
+          background:rgba(255,255,255,.12);color:rgba(255,255,255,.55);
+          display:flex;align-items:center;justify-content:center;gap:6px;
+          font:inherit;font-size:12px;font-weight:600;line-height:1;
+          cursor:pointer;-webkit-tap-highlight-color:transparent;
+          backdrop-filter:blur(8px);
+          transition:background .2s ease,color .2s ease}
+        #mirror-btn .glyph{font-size:14px}
+        #mirror-btn.on{background:rgba(250,204,21,.22);color:#facc15}
+
+        /* Flip the reading surface for teleprompter glass. */
+        body.mirrored #waiting,body.mirrored #main,body.mirrored #done{
+          transform:scaleX(-1)}
+
         /* Done */
         #done{display:none;flex-direction:column;align-items:center;
           justify-content:center;height:100%;gap:12px}
@@ -378,10 +395,18 @@ class BrowserServer {
           #bar{padding:10px 5% 20px}
           #waveform{width:160px;height:28px}
           #text-container{font-size:clamp(28px,calc(100vw / 10),60px)}
+          #mirror-btn{padding:0 10px;top:10px;right:10px}
+          #mirror-btn .label{display:none}
         }
         </style>
         </head>
         <body>
+
+        <button id="mirror-btn" type="button" aria-pressed="false"
+          title="Mirror for teleprompter glass">
+          <span class="glyph" aria-hidden="true">⇄</span>
+          <span class="label">Mirror</span>
+        </button>
 
         <div id="waiting">
           <div class="icon">📡</div>
@@ -408,7 +433,8 @@ class BrowserServer {
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
-        let ws,rt,prevWordKey='',scrollTgt=null;
+        const MIRROR_KEY='textream.remote.mirror';
+        let ws,rt,prevWordKey='',scrollTgt=null,mirrored=false;
 
         /* ---- helpers ---- */
 
@@ -424,6 +450,39 @@ class BrowserServer {
           return m?m.slice(0,3).map(Number):[255,255,255];
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
+
+        /* ---- mirror ---- */
+
+        // ?mirror=1 / ?mirror=0 lets a QR code or bookmark preset a device.
+        function mirrorOverride(){
+          const raw=new URLSearchParams(location.search).get('mirror');
+          if(raw===null)return null;
+          const v=raw.toLowerCase();
+          if(v==='1'||v==='true'||v==='on'||v==='yes')return true;
+          if(v==='0'||v==='false'||v==='off'||v==='no')return false;
+          return null;
+        }
+
+        function applyMirror(){
+          document.body.classList.toggle('mirrored',mirrored);
+          const b=document.getElementById('mirror-btn');
+          b.classList.toggle('on',mirrored);
+          b.setAttribute('aria-pressed',mirrored?'true':'false');
+        }
+
+        function initMirror(){
+          const o=mirrorOverride();
+          try{
+            if(o!==null)localStorage.setItem(MIRROR_KEY,o?'1':'0');
+            mirrored=o!==null?o:localStorage.getItem(MIRROR_KEY)==='1';
+          }catch(e){mirrored=o===true}
+          document.getElementById('mirror-btn').addEventListener('click',()=>{
+            mirrored=!mirrored;
+            try{localStorage.setItem(MIRROR_KEY,mirrored?'1':'0')}catch(e){}
+            applyMirror();
+          });
+          applyMirror();
+        }
 
         // Detect annotation words: [bracket] or emoji-only (no letters/digits)
         function isAnnotation(w){
@@ -592,6 +651,7 @@ class BrowserServer {
         for(let i=0;i<30;i++){const b=document.createElement('div');
           b.className='wf';b.style.height='2px';wfInit.appendChild(b)}
 
+        initMirror();
         connect();
         </script>
         </body>
