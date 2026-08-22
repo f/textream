@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+private let paragraphDividerExtraSpacing: CGFloat = 4
+
 // MARK: - CJK-aware word splitting
 
 extension Unicode.Scalar {
@@ -56,6 +58,41 @@ func splitTextIntoWords(_ text: String) -> [String] {
     return result
 }
 
+/// Returns the word indices that begin a new paragraph. Consecutive and
+/// whitespace-only lines collapse into a single visual separator.
+func paragraphBreakWordIndices(in text: String) -> Set<Int> {
+    let normalizedLineEndings = text
+        .replacingOccurrences(of: "\r\n", with: "\n")
+        .replacingOccurrences(of: "\r", with: "\n")
+    let lines = normalizedLineEndings.split(
+        separator: "\n",
+        omittingEmptySubsequences: false
+    )
+
+    var result = Set<Int>()
+    var wordCount = 0
+    var hasContent = false
+    var hasPendingBreak = false
+
+    for (index, line) in lines.enumerated() {
+        let lineWords = splitTextIntoWords(String(line))
+        if !lineWords.isEmpty {
+            if hasContent && hasPendingBreak {
+                result.insert(wordCount)
+            }
+            wordCount += lineWords.count
+            hasContent = true
+            hasPendingBreak = false
+        }
+
+        if index < lines.count - 1, hasContent {
+            hasPendingBreak = true
+        }
+    }
+
+    return result
+}
+
 // MARK: - Data
 
 struct WordItem: Identifiable {
@@ -94,11 +131,19 @@ struct SpeechScrollView: View {
     var smoothWordProgress: Double = 0
 
     var isListening: Bool = true
+    var readingPosition: ReadingPosition = .centered
+    var paragraphBreakBeforeWordIndices: Set<Int> = []
     @State private var scrollOffset: CGFloat = 0
     @State private var manualOffset: CGFloat = 0
     @State private var wordYPositions: [Int: CGFloat] = [:]
     @State private var containerHeight: CGFloat = 0
     @State private var isUserScrolling: Bool = false
+    @State private var stableTopLineCenter: CGFloat?
+    @State private var stableLineAdvance: CGFloat?
+    @State private var allowsNextBackwardTrackingUpdate = false
+    @State private var hasAppliedTrackingTarget = false
+    @State private var anchoredLayoutWidth: CGFloat = 0
+    @State private var anchoredParagraphBreakBeforeWordIndices: Set<Int> = []
 
     var body: some View {
         GeometryReader { geo in
@@ -111,24 +156,42 @@ struct SpeechScrollView: View {
                 cueUnreadOpacity: cueUnreadOpacity,
                 cueReadOpacity: cueReadOpacity,
                 highlightWords: !smoothScroll,
+                paragraphBreakBeforeWordIndices: paragraphBreakBeforeWordIndices,
                 containerWidth: geo.size.width,
                 onWordTap: { charOffset in
+                    let tappedWordIndex = wordIndex(at: charOffset)
                     manualOffset = 0
-                    onWordTap?(charOffset)
-                    // Force recenter on tapped word
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        recalcCenter(containerHeight: containerHeight)
+                    if charOffset < highlightedCharCount {
+                        allowsNextBackwardTrackingUpdate = true
                     }
+                    onWordTap?(charOffset)
+                    // Reposition from the tapped word itself instead of waiting
+                    // for the parent progress update. That update can arrive
+                    // after a stale recalculation has consumed the one-time
+                    // backward allowance.
+                    repositionTracking(toWordIndex: tappedWordIndex)
                 },
                 scrollOffset: scrollOffset + manualOffset,
                 viewportHeight: geo.size.height
             )
             .onPreferenceChange(WordYPreferenceKey.self) { positions in
                 let wasEmpty = wordYPositions.isEmpty
+                let widthChanged = abs(anchoredLayoutWidth - geo.size.width) > 0.5
+                let paragraphLayoutChanged = anchoredParagraphBreakBeforeWordIndices
+                    != paragraphBreakBeforeWordIndices
+                if widthChanged || paragraphLayoutChanged {
+                    hasAppliedTrackingTarget = false
+                }
+                captureStableLineMetrics(from: positions)
                 wordYPositions = positions
-                // After a page switch, wordYPositions was cleared — recenter once new positions arrive
-                if wasEmpty && !positions.isEmpty {
-                    recalcCenter(containerHeight: containerHeight)
+                // Re-anchor after a page switch or any live layout reflow. Keep
+                // the stable vertical metrics during width changes: the visible
+                // preference values may be culled from the middle of the text.
+                if (wasEmpty || widthChanged || paragraphLayoutChanged),
+                   !positions.isEmpty {
+                    anchoredLayoutWidth = geo.size.width
+                    anchoredParagraphBreakBeforeWordIndices = paragraphBreakBeforeWordIndices
+                    recalculateTracking(containerHeight: containerHeight)
                 }
             }
             .offset(y: scrollOffset + manualOffset)
@@ -136,44 +199,56 @@ struct SpeechScrollView: View {
             .animation(.easeOut(duration: 0.15), value: manualOffset)
             .onChange(of: geo.size.height) { _, newHeight in
                 containerHeight = newHeight
+                hasAppliedTrackingTarget = false
                 if highlightedCharCount == 0 && smoothWordProgress == 0 {
-                    // Initial state: center first line on screen
-                    let lineHeight = font.pointSize * 1.4
-                    scrollOffset = newHeight * 0.5 - lineHeight * 0.5
+                    scrollOffset = initialScrollOffset(containerHeight: newHeight)
                 } else if isListening {
-                    recalcCenter(containerHeight: newHeight)
+                    recalculateTracking(containerHeight: newHeight)
                 }
             }
             .onChange(of: highlightedCharCount) { _, _ in
                 if isListening && !smoothScroll {
                     manualOffset = 0
-                    recalcCenter(containerHeight: containerHeight)
+                    recalculateTracking(containerHeight: containerHeight)
                 }
             }
             .onChange(of: smoothWordProgress) { _, _ in
                 if isListening && smoothScroll {
                     manualOffset = 0
-                    recalcCenter(containerHeight: containerHeight)
+                    recalculateTracking(containerHeight: containerHeight)
                 }
             }
             .onChange(of: isListening) { _, listening in
                 if listening {
                     manualOffset = 0
-                    recalcCenter(containerHeight: containerHeight)
+                    recalculateTracking(containerHeight: containerHeight)
                 }
             }
             .onChange(of: words) { _, _ in
-                // First line at vertical center: height/2 + lineHeight/2
-                let lineHeight = font.pointSize * 1.4
-                scrollOffset = containerHeight * 0.5 - lineHeight * 0.5
+                scrollOffset = initialScrollOffset(containerHeight: containerHeight)
                 manualOffset = 0
                 wordYPositions = [:]
+                stableTopLineCenter = nil
+                stableLineAdvance = nil
+                allowsNextBackwardTrackingUpdate = false
+                hasAppliedTrackingTarget = false
+                anchoredLayoutWidth = 0
+                anchoredParagraphBreakBeforeWordIndices = []
+            }
+            .onChange(of: readingPosition) { _, _ in
+                manualOffset = 0
+                stableTopLineCenter = nil
+                stableLineAdvance = nil
+                allowsNextBackwardTrackingUpdate = false
+                hasAppliedTrackingTarget = false
+                scrollOffset = initialScrollOffset(containerHeight: containerHeight)
+                DispatchQueue.main.async {
+                    recalculateTracking(containerHeight: containerHeight)
+                }
             }
             .onAppear {
                 containerHeight = geo.size.height
-                // First line at vertical center: height/2 + lineHeight/2
-                let lineHeight = font.pointSize * 1.4
-                scrollOffset = containerHeight * 0.5 - lineHeight * 0.5
+                scrollOffset = initialScrollOffset(containerHeight: containerHeight)
             }
             .overlay(
                 ScrollWheelView(
@@ -208,12 +283,13 @@ struct SpeechScrollView: View {
                     },
                     onScrollEnd: {
                         if smoothScroll && isUserScrolling {
-                            // Find the word at the new visual center
+                            // Find the word at the active tracking anchor.
                             let newProgress = wordProgressAtCurrentOffset()
                             withAnimation(.easeOut(duration: 0.15)) {
                                 manualOffset = 0
                             }
                             isUserScrolling = false
+                            allowsNextBackwardTrackingUpdate = true
                             onManualScroll?(false, newProgress)
                         } else {
                             let maxY = wordYPositions.values.max() ?? 0
@@ -234,19 +310,40 @@ struct SpeechScrollView: View {
         .clipped()
         .mask(
             LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .white, location: 0.05),
-                    .init(color: .white, location: 0.95),
-                    .init(color: .clear, location: 1.0)
-                ],
+                stops: readingPosition == .nearTop
+                    ? [
+                        .init(color: .white, location: 0),
+                        .init(color: .white, location: 0.95),
+                        .init(color: .clear, location: 1.0)
+                    ]
+                    : [
+                        .init(color: .clear, location: 0),
+                        .init(color: .white, location: 0.05),
+                        .init(color: .white, location: 0.95),
+                        .init(color: .clear, location: 1.0)
+                    ],
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
     }
 
-    private func recalcCenter(containerHeight: CGFloat) {
+    private func initialScrollOffset(containerHeight: CGFloat) -> CGFloat {
+        switch readingPosition {
+        case .centered:
+            let lineHeight = font.pointSize * 1.4
+            return containerHeight * 0.5 - lineHeight * 0.5
+        case .nearTop:
+            return 0
+        }
+    }
+
+    private func recalculateTracking(containerHeight: CGFloat) {
+        if readingPosition == .nearTop {
+            recalcTopWithPreviousLine()
+            return
+        }
+
         let center = containerHeight * 0.5
 
         if smoothScroll {
@@ -258,25 +355,119 @@ struct SpeechScrollView: View {
             guard let wordY = wordYPositions[clampedIdx] else { return }
             let nextY = wordYPositions[clampedIdx + 1] ?? wordY
             let interpolatedY = wordY + (nextY - wordY) * CGFloat(fraction)
-            scrollOffset = bottomAnchor - interpolatedY
+            applyTrackingTarget(bottomAnchor - interpolatedY)
         } else {
             // Word-tracking/voice-activated: active word at vertical center
             let wordIdx = activeWordIndex()
             if let wordY = wordYPositions[wordIdx] {
                 let target = center - wordY
-                // Only update if it actually changed to avoid redundant animations
-                if abs(scrollOffset - target) > 1 {
-                    scrollOffset = target
-                }
+                applyTrackingTarget(target)
             }
         }
     }
 
+    private func recalcTopWithPreviousLine() {
+        if smoothScroll {
+            let wordIdx = Int(smoothWordProgress)
+            let fraction = smoothWordProgress - Double(wordIdx)
+            let clampedIdx = max(0, min(wordIdx, words.count - 1))
+            guard let wordY = wordYPositions[clampedIdx] else { return }
+            let nextY = wordYPositions[clampedIdx + 1] ?? wordY
+            let interpolatedY = wordY + (nextY - wordY) * CGFloat(fraction)
+            let target = min(interpolatedY, topReadingAnchor) - interpolatedY
+            applyTrackingTarget(target)
+        } else {
+            let wordIdx = activeWordIndex()
+            guard let wordY = wordYPositions[wordIdx] else { return }
+            let target = min(wordY, topReadingAnchor) - wordY
+            applyTrackingTarget(target)
+        }
+    }
+
+    private func repositionTracking(toWordIndex wordIndex: Int) {
+        guard let wordY = wordYPositions[wordIndex] else { return }
+
+        let target: CGFloat
+        switch readingPosition {
+        case .centered:
+            target = containerHeight * 0.5 - wordY
+        case .nearTop:
+            target = min(wordY, topReadingAnchor) - wordY
+        }
+
+        applyTrackingTarget(target, force: true)
+    }
+
+    private var topReadingAnchor: CGFloat {
+        let lineHeight = ceil(font.ascender - font.descender + font.leading)
+        let fallbackAdvance = lineHeight + (lineHeight / font.pointSize > 1.5 ? 2 : 8)
+        return (stableTopLineCenter ?? lineHeight * 0.5)
+            + (stableLineAdvance ?? fallbackAdvance)
+    }
+
+    /// Capture the actual row geometry once, before visibility culling changes
+    /// which word frames participate in the preference dictionary.
+    private func captureStableLineMetrics(from positions: [Int: CGFloat]) {
+        guard readingPosition == .nearTop,
+              stableTopLineCenter == nil || stableLineAdvance == nil else { return }
+
+        let positionedWords = positions.sorted { $0.value < $1.value }
+        let measuredLines = positionedWords.reduce(into: [(y: CGFloat, wordIDs: [Int])]()) { result, entry in
+            if let lastIndex = result.indices.last,
+               abs(result[lastIndex].y - entry.value) <= 0.5 {
+                result[lastIndex].wordIDs.append(entry.key)
+            } else {
+                result.append((y: entry.value, wordIDs: [entry.key]))
+            }
+        }
+        guard let firstLineY = measuredLines.first?.y else { return }
+        if stableTopLineCenter == nil {
+            stableTopLineCenter = firstLineY
+        }
+        if stableLineAdvance == nil, measuredLines.count > 1 {
+            for index in 1..<measuredLines.count {
+                let firstWordID = measuredLines[index].wordIDs.min() ?? -1
+                guard !paragraphBreakBeforeWordIndices.contains(firstWordID) else { continue }
+                stableLineAdvance = measuredLines[index].y - measuredLines[index - 1].y
+                break
+            }
+        }
+    }
+
+    /// Normal reading progress may only move the text upward. Brief backward
+    /// corrections from speech recognition must not produce a down/up bounce.
+    /// Explicit taps and manual scrolling opt into one backward reposition.
+    private func applyTrackingTarget(_ target: CGFloat, force: Bool = false) {
+        if !hasAppliedTrackingTarget
+            || target < scrollOffset - 1
+            || allowsNextBackwardTrackingUpdate
+            || force {
+            scrollOffset = target
+        }
+        hasAppliedTrackingTarget = true
+        allowsNextBackwardTrackingUpdate = false
+    }
+
+    private func wordIndex(at charOffset: Int) -> Int {
+        var offset = 0
+        for (index, word) in words.enumerated() {
+            let end = offset + word.count
+            if charOffset <= end { return index }
+            offset = end + 1
+        }
+        return max(0, words.count - 1)
+    }
+
     /// Find the word progress at the current visual position (scrollOffset + manualOffset)
     private func wordProgressAtCurrentOffset() -> Double {
-        let center = containerHeight * 0.5
-        // The Y position currently at the center of the view
-        let targetY = center - (scrollOffset + manualOffset)
+        let trackingY: CGFloat
+        switch readingPosition {
+        case .centered:
+            trackingY = containerHeight * 0.5
+        case .nearTop:
+            trackingY = topReadingAnchor
+        }
+        let targetY = trackingY - (scrollOffset + manualOffset)
 
         // Find the closest word and interpolate
         let sorted = wordYPositions.sorted { $0.key < $1.key }
@@ -338,6 +529,7 @@ struct WordFlowLayout: View {
     var cueUnreadOpacity: Double = 0.2
     var cueReadOpacity: Double = 0.5
     var highlightWords: Bool = true
+    var paragraphBreakBeforeWordIndices: Set<Int> = []
     let containerWidth: CGFloat
     var onWordTap: ((Int) -> Void)? = nil
     var scrollOffset: CGFloat = 0
@@ -356,18 +548,32 @@ struct WordFlowLayout: View {
     private static var _cacheKey: String = ""
     private static var _cachedItems: [WordItem] = []
     private static var _cachedLines: [[WordItem]] = []
+    private static var _cachedParagraphPrefixCounts: [Int] = []
 
-    private func cachedLayout() -> ([WordItem], [[WordItem]]) {
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))"
+    private func cachedLayout() -> ([WordItem], [[WordItem]], [Int]) {
+        let paragraphKey = paragraphBreakBeforeWordIndices.sorted()
+            .map(String.init)
+            .joined(separator: ",")
+        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
         if key == Self._cacheKey {
-            return (Self._cachedItems, Self._cachedLines)
+            return (Self._cachedItems, Self._cachedLines, Self._cachedParagraphPrefixCounts)
         }
         let items = buildItems()
         let lines = buildLines(items: items)
+        var paragraphPrefixCounts = [0]
+        for line in lines {
+            let beginsParagraph = line.first.map {
+                paragraphBreakBeforeWordIndices.contains($0.id)
+            } ?? false
+            paragraphPrefixCounts.append(
+                paragraphPrefixCounts[paragraphPrefixCounts.count - 1] + (beginsParagraph ? 1 : 0)
+            )
+        }
         Self._cacheKey = key
         Self._cachedItems = items
         Self._cachedLines = lines
-        return (items, lines)
+        Self._cachedParagraphPrefixCounts = paragraphPrefixCounts
+        return (items, lines, paragraphPrefixCounts)
     }
 
     // Find the index of the next word to read (first non-fully-lit, non-annotation word)
@@ -399,39 +605,91 @@ struct WordFlowLayout: View {
     }
 
     var body: some View {
-        let (items, lines) = cachedLayout()
+        let (items, lines, paragraphPrefixCounts) = cachedLayout()
         let nextIdx = nextWordIndex(items: items)
         let totalLines = lines.count
         let rtl = isRightToLeft(items: items)
 
         // Estimate line height for visibility culling using actual font metrics
-        let lineH = ceil(font.ascender - font.descender + font.leading) + lineSpacing
+        let rowHeight = ceil(font.ascender - font.descender + font.leading)
+        let lineH = rowHeight + lineSpacing
+        let lineTop: (Int) -> CGFloat = { lineIndex in
+            CGFloat(lineIndex) * lineH
+                + CGFloat(paragraphPrefixCounts[lineIndex]) * paragraphDividerExtraSpacing
+        }
+        let lineRowHeight: (Int) -> CGFloat = { lineIndex in
+            let beginsParagraph = paragraphPrefixCounts[lineIndex + 1]
+                > paragraphPrefixCounts[lineIndex]
+            return rowHeight + (beginsParagraph ? paragraphDividerExtraSpacing : 0)
+        }
+        let totalContentHeight = max(0, lineTop(totalLines) - lineSpacing)
 
         // Determine visible range of lines
         let canCull = viewportHeight > 0 && totalLines > 0
         let buffer: CGFloat = 400
-        let startLine = canCull ? max(0, min(totalLines, Int(floor((-scrollOffset - buffer) / lineH)))) : 0
-        let endLine = canCull ? max(startLine, min(totalLines, Int(ceil((viewportHeight - scrollOffset + buffer) / lineH)))) : totalLines
+        let startLine: Int = {
+            guard canCull else { return 0 }
+            let visibleMinY = -scrollOffset - buffer
+            var candidate = max(0, min(totalLines, Int(floor(max(0, visibleMinY) / lineH))))
+            while candidate > 0, lineTop(candidate) > visibleMinY {
+                candidate -= 1
+            }
+            while candidate < totalLines,
+                  lineTop(candidate) + lineRowHeight(candidate) < visibleMinY {
+                candidate += 1
+            }
+            return candidate
+        }()
+        let endLine: Int = {
+            guard canCull else { return totalLines }
+            let visibleMaxY = viewportHeight - scrollOffset + buffer
+            var candidate = max(startLine, min(totalLines, Int(ceil(max(0, visibleMaxY) / lineH))))
+            while candidate > startLine, lineTop(candidate) > visibleMaxY {
+                candidate -= 1
+            }
+            while candidate < totalLines, lineTop(candidate) < visibleMaxY {
+                candidate += 1
+            }
+            return max(startLine, candidate)
+        }()
 
         // For RTL scripts (Arabic, Hebrew, Persian, Urdu), flip the layout direction
         // so words within each line flow right-to-left instead of left-to-right.
         VStack(alignment: rtl ? .trailing : .leading, spacing: lineSpacing) {
             if startLine > 0 {
-                Color.clear.frame(height: CGFloat(startLine) * lineH)
+                Color.clear.frame(
+                    height: max(0, lineTop(startLine) - lineSpacing)
+                )
             }
 
             ForEach(startLine..<endLine, id: \.self) { lineIdx in
+                let beginsParagraph = paragraphPrefixCounts[lineIdx + 1]
+                    > paragraphPrefixCounts[lineIdx]
                 HStack(spacing: 0) {
                     ForEach(lines[lineIdx], id: \.id) { item in
                         wordView(for: item, isNextWord: item.id == nextIdx)
                             .id(item.id)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
+                .padding(.top, beginsParagraph ? paragraphDividerExtraSpacing : 0)
+                .overlay(alignment: .top) {
+                    if beginsParagraph {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(height: 1)
+                            .offset(
+                                y: (paragraphDividerExtraSpacing - lineSpacing) * 0.5
+                            )
+                    }
+                }
                 .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
             }
 
             if endLine < totalLines {
-                Color.clear.frame(height: CGFloat(totalLines - endLine) * lineH)
+                Color.clear.frame(
+                    height: max(0, totalContentHeight - lineTop(endLine))
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
@@ -545,6 +803,11 @@ struct WordFlowLayout: View {
         let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
 
         for item in items {
+            if paragraphBreakBeforeWordIndices.contains(item.id),
+               !lines[lines.count - 1].isEmpty {
+                lines.append([])
+                currentLineWidth = 0
+            }
             let wordWidth = (item.word as NSString).size(withAttributes: [.font: font]).width + spaceWidth
             if currentLineWidth + wordWidth > containerWidth && !lines[lines.count - 1].isEmpty {
                 lines.append([])

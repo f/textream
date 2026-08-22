@@ -55,10 +55,12 @@ class TextreamService: NSObject, ObservableObject {
         // Also show on external display if configured (same parsing as overlay)
         let words = splitTextIntoWords(trimmed)
         let totalCharCount = words.joined(separator: " ").count
+        let paragraphBreaks = paragraphBreakWordIndices(in: trimmed)
         externalDisplayController.show(
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
             totalCharCount: totalCharCount,
+            paragraphBreakBeforeWordIndices: paragraphBreaks,
             hasNextPage: hasNextPage
         )
 
@@ -115,6 +117,7 @@ class TextreamService: NSObject, ObservableObject {
         // Also update external display content in-place
         let words = splitTextIntoWords(trimmed)
         externalDisplayController.overlayContent.words = words
+        externalDisplayController.overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: trimmed)
         externalDisplayController.overlayContent.totalCharCount = words.joined(separator: " ").count
         externalDisplayController.overlayContent.hasNextPage = hasNextPage
 
@@ -378,10 +381,12 @@ class TextreamService: NSObject, ObservableObject {
         )
 
         // Also show on external display & browser if configured
+        let paragraphBreaks = paragraphBreakWordIndices(in: trimmed)
         externalDisplayController.show(
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
             totalCharCount: totalCharCount,
+            paragraphBreakBeforeWordIndices: paragraphBreaks,
             hasNextPage: false
         )
         if browserServer.isRunning {
@@ -409,6 +414,7 @@ class TextreamService: NSObject, ObservableObject {
 
         // Update overlay content without resetting speech progress
         overlayController.overlayContent.words = words
+        overlayController.overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: trimmed)
         overlayController.overlayContent.totalCharCount = totalCharCount
         overlayController.overlayContent.hasNextPage = false
 
@@ -420,6 +426,7 @@ class TextreamService: NSObject, ObservableObject {
 
         // Update external display & browser
         externalDisplayController.overlayContent.words = words
+        externalDisplayController.overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: trimmed)
         externalDisplayController.overlayContent.totalCharCount = totalCharCount
         if browserServer.isRunning {
             browserServer.updateContent(
@@ -434,6 +441,10 @@ class TextreamService: NSObject, ObservableObject {
         guard directorIsReading else { return }
         overlayController.dismiss()
         directorIsReading = false
+    }
+
+    func updateKeepAwakeActivity(enabled: Bool) {
+        overlayController.updateKeepAwakeActivity(enabled: enabled)
     }
 
     // macOS Services handler
