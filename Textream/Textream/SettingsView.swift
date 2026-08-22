@@ -810,6 +810,34 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
+                if settings.overlayMode != .pinned {
+                    Divider()
+
+                    Toggle(isOn: $settings.mirrorOverlay) {
+                        Text("Mirror the prompter")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+
+                    Text("Flips the overlay for a teleprompter mirror rig.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+
+                    if settings.mirrorOverlay {
+                        Picker("", selection: $settings.mirrorAxis) {
+                            ForEach(MirrorAxis.allCases) { axis in
+                                Text(axis.label).tag(axis)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+
+                        Text(settings.mirrorAxis.description)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 if settings.overlayMode == .pinned {
                     Divider()
 
@@ -1416,6 +1444,7 @@ struct SettingsView: View {
         settings.externalDisplayMode = .off
         settings.externalScreenID = 0
         settings.mirrorAxis = .horizontal
+        settings.mirrorOverlay = false
         settings.listeningMode = .wordTracking
         settings.scrollSpeed = 3
         settings.showElapsedTime = true

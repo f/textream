@@ -394,6 +394,12 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(mirrorAxis.rawValue, forKey: "mirrorAxis") }
     }
 
+    /// Mirror the Floating Window and Fullscreen overlays, using `mirrorAxis`.
+    /// The external display has its own Mirror mode and is unaffected.
+    var mirrorOverlay: Bool {
+        didSet { UserDefaults.standard.set(mirrorOverlay, forKey: "mirrorOverlay") }
+    }
+
     var listeningMode: ListeningMode {
         didSet { UserDefaults.standard.set(listeningMode.rawValue, forKey: "listeningMode") }
     }
@@ -491,6 +497,7 @@ class NotchSettings {
         let savedScreenID = UserDefaults.standard.integer(forKey: "externalScreenID")
         self.externalScreenID = UInt32(savedScreenID)
         self.mirrorAxis = MirrorAxis(rawValue: UserDefaults.standard.string(forKey: "mirrorAxis") ?? "") ?? .horizontal
+        self.mirrorOverlay = UserDefaults.standard.object(forKey: "mirrorOverlay") as? Bool ?? false
         self.listeningMode = ListeningMode(rawValue: UserDefaults.standard.string(forKey: "listeningMode") ?? "") ?? .wordTracking
         let savedSpeed = UserDefaults.standard.double(forKey: "scrollSpeed")
         self.scrollSpeed = savedSpeed > 0 ? savedSpeed : 3

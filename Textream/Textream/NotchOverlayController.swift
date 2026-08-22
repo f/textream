@@ -289,7 +289,11 @@ class NotchOverlayController: NSObject {
             baseHeight: panelHeight,
             followingCursor: true
         )
-        let contentView = NSHostingView(rootView: floatingView)
+        // Follow-cursor panels ignore mouse events, so the control would be
+        // unclickable there.
+        let contentView = NSHostingView(
+            rootView: MirroredOverlay(showsControl: false) { floatingView }
+        )
 
         let panel = NSPanel(
             contentRect: initialFrame,
@@ -321,7 +325,9 @@ class NotchOverlayController: NSObject {
             speechRecognizer: speechRecognizer,
             mirrorAxis: nil
         )
-        let contentView = NSHostingView(rootView: fullscreenView)
+        let contentView = NSHostingView(
+            rootView: MirroredOverlay(showsControl: true) { fullscreenView }
+        )
 
         let panel = NSPanel(
             contentRect: screenFrame,
@@ -356,7 +362,9 @@ class NotchOverlayController: NSObject {
             speechRecognizer: speechRecognizer,
             baseHeight: panelHeight
         )
-        let contentView = NSHostingView(rootView: floatingView)
+        let contentView = NSHostingView(
+            rootView: MirroredOverlay(showsControl: true) { floatingView }
+        )
 
         let panel = NSPanel(
             contentRect: NSRect(x: xPosition, y: yPosition, width: panelWidth, height: panelHeight),
@@ -1643,5 +1651,52 @@ struct FloatingOverlayView: View {
             Spacer()
         }
         .transition(.scale.combined(with: .opacity))
+    }
+}
+
+
+// MARK: - Overlay Mirroring
+
+/// Flips an overlay for a teleprompter mirror rig and, where the panel accepts
+/// clicks, puts a Mirror toggle on top of it. The control is a sibling of the
+/// flipped content, so it stays upright and readable while mirroring is on.
+struct MirroredOverlay<Content: View>: View {
+    let showsControl: Bool
+    @ViewBuilder let content: Content
+
+    @State private var isHovering = false
+
+    private var axis: MirrorAxis? {
+        let settings = NotchSettings.shared
+        return settings.mirrorOverlay ? settings.mirrorAxis : nil
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            content
+                .scaleEffect(x: axis?.scaleX ?? 1, y: axis?.scaleY ?? 1)
+
+            if showsControl {
+                Button {
+                    NotchSettings.shared.mirrorOverlay.toggle()
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(axis == nil ? Color.white.opacity(0.7) : Color.yellow)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            Circle().fill(axis == nil
+                                          ? Color.white.opacity(0.12)
+                                          : Color.yellow.opacity(0.22))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(axis == nil ? "Mirror the prompter" : "Stop mirroring")
+                .padding(10)
+                .opacity(isHovering ? 1 : 0.35)
+                .onHover { isHovering = $0 }
+                .animation(.easeInOut(duration: 0.15), value: isHovering)
+            }
+        }
     }
 }
