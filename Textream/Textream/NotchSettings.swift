@@ -542,9 +542,9 @@ class NotchSettings {
         self.fullscreenScreenID = UInt32(savedFullscreenScreenID)
         self.browserServerEnabled = UserDefaults.standard.object(forKey: "browserServerEnabled") as? Bool ?? false
         let savedPort = UserDefaults.standard.integer(forKey: "browserServerPort")
-        self.browserServerPort = savedPort > 0 ? UInt16(savedPort) : 7373
+        self.browserServerPort = (1024..<Int(UInt16.max)).contains(savedPort) ? UInt16(savedPort) : 7373
         self.directorModeEnabled = UserDefaults.standard.object(forKey: "directorModeEnabled") as? Bool ?? false
         let savedDirectorPort = UserDefaults.standard.integer(forKey: "directorServerPort")
-        self.directorServerPort = savedDirectorPort > 0 ? UInt16(savedDirectorPort) : 7575
+        self.directorServerPort = (1024..<Int(UInt16.max)).contains(savedDirectorPort) ? UInt16(savedDirectorPort) : 7575
     }
 }

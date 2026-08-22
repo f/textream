@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Textream Docs — Setup, Reading Modes &amp; Settings</title>
+  <meta name="description" content="Learn how to use and automate Textream on Mac, iPhone, and iPad, including scripts, reading modes, every setting, URL schemes, and the Director API.">
+  <link rel="canonical" href="https://textream.net/docs/">
+  <meta property="og:title" content="Textream Docs — Setup, Reading Modes &amp; Settings">
+  <meta property="og:description" content="The complete guide to Textream: scripts, reading modes, every setting, remote tools, recording, URL schemes, and the Director API.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://textream.net/docs/">
+  <meta property="og:site_name" content="Textream">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Textream Docs">
+  <meta name="twitter:description" content="Setup, usage, and every setting for Textream on Mac, iPhone, and iPad.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg: #09090b;
+      --bg-raised: #0e0e12;
+      --panel: #151519;
+      --panel-strong: #1c1c21;
+      --line: rgba(255, 255, 255, 0.09);
+      --text: #f5f5f7;
+      --text-soft: #c7c7cd;
+      --muted: #92929b;
+      --quiet: #666670;
+      --violet: #8d7cff;
+      --blue: #5d9dff;
+      --yellow: #ffd60a;
+      --radius-sm: 10px;
+      --radius: 18px;
+      --page: 1180px;
+      --header-height: 76px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: calc(var(--header-height) + 28px);
+    }
+
+    body {
+      min-width: 300px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% -8%, rgba(141, 124, 255, 0.15), transparent 35rem),
+        radial-gradient(circle at 92% 14%, rgba(93, 157, 255, 0.09), transparent 31rem),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 16px;
+      line-height: 1.68;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    a { color: #9fc2ff; text-underline-offset: 0.19em; }
+    a:hover { color: #c7d9ff; }
+
+    :focus-visible {
+      outline: 3px solid rgba(141, 124, 255, 0.78);
+      outline-offset: 4px;
+      border-radius: 6px;
+    }
+
+    ::selection {
+      background: rgba(141, 124, 255, 0.38);
+      color: white;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 12px;
+      z-index: 100;
+      padding: 10px 14px;
+      border-radius: 9px;
+      background: white;
+      color: #09090b;
+      font-weight: 750;
+      text-decoration: none;
+      transform: translateY(-150%);
+      transition: transform 140ms ease;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .ambient-grid {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.21;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black, transparent 62%);
+    }
+
+    .wrap {
+      width: min(calc(100% - 40px), var(--page));
+      margin-inline: auto;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      min-height: var(--header-height);
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 9, 11, 0.78);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+    }
+
+    .header-inner {
+      min-height: var(--header-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 780;
+      letter-spacing: -0.025em;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .brand svg {
+      width: 38px;
+      height: 38px;
+      filter: drop-shadow(0 8px 18px rgba(93, 157, 255, 0.16));
+    }
+
+    .top-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .top-nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 0 12px;
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 650;
+      text-decoration: none;
+      transition: color 150ms ease, background 150ms ease;
+    }
+
+    .top-nav a:hover {
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--text);
+    }
+
+    .top-nav a[aria-current="page"] {
+      border: 1px solid rgba(141, 124, 255, 0.25);
+      background: rgba(141, 124, 255, 0.11);
+      color: #c9c1ff;
+    }
+
+    .section-label {
+      margin: 0 0 15px;
+      color: #a99eff;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 225px minmax(0, 1fr);
+      gap: clamp(42px, 7vw, 92px);
+      padding: 64px 0 110px;
+    }
+
+    .toc {
+      align-self: start;
+      position: sticky;
+      top: calc(var(--header-height) + 26px);
+      max-height: calc(100vh - var(--header-height) - 48px);
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    .toc-title {
+      margin: 0 0 13px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 780;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .toc li + li { margin-top: 2px; }
+    .toc li.group-start { margin-top: 18px; }
+
+    .toc a {
+      display: block;
+      padding: 5px 9px;
+      border-left: 1px solid var(--line);
+      color: var(--quiet);
+      font-size: 13px;
+      line-height: 1.45;
+      text-decoration: none;
+      transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+    }
+
+    .toc a:hover {
+      border-left-color: var(--violet);
+      background: linear-gradient(90deg, rgba(141,124,255,0.08), transparent);
+      color: var(--text-soft);
+    }
+
+    .docs-main { min-width: 0; }
+
+    .doc-section {
+      padding: 74px 0;
+      border-top: 1px solid var(--line);
+      scroll-margin-top: calc(var(--header-height) + 26px);
+    }
+
+    .doc-section:first-child { padding-top: 0; border-top: 0; }
+
+    .doc-section h1,
+    .doc-section h2 {
+      max-width: 800px;
+      margin: 0;
+      font-family: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif;
+      font-size: clamp(32px, 4.4vw, 48px);
+      font-weight: 780;
+      letter-spacing: -0.04em;
+      line-height: 1.08;
+    }
+
+    .doc-section h3 {
+      margin: 0;
+      font-size: 23px;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+    }
+
+    .section-intro {
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .step-grid,
+    .mode-grid,
+    .platform-grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 34px;
+    }
+
+    .step-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); counter-reset: steps; }
+    .mode-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .step,
+    .mode,
+    .platform-card {
+      position: relative;
+      min-width: 0;
+      padding: 23px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(150deg, rgba(28,28,33,0.72), rgba(15,15,18,0.68));
+    }
+
+    .step { counter-increment: steps; }
+
+    .step::before {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      margin-bottom: 26px;
+      border: 1px solid rgba(141,124,255,0.28);
+      border-radius: 9px;
+      background: rgba(141,124,255,0.1);
+      color: #b7aeff;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+      font-weight: 760;
+      content: counter(steps, decimal-leading-zero);
+    }
+
+    .step h3,
+    .mode h3,
+    .platform-card h3 { font-size: 17px; }
+
+    .step p,
+    .mode p,
+    .platform-card p {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.62;
+    }
+
+    .mode-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 20px;
+      color: var(--quiet);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .mode-mark i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 13px rgba(93,157,255,0.52);
+    }
+
+    .mode:nth-child(2) .mode-mark i { background: var(--violet); box-shadow: 0 0 13px rgba(141,124,255,0.52); }
+    .mode:nth-child(3) .mode-mark i { background: var(--yellow); box-shadow: 0 0 13px rgba(255,214,10,0.45); }
+
+    .callout {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 15px;
+      margin-top: 28px;
+      padding: 19px 21px;
+      border: 1px solid rgba(141,124,255,0.23);
+      border-radius: 15px;
+      background: linear-gradient(120deg, rgba(141,124,255,0.085), rgba(93,157,255,0.045));
+      color: #d6d2ed;
+      font-size: 14px;
+    }
+
+    .callout .symbol {
+      display: grid;
+      place-items: center;
+      width: 25px;
+      height: 25px;
+      border-radius: 8px;
+      background: rgba(141,124,255,0.16);
+      color: #c6bfff;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .callout p { margin: 0; }
+    .callout strong { color: white; }
+
+    .prose {
+      max-width: 790px;
+      margin-top: 30px;
+      color: var(--text-soft);
+    }
+
+    .prose p { margin: 0 0 18px; }
+    .prose ul, .prose ol { margin: 15px 0 22px; padding-left: 22px; }
+    .prose li + li { margin-top: 9px; }
+    .prose strong { color: var(--text); }
+    .api-copy { margin-top: 20px; }
+
+    code, kbd {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.045);
+      color: #dedbe9;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 0.84em;
+    }
+
+    code { padding: 2px 6px; }
+    kbd { padding: 2px 7px; box-shadow: 0 2px rgba(255,255,255,0.08); }
+
+    .code-examples {
+      display: grid;
+      gap: 16px;
+      margin-top: 30px;
+    }
+
+    .code-example {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(11,11,14,0.82);
+    }
+
+    .code-example header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 19px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.025);
+    }
+
+    .code-example h3 { font-size: 15px; }
+
+    .code-language {
+      flex: 0 0 auto;
+      color: var(--quiet);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    pre {
+      margin: 0;
+      padding: 20px;
+      overflow-x: auto;
+      color: #dedbe9;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.65;
+      tab-size: 2;
+    }
+
+    pre code {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+    }
+
+    .script-sample {
+      position: relative;
+      max-width: 760px;
+      margin-top: 30px;
+      padding: 27px 28px 25px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(11,11,14,0.76);
+      box-shadow: inset 0 1px rgba(255,255,255,0.03);
+      color: #dddde2;
+      font-size: 15px;
+    }
+
+    .script-sample::before {
+      display: block;
+      margin-bottom: 18px;
+      color: var(--quiet);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      content: "Example script";
+    }
+
+    .script-sample p { margin: 0; }
+    .script-sample p + p { margin-top: 18px; }
+    .script-sample .cue { color: rgba(255,214,10,0.62); font-style: italic; }
+
+    .settings-index {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 29px;
+    }
+
+    .settings-index a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.025);
+      color: var(--muted);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 11px;
+      text-decoration: none;
+    }
+
+    .settings-index a:hover { border-color: rgba(141,124,255,0.35); color: var(--text); }
+
+    .settings-group {
+      margin-top: 58px;
+      scroll-margin-top: calc(var(--header-height) + 26px);
+    }
+
+    .settings-group.first { margin-top: 34px; }
+
+    .settings-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 17px;
+    }
+
+    .settings-heading p {
+      margin: 0;
+      color: var(--quiet);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 11px;
+    }
+
+    .setting-list {
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(17,17,21,0.58);
+    }
+
+    .setting-row {
+      display: grid;
+      grid-template-columns: minmax(155px, 0.31fr) minmax(0, 0.69fr);
+      gap: clamp(18px, 4vw, 45px);
+      padding: 20px 22px;
+    }
+
+    .setting-row + .setting-row { border-top: 1px solid var(--line); }
+
+    .setting-row dt {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 720;
+      line-height: 1.45;
+    }
+
+    .setting-row dd {
+      min-width: 0;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.62;
+    }
+
+    .choices {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .choice,
+    .default {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: #b4b4bc;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .default {
+      border-color: rgba(81,216,106,0.2);
+      background: rgba(81,216,106,0.07);
+      color: #8de89d;
+    }
+
+    .platform-card .platform-name {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      margin-bottom: 18px;
+      padding: 0 8px;
+      border-radius: 7px;
+      background: rgba(93,157,255,0.1);
+      color: #9fc2ff;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .platform-card ul {
+      margin: 18px 0 0;
+      padding-left: 19px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .platform-card li + li { margin-top: 8px; }
+
+    .mini-steps {
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: mini;
+    }
+
+    .mini-steps li {
+      display: grid;
+      grid-template-columns: 31px minmax(0, 1fr);
+      gap: 13px;
+      align-items: start;
+      counter-increment: mini;
+    }
+
+    .mini-steps li + li { margin-top: 17px; }
+
+    .mini-steps li::before {
+      display: grid;
+      place-items: center;
+      width: 29px;
+      height: 29px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: var(--quiet);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 10px;
+      content: counter(mini);
+    }
+
+    .mini-steps strong { display: block; color: var(--text); font-size: 14px; }
+    .mini-steps span { display: block; margin-top: 2px; color: var(--muted); font-size: 14px; }
+
+    .page-footer {
+      padding: 33px 0 44px;
+      border-top: 1px solid var(--line);
+      color: var(--quiet);
+      font-size: 13px;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .page-footer p { margin: 0; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 16px; }
+    .footer-links a { color: var(--muted); text-decoration: none; }
+    .footer-links a:hover { color: var(--text); }
+
+    @media (max-width: 960px) {
+      .docs-layout { grid-template-columns: 1fr; gap: 52px; }
+
+      .toc {
+        position: static;
+        max-height: none;
+        margin-inline: -20px;
+        padding-inline: 20px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .toc::-webkit-scrollbar { display: none; }
+      .toc-title { display: none; }
+      .toc ol { display: flex; width: max-content; gap: 6px; }
+      .toc li + li, .toc li.group-start { margin-top: 0; }
+
+      .toc a {
+        min-height: 38px;
+        padding: 8px 11px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: rgba(255,255,255,0.025);
+      }
+    }
+
+    @media (max-width: 760px) {
+      :root { --header-height: 68px; }
+      .wrap { width: min(calc(100% - 30px), var(--page)); }
+      .header-inner { gap: 12px; }
+      .brand { font-size: 16px; }
+      .brand svg { width: 34px; height: 34px; }
+      .top-nav { gap: 0; }
+      .top-nav a { min-height: 38px; padding-inline: 9px; font-size: 13px; }
+      .top-nav .nav-optional { display: none; }
+
+      .docs-layout { padding-top: 42px; }
+
+      .step-grid,
+      .mode-grid,
+      .platform-grid { grid-template-columns: 1fr; }
+
+      .doc-section { padding: 58px 0; }
+      .doc-section h1,
+      .doc-section h2 { font-size: 34px; }
+      .section-intro { font-size: 16px; }
+
+      .settings-heading { display: block; }
+      .settings-heading p { margin-top: 5px; }
+      .setting-row { grid-template-columns: 1fr; gap: 8px; padding: 18px; }
+      .script-sample { padding: 23px 20px; }
+
+      .footer-inner { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (max-width: 430px) {
+      .top-nav a[href="/support.html"] { display: none; }
+      .step, .mode, .platform-card { padding: 20px; }
+      .callout { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to documentation</a>
+  <div class="ambient-grid" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/" aria-label="Textream home">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="brand-bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#25252a"/>
+              <stop offset="100%" stop-color="#09090b"/>
+            </linearGradient>
+            <linearGradient id="brand-accent" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#8d7cff"/>
+              <stop offset="100%" stop-color="#5d9dff"/>
+            </linearGradient>
+            <clipPath id="brand-clip"><rect width="1024" height="1024" rx="228"/></clipPath>
+          </defs>
+          <rect width="1024" height="1024" rx="228" fill="url(#brand-bg)"/>
+          <g clip-path="url(#brand-clip)">
+            <path d="M172 0Q240 0 240 68V760Q240 840 320 840H704Q784 840 784 760V68Q784 0 852 0Z" fill="#303036"/>
+            <text x="512" y="600" font-family="-apple-system, sans-serif" font-size="480" font-weight="800" fill="url(#brand-accent)" text-anchor="middle">T</text>
+          </g>
+        </svg>
+        <span>Textream</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a href="/docs/" aria-current="page">Docs</a>
+        <a href="/support.html">Support</a>
+        <a class="nav-optional" href="/privacy.html">Privacy</a>
+        <a class="nav-optional" href="https://github.com/f/textream">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="docs-layout">
+      <aside class="toc">
+        <p class="toc-title">On this page</p>
+        <nav aria-label="Documentation contents">
+          <ol>
+            <li><a href="#quick-start">Quick start</a></li>
+            <li><a href="#write-script">Write your script</a></li>
+            <li><a href="#guidance-modes">Guidance modes</a></li>
+            <li><a href="#session-controls">Session controls</a></li>
+            <li class="group-start"><a href="#mac-settings">Mac settings</a></li>
+            <li><a href="#appearance">Appearance</a></li>
+            <li><a href="#guidance">Guidance</a></li>
+            <li><a href="#reading">Reading</a></li>
+            <li><a href="#teleprompter">Teleprompter</a></li>
+            <li><a href="#external">External display</a></li>
+            <li><a href="#remote">Remote</a></li>
+            <li><a href="#director">Director</a></li>
+            <li class="group-start"><a href="#ios-usage">iPhone &amp; iPad</a></li>
+            <li><a href="#ios-settings">iOS settings</a></li>
+            <li class="group-start"><a href="#automation-api">Automation &amp; API</a></li>
+            <li class="group-start"><a href="#privacy-help">Privacy &amp; help</a></li>
+          </ol>
+        </nav>
+      </aside>
+
+      <main class="docs-main" id="content">
+        <section class="doc-section" id="quick-start" aria-labelledby="quick-start-title">
+          <p class="section-label">01 / Start here</p>
+          <h1 id="quick-start-title">From blank page to confident read.</h1>
+          <p class="section-intro">Textream keeps the next words close to the camera and follows your pace. The basic workflow is the same on every device.</p>
+
+          <div class="step-grid">
+            <article class="step">
+              <h3>Add your words</h3>
+              <p>Type or paste a script. On Mac you can organize it into pages, open a saved <code>.textream</code> file, or import PowerPoint presenter notes.</p>
+            </article>
+            <article class="step">
+              <h3>Choose how it follows</h3>
+              <p>Use Word Tracking for speech-matched progress, Classic for steady auto-scroll, or Voice-Activated to move only while you speak.</p>
+            </article>
+            <article class="step">
+              <h3>Start naturally</h3>
+              <p>Place the prompt near the camera, press start, and speak at your own pace. Pause, restart, or jump to another word whenever you need.</p>
+            </article>
+          </div>
+
+          <div class="callout">
+            <span class="symbol" aria-hidden="true">i</span>
+            <p><strong>First time using voice features?</strong> Allow Microphone access. Word Tracking also needs Speech Recognition access. A Classic <em>Read</em> session works without either permission; mobile Record sessions still capture microphone audio.</p>
+          </div>
+        </section>
+
+        <section class="doc-section" id="write-script" aria-labelledby="write-script-title">
+          <p class="section-label">02 / Script craft</p>
+          <h2 id="write-script-title">Write for the way you speak.</h2>
+          <p class="section-intro">Short sentences, intentional breaks, and quiet delivery cues make a script easier to read without sounding read.</p>
+
+          <figure class="script-sample" aria-label="Example Textream script">
+            <p>Good morning, and thank you for being here. <span class="cue">[smile]</span></p>
+            <p>Today I want to share one clear idea: when we slow down and connect with one person at a time, even a complex message becomes easier to understand. <span class="cue">[pause]</span></p>
+            <p>Take a breath, look into the camera, and bring the message home. <span class="cue">[nod]</span></p>
+          </figure>
+
+          <div class="prose">
+            <h3>Stage directions</h3>
+            <p>Put cues in square brackets, such as <code>[smile]</code>, <code>[pause]</code>, or <code>[look at camera]</code>. Textream displays them in the cue color but skips them when matching your voice, so they never interrupt Word Tracking.</p>
+
+            <h3>Paragraphs and line breaks</h3>
+            <p>Start a new source line when you want a visual pause. On Mac, turn on <strong>Show Paragraph Dividers</strong> to add extra space and three centered dots before the next line. Consecutive empty lines collapse into one visual divider.</p>
+
+            <h3>Pages and presentation notes</h3>
+            <ul>
+              <li>On Mac, use <strong>Add Page</strong> to split a longer talk into sections and select pages from the sidebar.</li>
+              <li>Save the full page set as a <code>.textream</code> file and reopen it later.</li>
+              <li>Drop a <code>.pptx</code> file into the Mac editor to turn presenter notes into pages. Export Keynote or Google Slides to PowerPoint first.</li>
+              <li>If the script language differs from your speech setting, Textream can suggest a closer supported language.</li>
+            </ul>
+
+            <h3>Mac editor tools and shortcuts</h3>
+            <p>Use the red microphone button to dictate directly into the current page; press it again to pause dictation. The File menu can open a <code>.textream</code> file or presentation, save the current file, or save a new copy.</p>
+            <ul>
+              <li><kbd>Command</kbd> + <kbd>Return</kbd> starts the prompter; <kbd>Esc</kbd> stops the active overlay.</li>
+              <li><kbd>Command</kbd> + <kbd>,</kbd> opens Settings.</li>
+              <li><strong>Open File or Presentation</strong> (<kbd>Command</kbd> + <kbd>O</kbd>) opens a Textream file or supported presentation.</li>
+              <li><kbd>Command</kbd> + <kbd>S</kbd> saves; <kbd>Command</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> uses Save As.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="doc-section" id="guidance-modes" aria-labelledby="guidance-modes-title">
+          <p class="section-label">03 / Pace</p>
+          <h2 id="guidance-modes-title">Three ways to keep your place.</h2>
+          <p class="section-intro">Pick the mode that matches the room. You can rehearse without a microphone, follow an unscripted delivery, or track every spoken word.</p>
+
+          <div class="mode-grid">
+            <article class="mode">
+              <span class="mode-mark"><i aria-hidden="true"></i> Speech matched</span>
+              <h3>Word Tracking</h3>
+              <p>Listens through Apple Speech Recognition, matches what you say to the script, and highlights progress in real time. Choose the correct language and microphone for the strongest match.</p>
+            </article>
+            <article class="mode">
+              <span class="mode-mark"><i aria-hidden="true"></i> Constant pace</span>
+              <h3>Classic</h3>
+              <p>Moves steadily from 0.5 to 8 words per second. It does not need the microphone, making it useful for silent rehearsal or a fixed speaking pace.</p>
+            </article>
+            <article class="mode">
+              <span class="mode-mark"><i aria-hidden="true"></i> Voice gated</span>
+              <h3>Voice-Activated</h3>
+              <p>Uses microphone activity to scroll while you speak and pause in silence. Set the same 0.5–8 words-per-second pace used by Classic mode.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section" id="session-controls" aria-labelledby="session-controls-title">
+          <p class="section-label">04 / During a read</p>
+          <h2 id="session-controls-title">You stay in control.</h2>
+          <p class="section-intro">The prompt follows automatically, but it never locks you into a rigid take.</p>
+
+          <div class="platform-grid">
+            <article class="platform-card">
+              <span class="platform-name">Mac</span>
+              <h3>Overlay controls</h3>
+              <ul>
+                <li>Pause or resume the current read.</li>
+                <li>Mute and unmute voice input when the selected mode uses a microphone.</li>
+                <li>Scroll manually or select a word to move the reading position.</li>
+                <li>Press <kbd>Esc</kbd> to stop the teleprompter.</li>
+                <li>Move to another page manually, or enable Auto Next Page.</li>
+              </ul>
+            </article>
+            <article class="platform-card">
+              <span class="platform-name">iPhone &amp; iPad</span>
+              <h3>Read and Record controls</h3>
+              <ul>
+                <li>Play or pause, restart the script, and tap a word to jump.</li>
+                <li>Show or hide the camera during a Read session.</li>
+                <li>For Classic or Voice-Activated mode, adjust speed with the control or a horizontal swipe.</li>
+                <li>In Record mode, start or stop recording, switch cameras before a take, and open saved Textream recordings.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section" id="mac-settings" aria-labelledby="mac-settings-title">
+          <p class="section-label">05 / Complete reference</p>
+          <h2 id="mac-settings-title">Every setting on Mac.</h2>
+          <p class="section-intro">Open Textream Settings to tune how the prompt looks, follows your voice, and reaches other screens. Changes save automatically. Green labels below mark new-install defaults.</p>
+
+          <nav class="settings-index" aria-label="Mac settings sections">
+            <a href="#appearance">Appearance</a>
+            <a href="#guidance">Guidance</a>
+            <a href="#reading">Reading</a>
+            <a href="#teleprompter">Teleprompter</a>
+            <a href="#external">External</a>
+            <a href="#remote">Remote</a>
+            <a href="#director">Director</a>
+          </nav>
+
+          <section class="settings-group" id="appearance" aria-labelledby="appearance-title">
+            <div class="settings-heading">
+              <h3 id="appearance-title">Appearance</h3>
+              <p>Type, color, and overlay size</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Font</dt>
+                <dd><span class="choices"><span class="default">Sans</span><span class="choice">Serif</span><span class="choice">Mono</span><span class="choice">Dyslexia</span></span>Changes the reading typeface. Dyslexia uses the bundled OpenDyslexic font.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Size</dt>
+                <dd><span class="choices"><span class="choice">XS · 14pt</span><span class="choice">SM · 16pt</span><span class="default">LG · 20pt</span><span class="choice">XL · 24pt</span></span>Sets the prompt text size across overlay modes.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Highlight Color</dt>
+                <dd><span class="choices"><span class="default">White</span><span class="choice">Yellow</span><span class="choice">Green</span><span class="choice">Blue</span><span class="choice">Pink</span><span class="choice">Orange</span></span>Sets the primary text and progress color.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Cue Color</dt>
+                <dd><span class="choices"><span class="default">White</span><span class="choice">Yellow</span><span class="choice">Green</span><span class="choice">Blue</span><span class="choice">Pink</span><span class="choice">Orange</span></span>Colors bracketed stage directions independently from spoken words.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Cue Brightness</dt>
+                <dd><span class="choices"><span class="default">Dim</span><span class="choice">Low</span><span class="choice">Medium</span><span class="choice">Bright</span></span>Controls how strongly unread and completed cues appear.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Dimensions</dt>
+                <dd><span class="choices"><span class="default">340 × 150px</span><span class="choice">Width 310–500px</span><span class="choice">Height 100–400px</span></span>Adjusts the overlay reading area in 10px steps.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" id="guidance" aria-labelledby="guidance-title">
+            <div class="settings-heading">
+              <h3 id="guidance-title">Guidance</h3>
+              <p>Tracking, input, and pace</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Mode</dt>
+                <dd><span class="choices"><span class="default">Word Tracking</span><span class="choice">Classic</span><span class="choice">Voice-Activated</span></span>Selects the guidance behavior described above.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Speech Language</dt>
+                <dd><span class="choices"><span class="default">Closest supported system language</span></span>Appears in Word Tracking. Match it to the language you plan to speak, not only the language of the Mac interface.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Microphone</dt>
+                <dd><span class="choices"><span class="default">System Default</span><span class="choice">Any connected input</span></span>Appears for Word Tracking and Voice-Activated modes. Choose a specific device when macOS selects the wrong input.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Scroll Speed</dt>
+                <dd><span class="choices"><span class="default">3.0 words/s</span><span class="choice">0.5–8.0 words/s</span><span class="choice">0.5 steps</span></span>Appears in Classic and Voice-Activated modes.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" id="reading" aria-labelledby="reading-title">
+            <div class="settings-heading">
+              <h3 id="reading-title">Reading</h3>
+              <p>Anchor, context, and continuity</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Reading Position</dt>
+                <dd><span class="choices"><span class="default">Centered</span><span class="choice">Near Top</span></span>Centered keeps the active line in the middle. Near Top keeps the previous line visible above it and places the next words closer to the camera.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Show Paragraph Dividers</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span></span>Adds extra space and three centered dots at source line breaks. The setting also applies to text sent through Director Mode.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Show Last Spoken Words</dt>
+                <dd><span class="choices"><span class="default">On</span><span class="choice">Off</span></span>Shows recently recognized words while Word Tracking is active, helping confirm what the microphone heard.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Keep Screen Awake</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span></span>Prevents display and system sleep while the teleprompter is active.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" id="teleprompter" aria-labelledby="teleprompter-title">
+            <div class="settings-heading">
+              <h3 id="teleprompter-title">Teleprompter</h3>
+              <p>Placement and session behavior</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Overlay Mode</dt>
+                <dd><span class="choices"><span class="default">Pinned to Notch</span><span class="choice">Floating Window</span><span class="choice">Fullscreen</span></span>Pinned stays at the top of a screen, Floating can be placed anywhere and remains above other apps, and Fullscreen fills the chosen display.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Pinned Display</dt>
+                <dd><span class="choices"><span class="default">Follow Mouse</span><span class="choice">Fixed Display</span><span class="choice">Target Display</span></span>Follow Mouse moves the notch overlay to the display containing the pointer. Fixed Display keeps it on the screen you select.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Transparency</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span><span class="choice">Amount 20–95%</span><span class="choice">Default amount 85%</span></span>Available in Pinned mode. Makes desktop content visible through the overlay; the slider runs from more to less transparent.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Follow Cursor</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span></span>Available in Floating mode. Places the window at the pointer’s bottom-right and follows it between positions.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Glass Effect</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span><span class="choice">Opacity 0–60%</span><span class="choice">Default opacity 15%</span></span>Available in Floating mode. Adds a frosted surface and lets you tune its opacity.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Fullscreen Display</dt>
+                <dd><span class="choices"><span class="default">Main display</span><span class="choice">Any connected display</span></span>Selects the screen Fullscreen mode fills. Press <kbd>Esc</kbd> to stop.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Elapsed Time</dt>
+                <dd><span class="choices"><span class="default">On</span><span class="choice">Off</span></span>Shows a running timer while the teleprompter is active.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Hide from Screen Sharing</dt>
+                <dd><span class="choices"><span class="default">On</span><span class="choice">Off</span></span>Asks macOS to keep the overlay out of screen recordings and video calls. Capture apps and external hardware can behave differently, so make a short test recording first.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Auto Next Page</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span><span class="default">3 seconds</span><span class="choice">5 seconds</span></span>After a page finishes, shows a countdown and advances to the next nonempty page.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" id="external" aria-labelledby="external-title">
+            <div class="settings-heading">
+              <h3 id="external-title">External</h3>
+              <p>Displays, Sidecar, and mirror rigs</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>External Display Mode</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">Teleprompter</span><span class="choice">Mirror</span></span>Teleprompter presents normal fullscreen text. Mirror flips the output for reflective teleprompter glass.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Mirror Axis</dt>
+                <dd><span class="choices"><span class="default">Horizontal</span><span class="choice">Vertical</span><span class="choice">Both</span></span>Appears in Mirror mode. Horizontal is standard for most mirror rigs; Both rotates the output 180 degrees.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Target Display</dt>
+                <dd><span class="choices"><span class="default">First available external display</span><span class="choice">Any detected external display</span></span>Selects a connected monitor or Sidecar iPad. Use Refresh after connecting a new display.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" id="remote" aria-labelledby="remote-title">
+            <div class="settings-heading">
+              <h3 id="remote-title">Remote</h3>
+              <p>View the live prompt in a browser</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Enable Remote Connection</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span></span>Starts a local server. Scan the QR code or open the displayed address on a phone, tablet, TV, or computer connected to the same Wi-Fi network.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Port</dt>
+                <dd><span class="choices"><span class="default">7373 · HTTP</span><span class="default">7374 · WebSocket</span><span class="choice">Custom port 1024–65534</span></span>The WebSocket uses the number immediately after the HTTP port. Select Restart after changing it.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Browser Mirror</dt>
+                <dd><span class="choices"><span class="default">Remembered per browser</span><span class="choice"><code>?mirror=1</code></span><span class="choice"><code>?mirror=0</code></span></span>Use the Mirror button to flip the complete remote prompt horizontally for teleprompter glass. The choice is saved in that browser. Add <code>?mirror=1</code> or <code>?mirror=0</code> to a QR-code or bookmark URL to override and save the initial state.</dd>
+              </div>
+            </dl>
+            <div class="callout">
+              <span class="symbol" aria-hidden="true">!</span>
+              <p><strong>Use a trusted network.</strong> Remote Connection has no Textream cloud account or public relay. Anyone who can reach the local address may be able to see the current script and reading state.</p>
+            </div>
+          </section>
+
+          <section class="settings-group" id="director" aria-labelledby="director-title">
+            <div class="settings-heading">
+              <h3 id="director-title">Director</h3>
+              <p>Let another person drive the script</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Enable Director Mode</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span></span>Starts a browser editor at the displayed local address. The Mac editor is disabled while Director Mode is active. A director can send and update the script, then start or stop the read.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Reading behavior</dt>
+                <dd><span class="choices"><span class="choice">Go</span><span class="choice">Stop</span><span class="choice">New Script</span><span class="choice">Word Tracking is forced</span><span class="choice">Single live page</span></span><strong>Go</strong> sends the current script and starts the read; it changes to <strong>Stop</strong> while running. Completed text locks in the browser while unread text remains editable. After completion, <strong>New Script</strong> clears the director workspace. Source line breaks and enabled paragraph dividers are preserved.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Port</dt>
+                <dd><span class="choices"><span class="default">7575 · HTTP</span><span class="default">7576 · WebSocket</span><span class="choice">Custom port 1024–65534</span></span>The WebSocket uses the next port. Select Restart after changing it.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" aria-labelledby="reset-title">
+            <div class="settings-heading">
+              <h3 id="reset-title">Reset All</h3>
+              <p>Bottom-left of Mac Settings</p>
+            </div>
+            <div class="callout">
+              <span class="symbol" aria-hidden="true">↺</span>
+              <p>Returns every Mac setting to its new-install default after confirmation, including the closest supported system speech language and <strong>Hide from Screen Sharing</strong> set to On.</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="doc-section" id="ios-usage" aria-labelledby="ios-usage-title">
+          <p class="section-label">06 / iPhone &amp; iPad</p>
+          <h2 id="ios-usage-title">Read on screen. Or record the take.</h2>
+          <p class="section-intro">The mobile app combines the script editor, camera, follow mode, and session setup on one screen.</p>
+
+          <div class="platform-grid">
+            <article class="platform-card">
+              <span class="platform-name">Read</span>
+              <h3>A focused teleprompter session</h3>
+              <ul>
+                <li>Choose Word Tracking, Classic, or Voice-Activated.</li>
+                <li>Optionally show the camera behind the prompt.</li>
+                <li>Enable landscape mirror mode for teleprompter glass.</li>
+                <li>Keep the prompt readable over a plain background or optionally show the camera behind it.</li>
+              </ul>
+            </article>
+            <article class="platform-card">
+              <span class="platform-name">Record</span>
+              <h3>Camera and prompt together</h3>
+              <ul>
+                <li>The camera and microphone are required for a recorded take.</li>
+                <li>Switch between front and rear cameras before recording.</li>
+                <li>Finished videos save to Photos and appear in Textream’s recordings gallery.</li>
+                <li>If saving fails, use Retry Save; discard only when the pending recording is no longer needed.</li>
+              </ul>
+            </article>
+          </div>
+
+          <ol class="mini-steps">
+            <li><div><strong>Write or paste the script</strong><span>Use the expand button when you want a full-screen editor. Bracketed stage directions work here too.</span></div></li>
+            <li><div><strong>Choose Read or Record</strong><span>Read can work with or without the camera. Record always uses it.</span></div></li>
+            <li><div><strong>Select a follow mode and speed</strong><span>Speed appears for Classic and Voice-Activated modes.</span></div></li>
+            <li><div><strong>Start Prompter or Open Camera</strong><span>Grant requested permissions, then use the in-session controls to run the take.</span></div></li>
+          </ol>
+
+          <div class="callout">
+            <span class="symbol" aria-hidden="true">↔</span>
+            <p><strong>Adjust without ending the session.</strong> Open Mirror settings during a read to change mirroring and its axis, reading position, text size, Classic or Voice-Activated speed, and whether playback controls remain visible.</p>
+          </div>
+        </section>
+
+        <section class="doc-section" id="ios-settings" aria-labelledby="ios-settings-title">
+          <p class="section-label">07 / Mobile reference</p>
+          <h2 id="ios-settings-title">Every setting on iPhone and iPad.</h2>
+          <p class="section-intro">Open the sliders icon on the setup screen. These choices are saved for future sessions.</p>
+
+          <section class="settings-group first" aria-labelledby="ios-setup-title">
+            <div class="settings-heading">
+              <h3 id="ios-setup-title">Setup screen</h3>
+              <p>Saved session choices</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Session</dt>
+                <dd><span class="choices"><span class="default">Read</span><span class="choice">Record</span></span>Read starts a teleprompter session with an optional camera. Record opens the camera and always captures microphone audio with the video.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Follow Mode</dt>
+                <dd><span class="choices"><span class="default">Word Tracking</span><span class="choice">Classic</span><span class="choice">Voice-Activated</span></span>Selects speech-matched progress, constant auto-scroll, or scrolling that pauses in silence.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Speed</dt>
+                <dd><span class="choices"><span class="default">3.0 words/s</span><span class="choice">0.5–8.0 words/s</span><span class="choice">0.5 steps</span></span>Appears for Classic and Voice-Activated modes and is remembered between sessions.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Camera</dt>
+                <dd><span class="choices"><span class="default">Off in Read</span><span class="choice">Optional in Read</span><span class="choice">Required in Record</span></span>Shows the camera behind the prompt during Read. Selecting Record enables it automatically and prevents it from being turned off.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" aria-labelledby="ios-sheet-title">
+            <div class="settings-heading">
+              <h3 id="ios-sheet-title">Prompter Settings</h3>
+              <p>Sliders icon on the setup screen</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Mirror prompt in landscape</dt>
+                <dd><span class="choices"><span class="default">Off</span><span class="choice">On</span></span>Pre-flips the prompt for teleprompter glass during a landscape Read session. Controls remain readable on the device.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Mirror Axis</dt>
+                <dd><span class="choices"><span class="default">Horizontal</span><span class="choice">Vertical</span><span class="choice">Both</span></span>Appears when mirror mode is enabled. Horizontal is standard for teleprompter glass.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Reading Position</dt>
+                <dd><span class="choices"><span class="default">Near Camera</span><span class="choice">Center</span></span>Near Camera keeps the active line just below the front camera and controls for more natural eye contact. Center places it in the middle of the display.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Font Family</dt>
+                <dd><span class="choices"><span class="default">Sans</span><span class="choice">Serif</span><span class="choice">Mono</span><span class="choice">Dyslexia</span></span>Changes the prompt typeface; Dyslexia uses bundled OpenDyslexic.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Font Size</dt>
+                <dd><span class="choices"><span class="choice">XS · 28pt</span><span class="choice">SM · 34pt</span><span class="default">LG · 44pt</span><span class="choice">XL · 56pt</span></span>Sets the base fullscreen prompt size; landscape layout scales it to fit.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Text Color</dt>
+                <dd><span class="choices"><span class="default">White</span><span class="choice">Yellow</span><span class="choice">Green</span><span class="choice">Blue</span><span class="choice">Pink</span><span class="choice">Orange</span></span>Sets the primary prompt and progress color.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Stage Directions</dt>
+                <dd><span class="choices"><span class="default">White</span><span class="choice">Six color presets</span><span class="default">Dim</span><span class="choice">Low</span><span class="choice">Medium</span><span class="choice">Bright</span></span>Sets bracketed cue color and brightness separately from spoken text.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Camera Overlay Opacity</dt>
+                <dd><span class="choices"><span class="default">52%</span><span class="choice">30–80%</span><span class="choice">5% steps</span></span>Adjusts the dark overlay behind prompt text when the camera is visible.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Speech Language</dt>
+                <dd><span class="choices"><span class="default">English (US) on a new install</span><span class="choice">Any Apple-supported locale</span></span>Used by Word Tracking. The settings screen loads Apple’s supported languages; if a previously saved choice is no longer supported, it falls back to the closest system-language match.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>About</dt>
+                <dd>Shows the installed version and links to Textream for Mac, GitHub, Privacy, Support, and the OpenDyslexic acknowledgements.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="settings-group" aria-labelledby="ios-session-settings-title">
+            <div class="settings-heading">
+              <h3 id="ios-session-settings-title">During a session</h3>
+              <p>Session-only control</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Show Playback Controls</dt>
+                <dd><span class="choices"><span class="default">On for each new session</span><span class="choice">Off</span></span>Shows or hides the bottom playback controls without ending the current read. Open Mirror settings to change it alongside mirroring, reading position, text size, and available scroll speed.</dd>
+              </div>
+            </dl>
+          </section>
+        </section>
+
+        <section class="doc-section" id="automation-api" aria-labelledby="automation-api-title">
+          <p class="section-label">08 / Build with Textream</p>
+          <h2 id="automation-api-title">Launch it. Script it. Direct it.</h2>
+          <p class="section-intro">Textream exposes a URL scheme for one-shot prompts and a local WebSocket protocol for custom Director clients. These interfaces are available in the Mac app.</p>
+
+          <div class="settings-group first">
+            <div class="settings-heading">
+              <h3>URL scheme</h3>
+              <p>Open a prompt from another app</p>
+            </div>
+            <div class="prose api-copy">
+              <p>Open <code>textream://read?text=…</code> with a URL-encoded <code>text</code> value. Textream loads that text and starts the overlay. From Terminal, try <code>open 'textream://read?text=Hello%20world'</code>.</p>
+              <p>Textream also includes a macOS Service named <strong>Read in Textream</strong>. Enable it once in System Settings → Keyboard → Keyboard Shortcuts → Services, under Text. Then restart the source app if needed, select text, and choose Services → Read in Textream. Some apps with custom context menus do not expose macOS Services.</p>
+            </div>
+          </div>
+
+          <div class="code-examples">
+            <article class="code-example">
+              <header><h3>Open a prompt from Swift</h3><span class="code-language">Swift</span></header>
+              <pre><code>import AppKit
+
+var link = URLComponents()
+link.scheme = "textream"
+link.host = "read"
+link.queryItems = [
+    URLQueryItem(
+        name: "text",
+        value: "Welcome everyone. [pause] Let's begin."
+    )
+]
+
+if let url = link.url {
+    NSWorkspace.shared.open(url)
+}</code></pre>
+            </article>
+
+            <article class="code-example">
+              <header><h3>Open a prompt from a web page</h3><span class="code-language">JavaScript</span></header>
+              <pre><code>const script = "Welcome everyone. [pause] Let's begin.";
+const url = `textream://read?text=${encodeURIComponent(script)}`;
+
+window.location.href = url;</code></pre>
+            </article>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-heading">
+              <h3>Director WebSocket API</h3>
+              <p>Control a live read on the local network</p>
+            </div>
+            <dl class="setting-list">
+              <div class="setting-row">
+                <dt>Connect</dt>
+                <dd>Enable Director Mode, fetch <code>http://&lt;mac-ip&gt;:7575</code>, and extract the 64-character <code>AUTH_TOKEN</code> embedded in the page. Connect to <code>ws://&lt;mac-ip&gt;:7576</code> and send <code>{"type":"auth","text":"&lt;token&gt;"}</code> as the first frame within five seconds. Custom ports use HTTP port + 1 for WebSocket.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>Commands</dt>
+                <dd><span class="choices"><span class="choice">auth</span><span class="choice">setText</span><span class="choice">updateText</span><span class="choice">stop</span></span><code>setText</code> starts a new Word Tracking read. <code>updateText</code> sends the complete script plus the latest <code>highlightedCharCount</code> received from Textream as <code>readCharCount</code>; do not calculate that offset independently, and keep the locked prefix unchanged. <code>stop</code> ends the overlay.</dd>
+              </div>
+              <div class="setting-row">
+                <dt>State</dt>
+                <dd>Textream sends JSON state at about 10 Hz while active, including <code>words</code>, <code>highlightedCharCount</code>, <code>totalCharCount</code>, <code>isActive</code>, <code>isDone</code>, <code>isListening</code>, text and cue colors, the last spoken text, and audio levels.</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="callout">
+            <span class="symbol" aria-hidden="true">!</span>
+            <p><strong>Local network only.</strong> The token changes whenever the Director server restarts. HTTP and WebSocket traffic is not encrypted, so do not expose these ports to the internet or include the token in logs, screenshots, or shared source code.</p>
+          </div>
+
+          <div class="code-examples">
+            <article class="code-example">
+              <header><h3>Minimal Director client</h3><span class="code-language">Python</span></header>
+              <pre><code># pip install websockets
+import asyncio, json, re, urllib.request
+import websockets
+
+HOST = "192.168.1.42"
+HTTP_PORT = 7575
+
+def get_token():
+    url = f"http://{HOST}:{HTTP_PORT}"
+    with urllib.request.urlopen(url, timeout=3) as response:
+        page = response.read().decode("utf-8")
+    match = re.search(r"AUTH_TOKEN='([0-9a-f]{64})'", page)
+    if not match:
+        raise RuntimeError("Director token not found")
+    return match.group(1)
+
+async def run():
+    async with websockets.connect(
+        f"ws://{HOST}:{HTTP_PORT + 1}"
+    ) as socket:
+        await socket.send(json.dumps({
+            "type": "auth", "text": get_token()
+        }))
+        await socket.send(json.dumps({
+            "type": "setText",
+            "text": "Hello everyone.\nWelcome to the show."
+        }))
+
+        async for message in socket:
+            state = json.loads(message)
+            print(state["highlightedCharCount"], state["isDone"])
+            if state["isDone"]:
+                await socket.send(json.dumps({"type": "stop"}))
+                break
+
+asyncio.run(run())</code></pre>
+            </article>
+
+            <article class="code-example">
+              <header><h3>Minimal Director client</h3><span class="code-language">Node.js</span></header>
+              <pre><code>// npm install ws  (Node.js 18+)
+import WebSocket from "ws";
+
+const host = "192.168.1.42";
+const httpPort = 7575;
+const page = await fetch(`http://${host}:${httpPort}`)
+  .then(response =&gt; response.text());
+const token = page.match(/AUTH_TOKEN='([0-9a-f]{64})'/)?.[1];
+if (!token) throw new Error("Director token not found");
+
+const socket = new WebSocket(`ws://${host}:${httpPort + 1}`);
+socket.on("open", () =&gt; {
+  socket.send(JSON.stringify({ type: "auth", text: token }));
+  socket.send(JSON.stringify({
+    type: "setText",
+    text: "Hello everyone.\nWelcome to the show."
+  }));
+});
+
+socket.on("message", raw =&gt; {
+  const state = JSON.parse(raw.toString());
+  console.log(state.highlightedCharCount, state.isDone);
+  if (state.isDone) {
+    socket.send(JSON.stringify({ type: "stop" }), () =&gt; socket.close());
+  }
+});</code></pre>
+            </article>
+          </div>
+
+          <div class="prose">
+            <p>See the <a href="https://github.com/f/textream#director-mode-api">full Director protocol in the README</a> for every command field and state property.</p>
+          </div>
+        </section>
+
+        <section class="doc-section" id="privacy-help" aria-labelledby="privacy-help-title">
+          <p class="section-label">09 / Safe setup</p>
+          <h2 id="privacy-help-title">Permissions, networks, and help.</h2>
+          <p class="section-intro">Textream has no account, advertising, analytics SDK, or Textream-operated cloud service. Features that use hardware or your local network remain under your control.</p>
+
+          <div class="platform-grid">
+            <article class="platform-card">
+              <span class="platform-name">Permissions</span>
+              <h3>Grant only what your mode needs</h3>
+              <ul>
+                <li>Word Tracking: Microphone and Speech Recognition.</li>
+                <li>Voice-Activated: Microphone.</li>
+                <li>Classic Read: no microphone or speech permission. Record still captures microphone audio.</li>
+                <li>Mobile Record: Camera, Microphone, and Photos add access. Record captures microphone audio even when Classic is selected.</li>
+                <li>Recordings gallery: Photos read and write access.</li>
+              </ul>
+            </article>
+            <article class="platform-card">
+              <span class="platform-name">Connections</span>
+              <h3>Keep Remote and Director local</h3>
+              <ul>
+                <li>Use devices on the same trusted Wi-Fi network.</li>
+                <li>Allow incoming connections if the macOS firewall asks.</li>
+                <li>Do not share QR codes or local IP addresses publicly.</li>
+                <li>Turn each server off when you are finished.</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="prose">
+            <h3>Still stuck?</h3>
+            <p>Read the <a href="/support.html">support guide</a> for quick fixes, or search <a href="https://github.com/f/textream/issues">existing GitHub issues</a>. Before posting, remove private scripts, credentials, QR codes, local IP addresses, and personal details from screenshots or logs.</p>
+            <p>For a full explanation of scripts, recordings, microphone audio, speech recognition, Photos access, and local-network features, read the <a href="/privacy.html">Textream Privacy Policy</a>.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <div class="wrap footer-inner">
+      <p>© 2026 Fatih Kadir Akin · Textream is free and open source.</p>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="/">Home</a>
+        <a href="/support.html">Support</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="https://github.com/f/textream">Source</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

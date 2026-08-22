@@ -406,11 +406,18 @@ class TextreamService: NSObject, ObservableObject {
 
         pages = [trimmed]
 
-        // Preserve read progress: only update unread portion
-        let preservedCharCount = overlayController.speechRecognizer.recognizedCharCount
-
         let words = splitTextIntoWords(trimmed)
         let totalCharCount = words.joined(separator: " ").count
+
+        // Preserve only the prefix that was both recognized by the Mac and
+        // locked in the director's edit snapshot. Recognition can advance
+        // while an update is in flight, so trusting either count alone could
+        // make newly read text unexpectedly editable or overwriteable.
+        let recognizedCharCount = overlayController.speechRecognizer.recognizedCharCount
+        let preservedCharCount = min(
+            totalCharCount,
+            min(recognizedCharCount, max(0, readCharCount))
+        )
 
         // Update overlay content without resetting speech progress
         overlayController.overlayContent.words = words

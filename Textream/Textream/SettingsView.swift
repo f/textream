@@ -158,14 +158,27 @@ class NotchPreviewController {
 
 struct NotchPreviewContent: View {
     @Bindable var settings: NotchSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let menuBarHeight: CGFloat
 
-    private static let loremText = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor [pause] incididunt ut labore et dolore magna aliqua\nUt enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur\nExcepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt"
-    private static let loremWords = splitTextIntoWords(loremText)
-    private static let paragraphBreaks = paragraphBreakWordIndices(in: loremText)
+    private static let previewText = """
+    Good morning, and thank you for being here. [smile]
 
-    private let highlightedCount = 42
-    @State private var previewWordProgress: Double = 0
+    Today I want to share a simple idea: clear communication begins when we slow down and connect with one person at a time. The words matter, but the space between them matters too. [pause]
+
+    Take a breath, look into the camera, and let each sentence land. [look at camera] When we speak with calm and purpose, even a complex message becomes easier to understand.
+
+    So keep your pace steady, trust the story, and bring the message home. Thank you for listening. [nod]
+    """
+    private static let previewWords = splitTextIntoWords(previewText)
+    private static let paragraphBreaks = paragraphBreakWordIndices(in: previewText)
+    private static let wordTrackingAnchorWordIndex = 18
+    private static let highlightedCount = previewWords
+        .prefix(wordTrackingAnchorWordIndex)
+        .reduce(0) { $0 + $1.count + 1 }
+
+    @State private var previewWordProgress = 0.0
+    @State private var previewCycle = 0
     private let scrollTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     // Phase 1: corners flatten (0=concave, 1=squared)
@@ -173,12 +186,29 @@ struct NotchPreviewContent: View {
     // Phase 2: detach from top (0=stuck to top, 1=moved down + rounded)
     @State private var offsetPhase: CGFloat = 0
 
+    private var readingPreviewLayoutIdentity: String {
+        [
+            settings.listeningMode.rawValue,
+            settings.fontFamilyPreset.rawValue,
+            settings.fontSizePreset.rawValue,
+            settings.showParagraphDividers ? "dividers" : "continuous"
+        ].joined(separator: "|")
+    }
+
     var body: some View {
         GeometryReader { geo in
             let topPadding = menuBarHeight * (1 - offsetPhase) + 14 * offsetPhase
             let contentHeight = topPadding + settings.textAreaHeight
             let currentWidth = settings.notchWidth
             let yOffset = 60 * offsetPhase
+            let isPinned = settings.overlayMode == .pinned
+            // Match the compact live notch's text viewport. Its bottom controls
+            // and resize handle consume 24 + 8 + 2 + 10 points even though the
+            // settings preview deliberately leaves that chrome invisible.
+            let pinnedBottomChromeHeight: CGFloat = isPinned ? 44 : 0
+            let outerHorizontalPadding: CGFloat = isPinned ? 16 : 20
+            let textHorizontalPadding: CGFloat = isPinned ? 12 : 16
+            let textTopPadding: CGFloat = isPinned ? 6 : 10
 
             ZStack(alignment: .top) {
                 // Shape: concave corners flatten via cornerPhase, then cross-fade to rounded via offsetPhase
@@ -235,8 +265,10 @@ struct NotchPreviewContent: View {
                     .frame(height: topPadding)
 
                     SpeechScrollView(
-                        words: Self.loremWords,
-                        highlightedCharCount: settings.listeningMode == .wordTracking ? highlightedCount : Self.loremWords.count * 5,
+                        words: Self.previewWords,
+                        highlightedCharCount: settings.listeningMode == .wordTracking
+                            ? Self.highlightedCount
+                            : Self.previewWords.count * 5,
                         font: settings.font,
                         highlightColor: settings.fontColorPreset.color,
                         cueColor: settings.cueColorPreset.color,
@@ -244,16 +276,21 @@ struct NotchPreviewContent: View {
                         cueReadOpacity: settings.cueBrightness.readOpacity,
                         smoothScroll: settings.listeningMode != .wordTracking,
                         smoothWordProgress: previewWordProgress,
-                        isListening: settings.listeningMode != .wordTracking,
+                        isListening: true,
                         readingPosition: settings.readingPosition,
+                        readingPositionTransitionDuration: reduceMotion ? 0 : 0.28,
                         paragraphBreakBeforeWordIndices: settings.showParagraphDividers
                             ? Self.paragraphBreaks
                             : []
                     )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
+                    .id("\(readingPreviewLayoutIdentity)|\(previewCycle)")
+                    .padding(.horizontal, textHorizontalPadding)
+                    .padding(.top, textTopPadding)
+
+                    Color.clear
+                        .frame(height: pinnedBottomChromeHeight)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, outerHorizontalPadding)
                 .frame(width: currentWidth, height: contentHeight)
             }
             .frame(width: currentWidth, height: contentHeight, alignment: .top)
@@ -294,16 +331,18 @@ struct NotchPreviewContent: View {
         }
         .onReceive(scrollTimer) { _ in
             guard settings.listeningMode != .wordTracking else { return }
-            let wordCount = Double(Self.loremWords.count)
-            previewWordProgress += settings.scrollSpeed * 0.05
-            if previewWordProgress >= wordCount {
+            let wordCount = Double(Self.previewWords.count)
+            let nextProgress = previewWordProgress + settings.scrollSpeed * 0.05
+            if nextProgress >= wordCount {
                 previewWordProgress = 0
+                previewCycle &+= 1
+            } else {
+                previewWordProgress = nextProgress
             }
         }
-        .onChange(of: settings.listeningMode) { _, mode in
-            if mode != .wordTracking {
-                previewWordProgress = 0
-            }
+        .onChange(of: readingPreviewLayoutIdentity) { _, _ in
+            previewWordProgress = 0
+            previewCycle &+= 1
         }
     }
 }
@@ -311,7 +350,7 @@ struct NotchPreviewContent: View {
 // MARK: - Settings Tabs
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case appearance, guidance, teleprompter, external, browser, director
+    case appearance, guidance, reading, teleprompter, external, browser, director
 
     var id: String { rawValue }
 
@@ -319,6 +358,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .appearance: return "Appearance"
         case .guidance:   return "Guidance"
+        case .reading:    return "Reading"
         case .teleprompter: return "Teleprompter"
         case .external:   return "External"
         case .browser:    return "Remote"
@@ -330,6 +370,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .appearance: return "paintpalette"
         case .guidance:   return "waveform"
+        case .reading:    return "book"
         case .teleprompter: return "macwindow"
         case .external:   return "rectangle.on.rectangle"
         case .browser:    return "antenna.radiowaves.left.and.right"
@@ -395,6 +436,8 @@ struct SettingsView: View {
                     appearanceTab
                 case .guidance:
                     guidanceTab
+                case .reading:
+                    readingTab
                 case .teleprompter:
                     teleprompterTab
                 case .external:
@@ -796,6 +839,70 @@ struct SettingsView: View {
 
     @State private var availableMics: [AudioInputDevice] = []
 
+    // MARK: - Reading Tab
+
+    private var readingTab: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Reading Position")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Picker("Reading Position", selection: $settings.readingPosition) {
+                            ForEach(ReadingPosition.allCases) { position in
+                                Text(position.label).tag(position)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 190)
+                    }
+
+                    Text("Near Top keeps the previous line visible above the active line.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+
+                Toggle(isOn: $settings.showParagraphDividers) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Paragraph Dividers")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Separate source line breaks with extra space and three centered dots.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Toggle(isOn: $settings.showLastSpokenWords) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Last Spoken Words")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Display recently recognized words while using Word Tracking.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Toggle(isOn: $settings.keepScreenAwake) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep Screen Awake")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Prevent display and system sleep while the teleprompter is active.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+            }
+            .padding(16)
+        }
+    }
+
     // MARK: - Teleprompter Tab
 
     @State private var overlayScreens: [NSScreen] = []
@@ -955,65 +1062,6 @@ struct SettingsView: View {
                             .fill(Color.primary.opacity(0.04))
                     )
                 }
-
-                Divider()
-
-                // Reading Experience
-                Text("Reading Experience")
-                    .font(.system(size: 13, weight: .semibold))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Reading Position")
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Picker("", selection: $settings.readingPosition) {
-                            ForEach(ReadingPosition.allCases) { position in
-                                Text(position.label).tag(position)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(width: 190)
-                    }
-
-                    Text("Near Top keeps the previous line visible above the active line.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                Toggle(isOn: $settings.showParagraphDividers) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show Paragraph Dividers")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Start a new row and draw a subtle divider at source line breaks.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
-
-                Toggle(isOn: $settings.showLastSpokenWords) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show Last Spoken Words")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Display recently recognized words while using Word Tracking.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
-
-                Toggle(isOn: $settings.keepScreenAwake) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep Screen Awake")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Prevent display and system sleep while the teleprompter is active.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
 
                 Divider()
 
@@ -1205,7 +1253,7 @@ struct SettingsView: View {
                                 TextField("Port", text: Binding(
                                     get: { String(settings.browserServerPort) },
                                     set: { str in
-                                        if let val = UInt16(str), val >= 1024 {
+                                        if let val = UInt16(str), val >= 1024, val < UInt16.max {
                                             settings.browserServerPort = val
                                         }
                                     }
@@ -1328,7 +1376,7 @@ struct SettingsView: View {
                                 TextField("Port", text: Binding(
                                     get: { String(settings.directorServerPort) },
                                     set: { str in
-                                        if let val = UInt16(str), val >= 1024 {
+                                        if let val = UInt16(str), val >= 1024, val < UInt16.max {
                                             settings.directorServerPort = val
                                         }
                                     }
@@ -1464,6 +1512,7 @@ struct SettingsView: View {
     private func resetAllSettings() {
         settings.notchWidth = NotchSettings.defaultWidth
         settings.textAreaHeight = NotchSettings.defaultHeight
+        settings.speechLocale = NotchSettings.defaultLocale
         settings.fontSizePreset = .lg
         settings.fontFamilyPreset = .sans
         settings.fontColorPreset = .white
@@ -1484,6 +1533,7 @@ struct SettingsView: View {
         settings.listeningMode = .wordTracking
         settings.scrollSpeed = 3
         settings.showElapsedTime = true
+        settings.hideFromScreenShare = true
         settings.keepScreenAwake = false
         settings.readingPosition = .centered
         settings.showParagraphDividers = false

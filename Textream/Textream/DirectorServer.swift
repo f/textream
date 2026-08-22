@@ -439,7 +439,7 @@ class DirectorServer {
 
         <script>
         const WSP=\(wsPort),host=location.hostname,AUTH_TOKEN='\(authToken)';
-        let ws,rt,isActive=false,isRunning=false,lastReadCount=0;
+        let ws,rt,isActive=false,isRunning=false,lastReadCount=0,lockedReadText='';
 
         /* ---- connection ---- */
         function connect(){
@@ -511,13 +511,18 @@ class DirectorServer {
         }
 
         /* ---- read boundary ---- */
+        function normalizeDirectorText(text){
+          return text.replace(/\\r\\n?/g,'\\n')
+            .replace(/[^\\S\\n]+/g,' ')
+            .replace(/ *\\n(?:[^\\S\\n]*\\n)* */g,'\\n')
+            .trim();
+        }
         function getText(el){
-          return (el.innerText||el.textContent||'').replace(/\\n/g,' ');
+          return el.innerText||el.textContent||'';
         }
         function getFullText(){
-          const readEl=document.getElementById('read-text');
           const editEl=document.getElementById('edit-text');
-          return getText(readEl)+getText(editEl);
+          return normalizeDirectorText(lockedReadText+getText(editEl));
         }
 
         function updateReadBoundary(charCount){
@@ -532,6 +537,7 @@ class DirectorServer {
           const editEl=document.getElementById('edit-text');
           const divider=document.getElementById('read-divider');
 
+          lockedReadText=readPart;
           readEl.textContent=readPart;
           divider.classList.toggle('visible',readPart.length>0);
 
@@ -588,6 +594,7 @@ class DirectorServer {
           isRunning=false;
           isActive=false;
           lastReadCount=0;
+          lockedReadText='';
           updateGoButton();
         }
 
