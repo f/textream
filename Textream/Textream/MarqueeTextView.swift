@@ -7,7 +7,10 @@
 
 import SwiftUI
 
-private let paragraphDividerExtraSpacing: CGFloat = 4
+private let paragraphDividerExtraSpacing: CGFloat = 14
+private let paragraphDividerDotSize: CGFloat = 3
+private let paragraphDividerDotSpacing: CGFloat = 5
+private let paragraphDividerDotOpacity: Double = 0.16
 
 // MARK: - CJK-aware word splitting
 
@@ -132,6 +135,8 @@ struct SpeechScrollView: View {
 
     var isListening: Bool = true
     var readingPosition: ReadingPosition = .centered
+    /// Optional preview-only transition. Live overlays keep their existing behavior.
+    var readingPositionTransitionDuration: Double? = nil
     var paragraphBreakBeforeWordIndices: Set<Int> = []
     @State private var scrollOffset: CGFloat = 0
     @State private var manualOffset: CGFloat = 0
@@ -144,6 +149,22 @@ struct SpeechScrollView: View {
     @State private var hasAppliedTrackingTarget = false
     @State private var anchoredLayoutWidth: CGFloat = 0
     @State private var anchoredParagraphBreakBeforeWordIndices: Set<Int> = []
+    @State private var isAnimatingReadingPositionChange = false
+    @State private var readingPositionAnimationGeneration = 0
+
+    private var readingPositionTransitionAnimation: Animation? {
+        guard let duration = readingPositionTransitionDuration, duration > 0 else {
+            return nil
+        }
+        return .smooth(duration: duration, extraBounce: 0)
+    }
+
+    private var scrollOffsetAnimation: Animation? {
+        if isAnimatingReadingPositionChange {
+            return readingPositionTransitionAnimation
+        }
+        return smoothScroll ? .linear(duration: 0.06) : .easeOut(duration: 0.5)
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -195,7 +216,7 @@ struct SpeechScrollView: View {
                 }
             }
             .offset(y: scrollOffset + manualOffset)
-            .animation(smoothScroll ? .linear(duration: 0.06) : .easeOut(duration: 0.5), value: scrollOffset)
+            .animation(scrollOffsetAnimation, value: scrollOffset)
             .animation(.easeOut(duration: 0.15), value: manualOffset)
             .onChange(of: geo.size.height) { _, newHeight in
                 containerHeight = newHeight
@@ -241,9 +262,29 @@ struct SpeechScrollView: View {
                 stableLineAdvance = nil
                 allowsNextBackwardTrackingUpdate = false
                 hasAppliedTrackingTarget = false
-                scrollOffset = initialScrollOffset(containerHeight: containerHeight)
-                DispatchQueue.main.async {
-                    recalculateTracking(containerHeight: containerHeight)
+
+                if let transitionDuration = readingPositionTransitionDuration {
+                    captureStableLineMetrics(from: wordYPositions)
+                    readingPositionAnimationGeneration &+= 1
+                    let generation = readingPositionAnimationGeneration
+                    isAnimatingReadingPositionChange = transitionDuration > 0
+
+                    if let animation = readingPositionTransitionAnimation {
+                        withAnimation(animation) {
+                            recalculateTracking(containerHeight: containerHeight)
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + transitionDuration) {
+                            guard generation == readingPositionAnimationGeneration else { return }
+                            isAnimatingReadingPositionChange = false
+                        }
+                    } else {
+                        recalculateTracking(containerHeight: containerHeight)
+                    }
+                } else {
+                    scrollOffset = initialScrollOffset(containerHeight: containerHeight)
+                    DispatchQueue.main.async {
+                        recalculateTracking(containerHeight: containerHeight)
+                    }
                 }
             }
             .onAppear {
@@ -313,6 +354,7 @@ struct SpeechScrollView: View {
                 stops: readingPosition == .nearTop
                     ? [
                         .init(color: .white, location: 0),
+                        .init(color: .white, location: 0.05),
                         .init(color: .white, location: 0.95),
                         .init(color: .clear, location: 1.0)
                     ]
@@ -325,6 +367,7 @@ struct SpeechScrollView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .animation(readingPositionTransitionAnimation, value: readingPosition)
         )
     }
 
@@ -401,6 +444,16 @@ struct SpeechScrollView: View {
     private var topReadingAnchor: CGFloat {
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
         let fallbackAdvance = lineHeight + (lineHeight / font.pointSize > 1.5 ? 2 : 8)
+
+        // The live notch briefly returns to offset zero before measuring Near Top,
+        // so it always captures the document's first two rows. The animated
+        // preview cannot do that without visibly jumping through the beginning.
+        // Use the equivalent row geometry directly instead of treating the
+        // first currently rendered (and possibly culled) row as line zero.
+        if readingPositionTransitionDuration != nil {
+            return lineHeight * 0.5 + fallbackAdvance
+        }
+
         return (stableTopLineCenter ?? lineHeight * 0.5)
             + (stableLineAdvance ?? fallbackAdvance)
     }
@@ -554,7 +607,8 @@ struct WordFlowLayout: View {
         let paragraphKey = paragraphBreakBeforeWordIndices.sorted()
             .map(String.init)
             .joined(separator: ",")
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
+        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|"
+            + "\(font.fontName)|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
         if key == Self._cacheKey {
             return (Self._cachedItems, Self._cachedLines, Self._cachedParagraphPrefixCounts)
         }
@@ -675,12 +729,25 @@ struct WordFlowLayout: View {
                 .padding(.top, beginsParagraph ? paragraphDividerExtraSpacing : 0)
                 .overlay(alignment: .top) {
                     if beginsParagraph {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.2))
-                            .frame(height: 1)
+                        HStack(spacing: paragraphDividerDotSpacing) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Circle()
+                                    .fill(Color.white.opacity(paragraphDividerDotOpacity))
+                                    .frame(
+                                        width: paragraphDividerDotSize,
+                                        height: paragraphDividerDotSize
+                                    )
+                            }
+                        }
                             .offset(
-                                y: (paragraphDividerExtraSpacing - lineSpacing) * 0.5
+                                y: (
+                                    paragraphDividerExtraSpacing
+                                        - lineSpacing
+                                        - paragraphDividerDotSize
+                                ) * 0.5
                             )
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
                 }
                 .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)

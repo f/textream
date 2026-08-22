@@ -266,18 +266,32 @@ The Director Mode exposes an HTTP server and a WebSocket server on your local ne
 
 | Service | Default Port | Configurable in |
 |---|---|---|
-| **HTTP** (serves the built-in web UI) | `7575` | Settings → Director → Advanced |
+| **HTTP** (serves the built-in web UI) | `7575` | Settings → Director → Advanced (`1024`–`65534`) |
 | **WebSocket** (bidirectional communication) | `7576` (HTTP port + 1) | Automatic |
 
 ### Connecting
 
-1. Open a WebSocket connection to `ws://<mac-ip>:<ws-port>` (e.g. `ws://192.168.1.42:7576`).
-2. The server immediately begins sending **state frames** as JSON at ~10 Hz once a script is active.
-3. Send **command frames** as JSON to control the teleprompter.
+1. Fetch the built-in Director page from `http://<mac-ip>:<http-port>` and extract the current 64-character `AUTH_TOKEN` embedded in its script. The token changes whenever the Director server restarts.
+2. Open a WebSocket connection to `ws://<mac-ip>:<ws-port>` (e.g. `ws://192.168.1.42:7576`).
+3. Within five seconds, send `{"type":"auth","text":"<token>"}` as the first WebSocket frame. The server closes clients that skip or fail authentication.
+4. Send command frames to control the teleprompter. Once a script is active, the server broadcasts state frames as JSON at approximately 10 Hz.
+
+Director Mode is intended for trusted local networks. HTTP and WebSocket traffic is not encrypted, so do not expose either port to the public internet or log/share the token.
 
 ### Commands (Client → App)
 
 Send JSON messages over the WebSocket:
+
+#### `auth` — Authenticate the connection
+
+```json
+{
+  "type": "auth",
+  "text": "<64-character token from the Director page>"
+}
+```
+
+This must be the first frame on every connection. It does not start a read.
 
 #### `setText` — Start reading a new script
 
@@ -300,7 +314,7 @@ Replaces the current text, starts word tracking, and opens the teleprompter over
 }
 ```
 
-Updates the full script text while preserving the read position. `readCharCount` is the number of characters already read (locked). Only text after this offset is replaced. Use this for live editing during a read.
+Updates the full script text while preserving the confirmed read position. Set `readCharCount` to the latest `highlightedCharCount` received from Textream; do not calculate this offset independently. Textream clamps it to the Mac’s recognized count and the new script length. Keep the prefix before that offset unchanged and edit only unread text after it.
 
 #### `stop` — Stop the teleprompter
 
@@ -325,6 +339,7 @@ The server broadcasts a JSON object on every tick (~100 ms):
   "isDone": false,
   "isListening": true,
   "fontColor": "#F5F5F7",
+  "cueColor": "#F5F5F7",
   "lastSpokenText": "Welcome everyone to today's",
   "audioLevels": [0.12, 0.34, 0.08, ...]
 }
@@ -339,6 +354,7 @@ The server broadcasts a JSON object on every tick (~100 ms):
 | `isDone` | `bool` | `true` when `highlightedCharCount >= totalCharCount` (finished reading). |
 | `isListening` | `bool` | `true` when the microphone is actively listening. |
 | `fontColor` | `string` | CSS color of the text in the overlay (user preference). |
+| `cueColor` | `string` | CSS color of bracketed stage directions (user preference). |
 | `lastSpokenText` | `string` | Last recognized speech fragment. |
 | `audioLevels` | `double[]` | Array of audio level samples (0.0–1.0) for waveform visualization. |
 
@@ -347,10 +363,28 @@ When the overlay is not active, the server sends a frame with `isActive: false` 
 ### Example: Minimal Python Client
 
 ```python
-import asyncio, json, websockets
+import asyncio, json, re, urllib.request
+import websockets
+
+HOST = "192.168.1.42"
+HTTP_PORT = 7575
+
+def director_token():
+    with urllib.request.urlopen(f"http://{HOST}:{HTTP_PORT}", timeout=3) as response:
+        html = response.read().decode("utf-8")
+    match = re.search(r"AUTH_TOKEN='([0-9a-f]{64})'", html)
+    if not match:
+        raise RuntimeError("Director token not found")
+    return match.group(1)
 
 async def director():
-    async with websockets.connect("ws://192.168.1.42:7576") as ws:
+    async with websockets.connect(f"ws://{HOST}:{HTTP_PORT + 1}") as ws:
+        # Authenticate before sending any commands.
+        await ws.send(json.dumps({
+            "type": "auth",
+            "text": director_token()
+        }))
+
         # Send a script
         await ws.send(json.dumps({
             "type": "setText",

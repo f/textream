@@ -695,6 +695,8 @@ struct NotchOverlayView: View {
 
     private let topInset: CGFloat = 16
     private let collapsedInset: CGFloat = 8
+    private let compactControlTopSpacing: CGFloat = 8
+    private let compactControlFadeHeight: CGFloat = 20
 
     // macOS notch dimensions (approximate)
     private let notchHeight: CGFloat = 37
@@ -937,6 +939,17 @@ struct NotchOverlayView: View {
             )
             .padding(.horizontal, 12)
             .padding(.top, 6)
+            .mask {
+                VStack(spacing: 0) {
+                    Color.white
+                    LinearGradient(
+                        colors: [.white, .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: compactControlFadeHeight)
+                }
+            }
             .transition(.move(edge: .top).combined(with: .opacity))
 
             Group {
@@ -1063,6 +1076,7 @@ struct NotchOverlayView: View {
             }
             .frame(height: 24)
             .padding(.horizontal, 12)
+            .padding(.top, compactControlTopSpacing)
             .padding(.bottom, 2)
 
             // Keep the resize handle in the layout at all times to avoid hover-driven shifts.

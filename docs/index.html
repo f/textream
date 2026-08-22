@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Textream — Your Teleprompter for Streaming, Interviews & Presentations</title>
+  <title>Textream — Teleprompter for Mac, iPhone &amp; iPad</title>
   <meta name="description" content="Textream is a free macOS teleprompter app for streamers, interviewers, and presenters. It highlights your script in real-time as you speak, displayed in a beautiful Dynamic Island overlay.">
   <meta property="og:title" content="Textream — Live Teleprompter for macOS">
   <meta property="og:description" content="A free macOS teleprompter that highlights your script in real-time as you speak. Perfect for live streams, interviews, presentations, and podcasts.">
@@ -59,6 +59,12 @@
       align-items: center;
       justify-content: space-between;
       padding: 20px 0;
+    }
+
+    .nav-leading {
+      display: flex;
+      align-items: center;
+      gap: 18px;
     }
 
     .logo {
@@ -172,6 +178,8 @@
       font-size: 13px;
       color: var(--text3);
     }
+
+    .download-requirements { margin-top: 12px; }
 
     .hero-brew {
       display: inline-flex;
@@ -494,6 +502,12 @@
       color: var(--text);
     }
 
+    .donate-source-link {
+      color: var(--text);
+      font-weight: 700;
+      text-decoration: underline;
+    }
+
     .btn-donate {
       display: inline-flex;
       align-items: center;
@@ -553,6 +567,7 @@
       background: var(--surface2);
     }
 
+    nav .docs-link,
     nav .github-link {
       color: var(--text2);
       text-decoration: none;
@@ -561,10 +576,39 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: color 0.2s;
+      min-height: 44px;
+      border-radius: 10px;
+      transition: color 0.2s, background 0.2s;
     }
 
-    nav .github-link:hover { color: var(--text); }
+    nav .docs-link {
+      padding: 0 2px;
+    }
+
+    nav .github-link {
+      justify-content: center;
+      padding: 0 8px;
+    }
+
+    nav .docs-link:hover {
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    nav .github-link:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.08);
+    }
+
+    nav .docs-link:focus-visible,
+    nav .github-link:focus-visible,
+    nav .logo:focus-visible {
+      outline: 2px solid var(--accent2);
+      outline-offset: 3px;
+    }
+
+    nav .docs-link svg,
     nav .github-link svg { width: 18px; height: 18px; }
 
     /* Demo animation */
@@ -2194,6 +2238,20 @@
       font-weight: 600;
     }
 
+    .dl-dot-phone {
+      background: var(--accent2);
+      box-shadow: 0 0 4px rgba(79, 139, 255, 0.5);
+    }
+
+    .dl-label-phone { color: var(--accent2); }
+
+    .dl-dot-mac {
+      background: #facc15;
+      box-shadow: 0 0 4px rgba(250, 204, 21, 0.5);
+    }
+
+    .dl-label-mac { color: rgba(250, 204, 21, 0.7); }
+
     .director-footer {
       text-align: center;
       margin-top: 32px;
@@ -2211,6 +2269,11 @@
 
     /* Responsive */
     @media (max-width: 600px) {
+      .container { padding: 0 18px; }
+      .nav-leading { gap: 8px; }
+      nav .docs-link { padding: 0 2px; }
+      nav .github-link { width: 44px; padding: 0; }
+      nav .github-link span { display: none; }
       .hero { padding: 60px 0 30px; }
       .hero .subtitle { font-size: 16px; }
       .icon-showcase svg { width: 120px; height: 120px; }
@@ -2235,7 +2298,7 @@
 <body>
   <!-- Donate top bar -->
   <div class="donate-bar">
-    <p>Donate me to make <a href="https://prompts.chat" style="color:var(--text);text-decoration:underline;font-weight:700;">prompts.chat</a> and my other apps better</p>
+    <p>Donate me to make <a href="https://prompts.chat" class="donate-source-link">prompts.chat</a> and my other apps better</p>
     <a href="https://donate.stripe.com/aFa8wO4NF2S96jDfn4dMI09" class="btn-donate">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
       Donate
@@ -2246,25 +2309,31 @@
 
   <div class="container">
     <!-- Nav -->
-    <nav>
-      <a href="/" class="logo">
-        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="nbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1C1C1E"/><stop offset="100%" stop-color="#0A0A0C"/></linearGradient>
-            <linearGradient id="nac" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C6AFF"/><stop offset="100%" stop-color="#4F8BFF"/></linearGradient>
-            <clipPath id="nrb"><rect width="1024" height="1024" rx="228"/></clipPath>
-          </defs>
-          <rect width="1024" height="1024" rx="228" fill="url(#nbg)"/>
-          <g clip-path="url(#nrb)">
-            <path d="M 172 0 Q 240 0, 240 68 L 240 760 Q 240 840, 320 840 L 704 840 Q 784 840, 784 760 L 784 68 Q 784 0, 852 0 Z" fill="#2A2A2C"/>
-            <text x="512" y="600" font-family="-apple-system, SF Pro Display, Helvetica Neue, sans-serif" font-size="480" font-weight="800" fill="url(#nac)" text-anchor="middle">T</text>
-          </g>
-        </svg>
-        <span>Textream</span>
-      </a>
-      <a href="https://github.com/f/textream" class="github-link">
-        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub
+    <nav aria-label="Primary navigation">
+      <div class="nav-leading">
+        <a href="/" class="logo" aria-label="Textream home">
+          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="nbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1C1C1E"/><stop offset="100%" stop-color="#0A0A0C"/></linearGradient>
+              <linearGradient id="nac" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C6AFF"/><stop offset="100%" stop-color="#4F8BFF"/></linearGradient>
+              <clipPath id="nrb"><rect width="1024" height="1024" rx="228"/></clipPath>
+            </defs>
+            <rect width="1024" height="1024" rx="228" fill="url(#nbg)"/>
+            <g clip-path="url(#nrb)">
+              <path d="M 172 0 Q 240 0, 240 68 L 240 760 Q 240 840, 320 840 L 704 840 Q 784 840, 784 760 L 784 68 Q 784 0, 852 0 Z" fill="#2A2A2C"/>
+              <text x="512" y="600" font-family="-apple-system, SF Pro Display, Helvetica Neue, sans-serif" font-size="480" font-weight="800" fill="url(#nac)" text-anchor="middle">T</text>
+            </g>
+          </svg>
+          <span>Textream</span>
+        </a>
+        <a href="/docs/" class="docs-link" aria-label="Textream documentation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 5.2A3.2 3.2 0 0 1 6 2h5v17H6a3.2 3.2 0 0 0-3.2 3V5.2Z"/><path d="M21.2 5.2A3.2 3.2 0 0 0 18 2h-5v17h5a3.2 3.2 0 0 1 3.2 3V5.2Z"/></svg>
+          <span>Docs</span>
+        </a>
+      </div>
+      <a href="https://github.com/f/textream" class="github-link" aria-label="Textream on GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        <span>GitHub</span>
       </a>
     </nav>
 
@@ -2917,14 +2986,14 @@
             <div class="fs-notch-words visible" id="fsWords"></div>
           </div>
         </div>
-        <span class="fs-label" id="fsLabel">Sans Serif &middot; Medium &middot; White</span>
+        <span class="fs-label" id="fsLabel">Sans Serif &middot; LG &middot; White</span>
         <div class="fs-a11y-tag" id="fsA11y">
           <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           Dyslexia-friendly mode
         </div>
       </div>
       <div class="font-showcase-footer">
-        <p><strong>Sans Serif, Serif, Monospace, and OpenDyslexic</strong> &mdash; six highlight colors &mdash; five text sizes.<br>Customize everything in Settings. Your eyes, your rules.</p>
+        <p><strong>Sans Serif, Serif, Monospace, and OpenDyslexic</strong> &mdash; six highlight colors &mdash; four text sizes.<br>Customize everything in Settings. Your eyes, your rules.</p>
       </div>
     </section>
 
@@ -2955,8 +3024,8 @@
         dyslexic: { f: "'OpenDyslexic', sans-serif", n: 'OpenDyslexic' }
       };
       var sizes = {
-        xs: { p: '11px', lh: '1.3', n: 'XS' }, s: { p: '13px', lh: '1.35', n: 'S' }, m: { p: '15px', lh: '1.45', n: 'M' },
-        l: { p: '17px', lh: '1.55', n: 'L' }, xl: { p: '20px', lh: '1.65', n: 'XL' }
+        xs: { p: '11px', lh: '1.3', n: 'XS' }, sm: { p: '13px', lh: '1.35', n: 'SM' },
+        lg: { p: '17px', lh: '1.55', n: 'LG' }, xl: { p: '20px', lh: '1.65', n: 'XL' }
       };
       var colors = {
         white: { h: '#F5F5F7', n: 'White' }, yellow: { h: '#FFD60A', n: 'Yellow' },
@@ -2986,18 +3055,18 @@
       }
 
       var seq = [
-        { f:'sans',    s:'m',  c:'white',  d:500 },
-        { f:'serif',   s:'l',  c:'yellow', d:500 },
-        { f:'mono',    s:'s',  c:'green',  d:500 },
+        { f:'sans',    s:'lg', c:'white',  d:500 },
+        { f:'serif',   s:'lg', c:'yellow', d:500 },
+        { f:'mono',    s:'sm', c:'green',  d:500 },
         { f:'sans',    s:'xl', c:'blue',   d:500 },
-        { f:'serif',   s:'m',  c:'pink',   d:500 },
-        { f:'mono',    s:'l',  c:'orange', d:500 },
-        { f:'dyslexic',s:'l',  c:'yellow', d:1500 },
+        { f:'serif',   s:'lg', c:'pink',   d:500 },
+        { f:'mono',    s:'lg', c:'orange', d:500 },
+        { f:'dyslexic',s:'lg', c:'yellow', d:1500 },
         { f:'sans',    s:'xl', c:'green',  d:500 },
-        { f:'mono',    s:'s',  c:'blue',   d:500 },
-        { f:'serif',   s:'l',  c:'white',  d:500 },
-        { f:'dyslexic',s:'m',  c:'green',  d:1500 },
-        { f:'sans',    s:'m',  c:'white',  d:500 },
+        { f:'mono',    s:'sm', c:'blue',   d:500 },
+        { f:'serif',   s:'lg', c:'white',  d:500 },
+        { f:'dyslexic',s:'lg', c:'green',  d:1500 },
+        { f:'sans',    s:'lg', c:'white',  d:500 },
       ];
 
       var i = 0;
@@ -3007,7 +3076,7 @@
         i++;
         setTimeout(tick, s.d);
       }
-      morph('sans', 'm', 'white');
+      morph('sans', 'lg', 'white');
       setTimeout(tick, 500);
     })();
     </script>
@@ -3146,8 +3215,8 @@
       </div>
 
       <div class="director-labels">
-        <div class="dl-item"><div class="dl-dot" style="background:var(--accent2);box-shadow:0 0 4px rgba(79,139,255,0.5)"></div><span style="color:var(--accent2)">Director's Phone</span></div>
-        <div class="dl-item"><div class="dl-dot" style="background:#facc15;box-shadow:0 0 4px rgba(250,204,21,0.5)"></div><span style="color:rgba(250,204,21,0.7)">Your Mac</span></div>
+        <div class="dl-item"><div class="dl-dot dl-dot-phone"></div><span class="dl-label-phone">Director's Phone</span></div>
+        <div class="dl-item"><div class="dl-dot dl-dot-mac"></div><span class="dl-label-mac">Your Mac</span></div>
       </div>
 
       <div class="director-footer">
@@ -3383,7 +3452,7 @@
           Download on the App Store
         </a>
       </div>
-      <p class="dl-meta" style="margin-top: 12px;">Requires macOS 15 or iOS/iPadOS 26</p>
+      <p class="dl-meta download-requirements">Requires macOS 15 or iOS/iPadOS 26</p>
     </section>
 
     <!-- Install via Homebrew -->
@@ -3396,7 +3465,7 @@
     <!-- Footer -->
     <footer>
       <p>Original idea by <a href="https://x.com/semihdev">Semih Kışlar</a> &mdash; thanks to him!</p>
-      <p>Made by <a href="https://fka.dev">Fatih Kadir Akin</a> &middot; <a href="https://github.com/f/textream">Source on GitHub</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="support.html">Support</a></p>
+      <p>Made by <a href="https://fka.dev">Fatih Kadir Akin</a> &middot; <a href="/docs/">Docs</a> &middot; <a href="https://github.com/f/textream">Source on GitHub</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="support.html">Support</a></p>
     </footer>
   </div>
 </body>
