@@ -126,6 +126,7 @@ View your teleprompter on **any device** — phone, tablet, or another computer 
 - **Enable in Settings → Remote** — Starts a lightweight HTTP + WebSocket server on your Mac.
 - **QR code** — Scan the generated QR code from your phone or tablet to open the teleprompter instantly.
 - **Real-time sync** — Words highlight, waveform animates, and progress updates in real time over WebSocket.
+- **Mirror mode (per device)** — Tap **Mirror** in the remote view to flip the prompt horizontally for teleprompter glass. The choice is remembered on that device, and `?mirror=1` or `?mirror=0` in the URL presets it.
 - **No app needed** — Works in any modern browser. No installation required on the remote device.
 - **Configurable port** — Default port 7373, adjustable in advanced settings.
 - **Direct local connection** — Textream does not relay Remote Connection traffic through a developer server. Enable it only on a local network and with devices you trust.
