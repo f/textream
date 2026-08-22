@@ -14,6 +14,9 @@ Textream/Textream.xcodeproj/project.xcworkspace/xcuserdata/
 *.dSYM.zip
 *.dSYM
 
+# Local App Store metadata and assets
+/app-store/
+
 # macOS
 .DS_Store
 .AppleDouble

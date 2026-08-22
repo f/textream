@@ -1,1 +1,0 @@
-teleprompter,presenter,script,speech,streaming,podcast,notch,autoscroll,sidecar,prompter
