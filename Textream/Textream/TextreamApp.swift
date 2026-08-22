@@ -10,6 +10,7 @@ import SwiftUI
 extension Notification.Name {
     static let openSettings = Notification.Name("openSettings")
     static let openAbout = Notification.Name("openAbout")
+    static let startPrompter = Notification.Name("startPrompter")
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -168,6 +169,13 @@ struct TextreamApp: App {
                     TextreamService.shared.saveFileAs()
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Start Prompter") {
+                    NotificationCenter.default.post(name: .startPrompter, object: nil)
+                }
+                .keyboardShortcut(.return, modifiers: .command)
             }
             CommandGroup(replacing: .windowArrangement) { }
             CommandGroup(replacing: .help) {
