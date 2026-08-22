@@ -359,6 +359,16 @@ class BrowserServer {
         #mic-dot{width:10px;height:10px;border-radius:50%;
           background:#facc15;opacity:0;transition:opacity .2s}
         #mic-dot.on{opacity:1}
+        #mirror-btn{height:40px;min-width:40px;padding:0 12px;border-radius:20px;
+          border:0;background:rgba(255,255,255,.15);color:rgba(255,255,255,.75);
+          display:flex;align-items:center;justify-content:center;gap:6px;
+          font-size:13px;font-weight:600;line-height:1;cursor:pointer;
+          transition:background .2s,color .2s}
+        #mirror-btn .icon{font-size:14px}
+        #mirror-btn.on{background:rgba(250,204,21,.22);color:#facc15}
+
+        body.mirrored #main,body.mirrored #done{
+          transform:scaleX(-1);transform-origin:center}
 
         /* Done */
         #done{display:none;flex-direction:column;align-items:center;
@@ -378,6 +388,8 @@ class BrowserServer {
           #bar{padding:10px 5% 20px}
           #waveform{width:160px;height:28px}
           #text-container{font-size:clamp(28px,calc(100vw / 10),60px)}
+          #mirror-btn{padding:0 10px;min-width:36px}
+          #mirror-btn .label{display:none}
         }
         </style>
         </head>
@@ -398,6 +410,10 @@ class BrowserServer {
             <div id="waveform"></div>
             <div id="spoken"></div>
             <div id="mic-btn"><div id="mic-dot"></div></div>
+            <button id="mirror-btn" type="button" aria-pressed="false" title="Enable Mirror">
+              <span class="icon">⇋</span>
+              <span class="label">Mirror</span>
+            </button>
           </div>
         </div>
 
@@ -408,7 +424,8 @@ class BrowserServer {
 
         <script>
         const WSP=\(wsPort),host=location.hostname;
-        let ws,rt,prevWordKey='',scrollTgt=null;
+        const MIRROR_STORAGE_KEY='textream.remote.mirror';
+        let ws,rt,prevWordKey='',scrollTgt=null,mirrorEnabled=false;
 
         /* ---- helpers ---- */
 
@@ -424,6 +441,43 @@ class BrowserServer {
           return m?m.slice(0,3).map(Number):[255,255,255];
         }
         function rgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
+
+        function parseMirrorQueryParam(){
+          const raw=new URLSearchParams(location.search).get('mirror');
+          if(raw===null)return null;
+          const val=raw.toLowerCase();
+          if(val==='1'||val==='true'||val==='on'||val==='yes')return true;
+          if(val==='0'||val==='false'||val==='off'||val==='no')return false;
+          return null;
+        }
+
+        function applyMirrorMode(){
+          document.body.classList.toggle('mirrored',mirrorEnabled);
+          const btn=document.getElementById('mirror-btn');
+          if(!btn)return;
+          btn.classList.toggle('on',mirrorEnabled);
+          btn.setAttribute('aria-pressed',mirrorEnabled?'true':'false');
+          btn.title=mirrorEnabled?'Disable Mirror':'Enable Mirror';
+        }
+
+        function toggleMirrorMode(){
+          mirrorEnabled=!mirrorEnabled;
+          localStorage.setItem(MIRROR_STORAGE_KEY,mirrorEnabled?'1':'0');
+          applyMirrorMode();
+        }
+
+        function initializeMirrorMode(){
+          const override=parseMirrorQueryParam();
+          if(override!==null){
+            mirrorEnabled=override;
+            localStorage.setItem(MIRROR_STORAGE_KEY,mirrorEnabled?'1':'0');
+          }else{
+            mirrorEnabled=localStorage.getItem(MIRROR_STORAGE_KEY)==='1';
+          }
+          const btn=document.getElementById('mirror-btn');
+          if(btn)btn.addEventListener('click',toggleMirrorMode);
+          applyMirrorMode();
+        }
 
         // Detect annotation words: [bracket] or emoji-only (no letters/digits)
         function isAnnotation(w){
@@ -592,6 +646,7 @@ class BrowserServer {
         for(let i=0;i<30;i++){const b=document.createElement('div');
           b.className='wf';b.style.height='2px';wfInit.appendChild(b)}
 
+        initializeMirrorMode();
         connect();
         </script>
         </body>
