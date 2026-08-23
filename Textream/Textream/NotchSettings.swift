@@ -377,6 +377,18 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(Int(pinnedScreenID), forKey: "pinnedScreenID") }
     }
 
+    /// Not observed: nothing renders from this, and it is written on every drag
+    /// and resize step, which would otherwise redraw the overlay continuously.
+    @ObservationIgnored var floatingWindowFrame: NSRect? {
+        didSet {
+            if let floatingWindowFrame {
+                UserDefaults.standard.set(NSStringFromRect(floatingWindowFrame), forKey: "floatingWindowFrame")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "floatingWindowFrame")
+            }
+        }
+    }
+
     var floatingGlassEffect: Bool {
         didSet { UserDefaults.standard.set(floatingGlassEffect, forKey: "floatingGlassEffect") }
     }
@@ -514,6 +526,8 @@ class NotchSettings {
         self.notchDisplayMode = NotchDisplayMode(rawValue: UserDefaults.standard.string(forKey: "notchDisplayMode") ?? "") ?? .followMouse
         let savedPinnedScreenID = UserDefaults.standard.integer(forKey: "pinnedScreenID")
         self.pinnedScreenID = UInt32(savedPinnedScreenID)
+        let savedFloatingFrame = NSRectFromString(UserDefaults.standard.string(forKey: "floatingWindowFrame") ?? "")
+        self.floatingWindowFrame = savedFloatingFrame.width > 0 && savedFloatingFrame.height > 0 ? savedFloatingFrame : nil
         self.floatingGlassEffect = UserDefaults.standard.object(forKey: "floatingGlassEffect") as? Bool ?? false
         let savedOpacity = UserDefaults.standard.double(forKey: "glassOpacity")
         self.glassOpacity = savedOpacity > 0 ? savedOpacity : 0.15

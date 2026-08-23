@@ -1521,6 +1521,7 @@ struct SettingsView: View {
         settings.overlayMode = .pinned
         settings.notchDisplayMode = .followMouse
         settings.pinnedScreenID = 0
+        settings.floatingWindowFrame = nil
         settings.floatingGlassEffect = false
         settings.glassOpacity = 0.15
         settings.overlayTransparency = false
