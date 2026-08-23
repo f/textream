@@ -297,7 +297,8 @@ class NotchOverlayController: NSObject {
             content: overlayContent,
             speechRecognizer: speechRecognizer,
             baseHeight: panelHeight,
-            followingCursor: true
+            followingCursor: true,
+            mirrorAxis: settings.floatingMirrorDisplay ? settings.floatingMirrorAxis : nil
         )
         let contentView = NSHostingView(rootView: floatingView)
 
@@ -329,7 +330,7 @@ class NotchOverlayController: NSObject {
         let fullscreenView = ExternalDisplayView(
             content: overlayContent,
             speechRecognizer: speechRecognizer,
-            mirrorAxis: nil
+            mirrorAxis: settings.fullscreenMirrorDisplay ? settings.fullscreenMirrorAxis : nil
         )
         let contentView = NSHostingView(rootView: fullscreenView)
 
@@ -364,7 +365,8 @@ class NotchOverlayController: NSObject {
         let floatingView = FloatingOverlayView(
             content: overlayContent,
             speechRecognizer: speechRecognizer,
-            baseHeight: panelHeight
+            baseHeight: panelHeight,
+            mirrorAxis: settings.floatingMirrorDisplay ? settings.floatingMirrorAxis : nil
         )
         let contentView = NSHostingView(rootView: floatingView)
 
@@ -1256,6 +1258,7 @@ struct FloatingOverlayView: View {
     @Bindable var speechRecognizer: SpeechRecognizer
     let baseHeight: CGFloat
     var followingCursor: Bool = false
+    var mirrorAxis: MirrorAxis? = nil
 
     private var words: [String] { content.words }
     private var totalCharCount: Int { content.totalCharCount }
@@ -1362,7 +1365,10 @@ struct FloatingOverlayView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .opacity(appeared ? 1 : 0)
-        .scaleEffect(appeared ? 1 : 0.9)
+        .scaleEffect(
+            x: (mirrorAxis?.scaleX ?? 1) * (appeared ? 1 : 0.9),
+            y: (mirrorAxis?.scaleY ?? 1) * (appeared ? 1 : 0.9)
+        )
         .onAppear {
             withAnimation(.easeOut(duration: 0.3)) {
                 appeared = true

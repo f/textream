@@ -1008,6 +1008,13 @@ struct SettingsView: View {
 
                     Divider()
 
+                    mirrorDisplayPicker(
+                        isEnabled: $settings.floatingMirrorDisplay,
+                        axis: $settings.floatingMirrorAxis
+                    )
+
+                    Divider()
+
                     Toggle(isOn: $settings.floatingGlassEffect) {
                         Text("Glass Effect")
                             .font(.system(size: 13, weight: .medium))
@@ -1045,6 +1052,13 @@ struct SettingsView: View {
                         screens: overlayScreens,
                         selectedID: $settings.fullscreenScreenID,
                         onRefresh: { refreshOverlayScreens() }
+                    )
+
+                    Divider()
+
+                    mirrorDisplayPicker(
+                        isEnabled: $settings.fullscreenMirrorDisplay,
+                        axis: $settings.fullscreenMirrorAxis
                     )
 
                     HStack(spacing: 6) {
@@ -1122,6 +1136,35 @@ struct SettingsView: View {
             .padding(16)
         }
         .onAppear { refreshOverlayScreens() }
+    }
+
+    private func mirrorDisplayPicker(isEnabled: Binding<Bool>, axis: Binding<MirrorAxis>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: isEnabled) {
+                Text("Mirror Display")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
+            Text("Flip the teleprompter for use with a mirror rig.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            if isEnabled.wrappedValue {
+                Picker("", selection: axis) {
+                    ForEach(MirrorAxis.allCases) { mirrorAxis in
+                        Text(mirrorAxis.label).tag(mirrorAxis)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                Text(axis.wrappedValue.description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     // MARK: - External Tab
@@ -1526,7 +1569,11 @@ struct SettingsView: View {
         settings.overlayTransparency = false
         settings.overlayTransparencyOpacity = 0.85
         settings.followCursorWhenUndocked = false
+        settings.floatingMirrorDisplay = false
+        settings.floatingMirrorAxis = .horizontal
         settings.fullscreenScreenID = 0
+        settings.fullscreenMirrorDisplay = false
+        settings.fullscreenMirrorAxis = .horizontal
         settings.externalDisplayMode = .off
         settings.externalScreenID = 0
         settings.mirrorAxis = .horizontal
