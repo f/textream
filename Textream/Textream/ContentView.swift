@@ -713,23 +713,27 @@ Happy presenting! [wave]
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            Button {
-                if isRecording {
-                    stopRecording()
+            VStack(spacing: 0) {
+                RemoteQRPanel()
+
+                Button {
+                    if isRecording {
+                        stopRecording()
+                    }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        service.pages.append("")
+                        service.currentPageIndex = service.pages.count - 1
+                    }
+                } label: {
+                    Label("Add Page", systemImage: "plus")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                 }
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    service.pages.append("")
-                    service.currentPageIndex = service.pages.count - 1
-                }
-            } label: {
-                Label("Add Page", systemImage: "plus")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -917,4 +921,73 @@ struct AboutView: View {
 
 #Preview {
     ContentView()
+}
+
+
+// MARK: - Remote QR Panel
+
+/// Keeps the Remote Connection QR code on screen in the main window, so a phone
+/// can be pointed at it without opening Settings. Hidden when Remote is off.
+private struct RemoteQRPanel: View {
+    @State private var localIP: String?
+    @State private var qrImage: NSImage?
+
+    private var url: String? {
+        guard NotchSettings.shared.browserServerEnabled, let ip = localIP else { return nil }
+        return "http://\(ip):\(NotchSettings.shared.browserServerPort)"
+    }
+
+    var body: some View {
+        Group {
+            if let url {
+                VStack(spacing: 6) {
+                    Divider()
+
+                    if let qrImage {
+                        Image(nsImage: qrImage)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 96, height: 96)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .padding(.top, 10)
+                    }
+
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(url, forType: .string)
+                    } label: {
+                        Text(url)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Copy the remote URL")
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+                // Regenerate only when the address or port actually changes.
+                .task(id: url) { qrImage = Self.qrCode(for: url) }
+            }
+        }
+        .onAppear { localIP = BrowserServer.localIPAddress() }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification)) { _ in
+            localIP = BrowserServer.localIPAddress()
+        }
+    }
+
+    private static func qrCode(for string: String) -> NSImage? {
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(string.utf8)
+        filter.correctionLevel = "M"
+        guard let ciImage = filter.outputImage else { return nil }
+        let scaled = ciImage.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+        return NSImage(cgImage: cgImage,
+                       size: NSSize(width: scaled.extent.width, height: scaled.extent.height))
+    }
 }
