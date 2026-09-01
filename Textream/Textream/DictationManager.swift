@@ -213,13 +213,10 @@ class DictationManager {
             return
         }
 
-        let monoFormat = AVAudioFormat(
-            commonFormat: recordingFormat.commonFormat,
-            sampleRate: recordingFormat.sampleRate,
-            channels: 1,
-            interleaved: recordingFormat.isInterleaved
-        )
-        let tapFormat = recordingFormat.channelCount > 1 ? monoFormat : recordingFormat
+        guard let tapFormat = speechCaptureFormat(for: recordingFormat) else {
+            fail("Audio input format is unsupported.")
+            return
+        }
 
         // Observe audio configuration changes
         configurationChangeObserver = NotificationCenter.default.addObserver(
@@ -235,8 +232,19 @@ class DictationManager {
 
         inputNode.removeTap(onBus: 0)
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
+        let waveformFrameInterval = AVAudioFrameCount(max(1, tapFormat.sampleRate / 20.0))
+        var framesSinceWaveformUpdate = waveformFrameInterval
+
+        inputNode.installTap(
+            onBus: 0,
+            bufferSize: speechCaptureBufferSize(for: tapFormat),
+            format: tapFormat
+        ) { [weak self] buffer, _ in
             self?.appendBuffer(buffer)
+
+            framesSinceWaveformUpdate &+= buffer.frameLength
+            guard framesSinceWaveformUpdate >= waveformFrameInterval else { return }
+            framesSinceWaveformUpdate %= waveformFrameInterval
 
             guard let channelData = buffer.floatChannelData?[0] else { return }
             let frameLength = Int(buffer.frameLength)

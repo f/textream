@@ -11,6 +11,27 @@ import Speech
 import AVFoundation
 import CoreAudio
 
+private let waveformUpdatesPerSecond = 20.0
+private let speechCaptureBuffersPerSecond = 40.0
+
+func speechCaptureFormat(for hardwareFormat: AVAudioFormat) -> AVAudioFormat? {
+    guard hardwareFormat.channelCount > 1 else { return hardwareFormat }
+
+    // An input-node tap must use the hardware sample rate. AVAudioEngine can
+    // downmix channels here, but requesting a different rate raises an
+    // uncaught AVFAudio format-mismatch exception on high-rate USB devices.
+    return AVAudioFormat(
+        commonFormat: .pcmFormatFloat32,
+        sampleRate: hardwareFormat.sampleRate,
+        channels: 1,
+        interleaved: false
+    )
+}
+
+func speechCaptureBufferSize(for format: AVAudioFormat) -> AVAudioFrameCount {
+    AVAudioFrameCount(max(1024, format.sampleRate / speechCaptureBuffersPerSecond))
+}
+
 struct AudioInputDevice: Identifiable, Hashable {
     let id: AudioDeviceID
     let uid: String
@@ -469,16 +490,12 @@ class SpeechRecognizer {
             return
         }
 
-        // SFSpeechRecognizer requires mono audio. Multi-channel devices (e.g.
-        // RODECaster Pro II at 2ch/48kHz) cause the recognition task to silently
-        // return no results. Request a mono tap and let AVAudioEngine downmix.
-        let monoFormat = AVAudioFormat(
-            commonFormat: hardwareFormat.commonFormat,
-            sampleRate: hardwareFormat.sampleRate,
-            channels: 1,
-            interleaved: hardwareFormat.isInterleaved
-        )
-        let tapFormat = (hardwareFormat.channelCount > 1) ? monoFormat : hardwareFormat
+        // SFSpeechRecognizer expects mono voice audio. Downmix multi-channel
+        // devices without changing the input node's hardware sample rate.
+        guard let tapFormat = speechCaptureFormat(for: hardwareFormat) else {
+            failListening("Audio input format is unsupported.")
+            return
+        }
 
         // Observe audio configuration changes (e.g. mic switched externally) to restart gracefully
         configurationChangeObserver = NotificationCenter.default.addObserver(
@@ -496,8 +513,21 @@ class SpeechRecognizer {
         // Belt-and-suspenders: ensure no stale tap exists before installing
         inputNode.removeTap(onBus: 0)
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
+        let waveformFrameInterval = AVAudioFrameCount(
+            max(1, tapFormat.sampleRate / waveformUpdatesPerSecond)
+        )
+        var framesSinceWaveformUpdate = waveformFrameInterval
+
+        inputNode.installTap(
+            onBus: 0,
+            bufferSize: speechCaptureBufferSize(for: tapFormat),
+            format: tapFormat
+        ) { [weak self] buffer, _ in
             self?.appendBufferToRequest(buffer)
+
+            framesSinceWaveformUpdate &+= buffer.frameLength
+            guard framesSinceWaveformUpdate >= waveformFrameInterval else { return }
+            framesSinceWaveformUpdate %= waveformFrameInterval
 
             guard let channelData = buffer.floatChannelData?[0] else { return }
             let frameLength = Int(buffer.frameLength)
