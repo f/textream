@@ -58,7 +58,7 @@ class ExternalDisplayController {
 
         let hostingView = NSHostingView(rootView: content)
 
-        let panel = NSPanel(
+        let panel = PrompterPanel(
             contentRect: screenFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,

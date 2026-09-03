@@ -9,6 +9,13 @@ import AppKit
 import SwiftUI
 import Combine
 
+/// A nonactivating panel that can still receive keyboard and control events.
+/// This keeps the prompter interactive while another app (for example, a
+/// screen recorder) remains the active application.
+final class PrompterPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 @Observable
 class NotchFrameTracker {
     var visibleHeight: CGFloat = 37 {
@@ -253,7 +260,7 @@ class NotchOverlayController: NSObject {
         let targetHeight = menuBarHeight + textAreaHeight
         let targetY = screenFrame.maxY - targetHeight
         let xPosition = screenFrame.midX - notchWidth / 2
-        let panel = NSPanel(
+        let panel = PrompterPanel(
             contentRect: NSRect(x: xPosition, y: targetY, width: notchWidth, height: targetHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -301,7 +308,7 @@ class NotchOverlayController: NSObject {
         )
         let contentView = NSHostingView(rootView: floatingView)
 
-        let panel = NSPanel(
+        let panel = PrompterPanel(
             contentRect: initialFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -333,7 +340,7 @@ class NotchOverlayController: NSObject {
         )
         let contentView = NSHostingView(rootView: fullscreenView)
 
-        let panel = NSPanel(
+        let panel = PrompterPanel(
             contentRect: screenFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -368,7 +375,7 @@ class NotchOverlayController: NSObject {
         )
         let contentView = NSHostingView(rootView: floatingView)
 
-        let panel = NSPanel(
+        let panel = PrompterPanel(
             contentRect: NSRect(x: xPosition, y: yPosition, width: panelWidth, height: panelHeight),
             styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
@@ -538,7 +545,7 @@ class NotchOverlayController: NSObject {
             self.dismiss()
         })
 
-        let panel = NSPanel(
+        let panel = PrompterPanel(
             contentRect: NSRect(x: x, y: y, width: buttonSize, height: buttonSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
