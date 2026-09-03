@@ -141,14 +141,16 @@ class TextreamService: NSObject, ObservableObject {
     }
 
     func updatePageInfo() {
-        let content = overlayController.overlayContent
-        content.pageCount = pages.count
-        content.currentPageIndex = currentPageIndex
-        content.pagePreviews = pages.enumerated().map { (i, text) in
+        let pagePreviews = pages.enumerated().map { (i, text) in
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { return "" }
             let preview = String(trimmed.prefix(40))
             return preview + (trimmed.count > 40 ? "…" : "")
+        }
+        for content in [overlayController.overlayContent, externalDisplayController.overlayContent] {
+            content.pageCount = pages.count
+            content.currentPageIndex = currentPageIndex
+            content.pagePreviews = pagePreviews
         }
     }
 

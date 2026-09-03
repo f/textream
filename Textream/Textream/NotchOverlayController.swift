@@ -329,7 +329,8 @@ class NotchOverlayController: NSObject {
         let fullscreenView = ExternalDisplayView(
             content: overlayContent,
             speechRecognizer: speechRecognizer,
-            mirrorAxis: nil
+            mirrorAxis: nil,
+            handlesAutoNextPage: true
         )
         let contentView = NSHostingView(rootView: fullscreenView)
 
@@ -895,6 +896,10 @@ struct NotchOverlayView: View {
         .onChange(of: content.totalCharCount) { _, _ in
             timerWordProgress = 0
         }
+        .onChange(of: content.currentPageIndex) { _, _ in
+            timerWordProgress = 0
+            isUserScrolling = false
+        }
     }
 
     private var isEffectivelyListening: Bool {
@@ -937,6 +942,7 @@ struct NotchOverlayView: View {
                     ? content.paragraphBreakBeforeWordIndices
                     : []
             )
+            .id(content.currentPageIndex)
             .padding(.horizontal, 12)
             .padding(.top, 6)
             .mask {
@@ -1170,6 +1176,13 @@ struct NotchOverlayView: View {
     private func startCountdown() {
         countdownTimer?.invalidate()
         countdownRemaining = NotchSettings.shared.autoNextPageDelay
+        guard countdownRemaining > 0 else {
+            countdownTimer = nil
+            DispatchQueue.main.async {
+                speechRecognizer.shouldAdvancePage = true
+            }
+            return
+        }
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
             DispatchQueue.main.async {
                 countdownRemaining -= 1
@@ -1413,6 +1426,10 @@ struct FloatingOverlayView: View {
         .onChange(of: content.totalCharCount) { _, _ in
             timerWordProgress = 0
         }
+        .onChange(of: content.currentPageIndex) { _, _ in
+            timerWordProgress = 0
+            isUserScrolling = false
+        }
     }
 
     private var floatingPrompterView: some View {
@@ -1446,6 +1463,7 @@ struct FloatingOverlayView: View {
                     ? content.paragraphBreakBeforeWordIndices
                     : []
             )
+            .id(content.currentPageIndex)
             .padding(.horizontal, 16)
             .padding(.top, 12)
 
@@ -1580,6 +1598,13 @@ struct FloatingOverlayView: View {
     private func startCountdown() {
         countdownTimer?.invalidate()
         countdownRemaining = NotchSettings.shared.autoNextPageDelay
+        guard countdownRemaining > 0 else {
+            countdownTimer = nil
+            DispatchQueue.main.async {
+                speechRecognizer.shouldAdvancePage = true
+            }
+            return
+        }
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
             DispatchQueue.main.async {
                 countdownRemaining -= 1

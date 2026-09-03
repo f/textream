@@ -537,7 +537,10 @@ class NotchSettings {
         self.selectedMicUID = UserDefaults.standard.string(forKey: "selectedMicUID") ?? ""
         self.autoNextPage = UserDefaults.standard.object(forKey: "autoNextPage") as? Bool ?? false
         let savedDelay = UserDefaults.standard.integer(forKey: "autoNextPageDelay")
-        self.autoNextPageDelay = savedDelay > 0 ? savedDelay : 3
+        self.autoNextPageDelay = [0, 1, 3, 5].contains(savedDelay)
+            && UserDefaults.standard.object(forKey: "autoNextPageDelay") != nil
+            ? savedDelay
+            : 3
         let savedFullscreenScreenID = UserDefaults.standard.integer(forKey: "fullscreenScreenID")
         self.fullscreenScreenID = UInt32(savedFullscreenScreenID)
         self.browserServerEnabled = UserDefaults.standard.object(forKey: "browserServerEnabled") as? Bool ?? false
