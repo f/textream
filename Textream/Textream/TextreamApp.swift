@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OSLog
 
 extension Notification.Name {
     static let openSettings = Notification.Name("openSettings")
@@ -14,6 +15,11 @@ extension Notification.Name {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private let lifecycleLogger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "dev.fka.textream",
+        category: "AppLifecycle"
+    )
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
         let launchedByURL: Bool
@@ -77,6 +83,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         NSApp.terminate(nil)
         return false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard
+            TextreamService.shared.overlayController.isShowing,
+            let event = NSAppleEventManager.shared().currentAppleEvent,
+            event.eventClass == kCoreEventClass,
+            event.eventID == kAEQuitApplication,
+            event.paramDescriptor(forKeyword: kAEQuitReason) == nil
+        else {
+            return .terminateNow
+        }
+
+        let senderPID = event.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value ?? 0
+        let runningApplication = NSRunningApplication(processIdentifier: pid_t(senderPID))
+        let senderName = runningApplication?.localizedName ?? "unknown"
+        let senderBundleIdentifier = runningApplication?.bundleIdentifier ?? "unknown"
+
+        lifecycleLogger.warning(
+            "Blocked external quit while teleprompter is active; senderPID=\(senderPID, privacy: .public) sender=\(senderName, privacy: .public) bundleIdentifier=\(senderBundleIdentifier, privacy: .public)"
+        )
+        return .terminateCancel
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
