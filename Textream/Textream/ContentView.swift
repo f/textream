@@ -790,6 +790,7 @@ Happy presenting! [wave]
                     service.currentPageIndex = 0
                     service.readPages.removeAll()
                     service.currentFileURL = nil
+                    service.rememberDocumentURL(url)
                     isImporting = false
                 }
             } catch {
