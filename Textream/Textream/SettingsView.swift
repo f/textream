@@ -1106,16 +1106,17 @@ struct SettingsView: View {
                 .toggleStyle(.checkbox)
 
                 if settings.autoNextPage {
-                    HStack {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Countdown")
                             .font(.system(size: 13))
-                        Spacer()
-                        Picker("", selection: $settings.autoNextPageDelay) {
+                        Picker("Countdown", selection: $settings.autoNextPageDelay) {
+                            Text("Instant").tag(0)
+                            Text("1 second").tag(1)
                             Text("3 seconds").tag(3)
                             Text("5 seconds").tag(5)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 160)
+                        .labelsHidden()
                     }
                 }
             }
