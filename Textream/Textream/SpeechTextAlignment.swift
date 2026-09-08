@@ -77,21 +77,40 @@ enum SpeechTextAlignment {
     }
 
     /// Combine the character-level and word-level match results into a single
-    /// forward offset. When they roughly agree, average them. When they
-    /// disagree, prefer the further match: the word-level scan advances
-    /// in-order and monotonically, so trusting it lets fast reading catch up
-    /// instead of being dragged back by the brittle character scan that
-    /// desyncs over long spans. `shouldCommit` still gates single-strategy
-    /// (one result is zero) jumps behind confirmation.
+    /// forward offset.
+    ///
+    /// When the two strategies agree (within `agreementTolerance`), average
+    /// them — both independently confirmed roughly the same position.
+    ///
+    /// When they disagree, be conservative. The word-level scan is fuzzy
+    /// (prefix/edit-distance matches, and it can skip several source words on a
+    /// single optimistic hit), so one over-eager word-level result must not be
+    /// trusted to run the cursor far ahead of the speaker. Anchor to the
+    /// non-fuzzy character result and let the word result lead it by at most
+    /// `disagreementAllowance` characters — enough for genuinely fast reading to
+    /// catch up, but never enough for a single fuzzy match to jump away on its
+    /// own. When the character result itself leads, it is trusted: it advances
+    /// conservatively and is never the source of a runaway, so a lagging word
+    /// scan must not discard the progress it confirmed.
+    ///
+    /// `shouldCommit` still gates single-strategy (one result is zero) jumps
+    /// behind confirmation.
     static func bestOffset(
         characterResult: Int,
         wordResult: Int,
-        agreementTolerance: Int = 20
+        agreementTolerance: Int = 20,
+        disagreementAllowance: Int = 30
     ) -> Int {
         if abs(characterResult - wordResult) <= agreementTolerance {
             return (characterResult + wordResult) / 2
         }
-        return max(characterResult, wordResult)
+        // Cap how far the optimistic word result may lead the character anchor,
+        // then never fall below the character result. A fuzzy word match can
+        // thus refine the position within a bounded window but can never leap
+        // far ahead on its own, and real character-level progress is preserved
+        // when the word scan lags.
+        let cappedWord = min(wordResult, characterResult + disagreementAllowance)
+        return max(characterResult, cappedWord)
     }
 
     static func shouldCommit(
