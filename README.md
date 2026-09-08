@@ -42,6 +42,11 @@ brew install textream
 
 > Requires **macOS 15 Sequoia** or later. Works on Apple Silicon and Intel.
 
+### Windows
+
+A community-maintained Windows port is available at
+**[CRTkafa/textream-windows](https://github.com/CRTkafa/textream-windows)**.
+
 ## iOS 26 Companion
 
 The Textream companion for iPhone and iPad is part of the same universal App Store listing as the Mac app.
@@ -402,7 +407,7 @@ async def director():
                 break
 
         # Stop
-        await ws.send(json.dumps({"type": "stop"}))
+        await ws.send(json.dumps({"type":"stop"}))
 
 asyncio.run(director())
 ```
