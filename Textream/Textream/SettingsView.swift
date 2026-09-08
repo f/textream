@@ -485,14 +485,7 @@ struct SettingsView: View {
             Text("This will restore all settings to their defaults.")
         }
         .onAppear {
-            if settings.overlayMode != .fullscreen {
-                previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
-            }
+            showPreviewIfIdle(settings)
         }
         .onDisappear {
             previewController.dismiss()
@@ -501,14 +494,7 @@ struct SettingsView: View {
             previewController.hide()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            if settings.overlayMode != .fullscreen {
-                previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
-            }
+            showPreviewIfIdle(settings)
         }
         .onChange(of: settings.followCursorWhenUndocked) { _, follow in
             if follow && settings.overlayMode == .floating {
@@ -518,7 +504,7 @@ struct SettingsView: View {
             }
         }
         .onChange(of: settings.overlayMode) { _, mode in
-            if mode == .fullscreen {
+            if mode != .pinned || isPrompterRunning {
                 previewController.hide()
             } else {
                 previewController.show(settings: settings)
@@ -527,6 +513,25 @@ struct SettingsView: View {
                 } else if previewController.isAtCursor {
                     previewController.animateFromCursor()
                 }
+            }
+        }
+    }
+
+    /// The preview panel is drawn at the notch, always on top, and ignores
+    /// mouse events. That only makes sense for Pinned mode: in Floating mode it
+    /// previews at a position the overlay will never occupy and sits over the
+    /// settings window, and during a live session it reads as a second,
+    /// undraggable prompter running the wrong script.
+    private var isPrompterRunning: Bool {
+        TextreamService.shared.overlayController.isShowing
+    }
+
+    private func showPreviewIfIdle(_ settings: NotchSettings) {
+        guard !isPrompterRunning, settings.overlayMode == .pinned else { return }
+        previewController.show(settings: settings)
+        if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                previewController.animateToCursor(settings: settings)
             }
         }
     }
