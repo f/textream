@@ -757,83 +757,104 @@ struct SettingsView: View {
     // MARK: - Guidance Tab
 
     private var guidanceTab: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Picker("", selection: $settings.listeningMode) {
-                ForEach(ListeningMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            Text(settings.listeningMode.description)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            if settings.listeningMode == .wordTracking {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Speech Language")
-                        .font(.system(size: 13, weight: .medium))
-                    Picker("", selection: $settings.speechLocale) {
-                        ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
-                            Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
-                                .tag(locale.identifier)
-                        }
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("", selection: $settings.listeningMode) {
+                    ForEach(ListeningMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
                     }
-                    .labelsHidden()
                 }
-            }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-            if settings.listeningMode != .classic {
-                Divider()
+                Text(settings.listeningMode.description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Microphone")
-                        .font(.system(size: 13, weight: .medium))
-                    Picker("", selection: $settings.selectedMicUID) {
-                        Text("System Default").tag("")
-                        ForEach(availableMics) { mic in
-                            Text(mic.name).tag(mic.uid)
-                        }
-                    }
-                    .labelsHidden()
-                }
-            }
+                if settings.listeningMode == .wordTracking {
+                    Divider()
 
-            if settings.listeningMode != .wordTracking {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Scroll Speed")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Engine")
                             .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text(String(format: "%.1f words/s", settings.scrollSpeed))
-                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                        Picker("", selection: $settings.speechEngine) {
+                            ForEach(SpeechEngine.allCases) { engine in
+                                Text(engine.label).tag(engine)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        Text(settings.speechEngine.description)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
-                    Slider(
-                        value: $settings.scrollSpeed,
-                        in: 0.5...8,
-                        step: 0.5
-                    )
-                    HStack {
-                        Text("Slower")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text("Faster")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
+
+                    Divider()
+
+                    if settings.speechEngine == .local {
+                        LocalModelSettingsSection(settings: settings)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Speech Language")
+                                .font(.system(size: 13, weight: .medium))
+                            Picker("", selection: $settings.speechLocale) {
+                                ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
+                                    Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+                                        .tag(locale.identifier)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                    }
+                }
+
+                if settings.listeningMode != .classic {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Microphone")
+                            .font(.system(size: 13, weight: .medium))
+                        Picker("", selection: $settings.selectedMicUID) {
+                            Text("System Default").tag("")
+                            ForEach(availableMics) { mic in
+                                Text(mic.name).tag(mic.uid)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                }
+
+                if settings.listeningMode != .wordTracking {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Scroll Speed")
+                                .font(.system(size: 13, weight: .medium))
+                            Spacer()
+                            Text(String(format: "%.1f words/s", settings.scrollSpeed))
+                                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(
+                            value: $settings.scrollSpeed,
+                            in: 0.5...8,
+                            step: 0.5
+                        )
+                        HStack {
+                            Text("Slower")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                            Text("Faster")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
             }
-
-            Spacer()
+            .padding(16)
         }
-        .padding(16)
         .onAppear { availableMics = AudioInputDevice.allInputDevices() }
     }
 

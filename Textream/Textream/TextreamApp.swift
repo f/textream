@@ -7,6 +7,7 @@
 
 import SwiftUI
 import OSLog
+import TranscribeCpp
 
 extension Notification.Name {
     static let openSettings = Notification.Name("openSettings")
@@ -37,6 +38,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = TextreamService.shared
         NSUpdateDynamicServices()
+
+        // Route native transcribe.cpp diagnostics to the system log. ggml emits
+        // verbose per-kernel detail at info level; keep only warnings/errors.
+        let logSubsystem = Bundle.main.bundleIdentifier ?? "dev.fka.textream"
+        Transcribe.setLogHandler { level, message in
+            guard level == .warn || level == .error else { return }
+            let logger = Logger(subsystem: logSubsystem, category: "LocalSpeech")
+            if level == .error {
+                logger.error("\(message, privacy: .public)")
+            } else {
+                logger.warning("\(message, privacy: .public)")
+            }
+        }
 
         if TextreamService.shared.launchedExternally {
             TextreamService.shared.hideMainWindow()
@@ -105,6 +119,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "Blocked external quit while teleprompter is active; senderPID=\(senderPID, privacy: .public) sender=\(senderName, privacy: .public) bundleIdentifier=\(senderBundleIdentifier, privacy: .public)"
         )
         return .terminateCancel
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Release the local model while the process is still fully alive: the
+        // native Metal backend asserts if its device tears down during static
+        // destruction while a model is still loaded (upstream ggml constraint).
+        LocalSpeechEngine.shared.unloadModelSynchronously()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

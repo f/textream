@@ -25,6 +25,7 @@ Textream/Textream.xcodeproj/project.xcworkspace/xcuserdata/
 
 # SwiftPM
 .build/
+.swiftpm/
 Package.resolved
 
 # CocoaPods
