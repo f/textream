@@ -333,158 +333,197 @@ enum ReadingPosition: String, CaseIterable, Identifiable {
 @Observable
 class NotchSettings {
     static let shared = NotchSettings()
+    @ObservationIgnored private let defaults: UserDefaults
+
+    @ObservationIgnored var floatingWindowFrame: NSRect? {
+        didSet {
+            defaults.set(floatingWindowFrame.map(NSStringFromRect), forKey: "floatingWindowFrame")
+        }
+    }
+
+    private var storedFontSize: Double
+
+    var fontSize: Double {
+        get { storedFontSize }
+        set {
+            storedFontSize = Self.validFontSize(newValue)
+            defaults.set(storedFontSize, forKey: "fontSize")
+        }
+    }
+
+    private var storedLineSpacingMultiplier: Double
+
+    var lineSpacingMultiplier: Double {
+        get { storedLineSpacingMultiplier }
+        set {
+            storedLineSpacingMultiplier = Self.validLineSpacingMultiplier(newValue)
+            defaults.set(storedLineSpacingMultiplier, forKey: "lineSpacingMultiplier")
+        }
+    }
 
     var notchWidth: CGFloat {
-        didSet { UserDefaults.standard.set(Double(notchWidth), forKey: "notchWidth") }
+        didSet { defaults.set(Double(notchWidth), forKey: "notchWidth") }
     }
     var textAreaHeight: CGFloat {
-        didSet { UserDefaults.standard.set(Double(textAreaHeight), forKey: "textAreaHeight") }
+        didSet { defaults.set(Double(textAreaHeight), forKey: "textAreaHeight") }
     }
 
     var speechLocale: String {
-        didSet { UserDefaults.standard.set(speechLocale, forKey: "speechLocale") }
-    }
-
-    var fontSizePreset: FontSizePreset {
-        didSet { UserDefaults.standard.set(fontSizePreset.rawValue, forKey: "fontSizePreset") }
+        didSet { defaults.set(speechLocale, forKey: "speechLocale") }
     }
 
     var fontFamilyPreset: FontFamilyPreset {
-        didSet { UserDefaults.standard.set(fontFamilyPreset.rawValue, forKey: "fontFamilyPreset") }
+        didSet { defaults.set(fontFamilyPreset.rawValue, forKey: "fontFamilyPreset") }
     }
 
     var fontColorPreset: FontColorPreset {
-        didSet { UserDefaults.standard.set(fontColorPreset.rawValue, forKey: "fontColorPreset") }
+        didSet { defaults.set(fontColorPreset.rawValue, forKey: "fontColorPreset") }
     }
 
     var cueColorPreset: FontColorPreset {
-        didSet { UserDefaults.standard.set(cueColorPreset.rawValue, forKey: "cueColorPreset") }
+        didSet { defaults.set(cueColorPreset.rawValue, forKey: "cueColorPreset") }
     }
 
     var cueBrightness: CueBrightness {
-        didSet { UserDefaults.standard.set(cueBrightness.rawValue, forKey: "cueBrightness") }
+        didSet { defaults.set(cueBrightness.rawValue, forKey: "cueBrightness") }
     }
 
     var overlayMode: OverlayMode {
-        didSet { UserDefaults.standard.set(overlayMode.rawValue, forKey: "overlayMode") }
+        didSet { defaults.set(overlayMode.rawValue, forKey: "overlayMode") }
     }
 
     var notchDisplayMode: NotchDisplayMode {
-        didSet { UserDefaults.standard.set(notchDisplayMode.rawValue, forKey: "notchDisplayMode") }
+        didSet { defaults.set(notchDisplayMode.rawValue, forKey: "notchDisplayMode") }
     }
 
     var pinnedScreenID: UInt32 {
-        didSet { UserDefaults.standard.set(Int(pinnedScreenID), forKey: "pinnedScreenID") }
+        didSet { defaults.set(Int(pinnedScreenID), forKey: "pinnedScreenID") }
     }
 
     var floatingGlassEffect: Bool {
-        didSet { UserDefaults.standard.set(floatingGlassEffect, forKey: "floatingGlassEffect") }
+        didSet { defaults.set(floatingGlassEffect, forKey: "floatingGlassEffect") }
     }
 
     var glassOpacity: Double {
-        didSet { UserDefaults.standard.set(glassOpacity, forKey: "glassOpacity") }
+        didSet { defaults.set(glassOpacity, forKey: "glassOpacity") }
     }
 
     var overlayTransparency: Bool {
-        didSet { UserDefaults.standard.set(overlayTransparency, forKey: "overlayTransparency") }
+        didSet { defaults.set(overlayTransparency, forKey: "overlayTransparency") }
     }
 
     var overlayTransparencyOpacity: Double {
-        didSet { UserDefaults.standard.set(overlayTransparencyOpacity, forKey: "overlayTransparencyOpacity") }
+        didSet { defaults.set(overlayTransparencyOpacity, forKey: "overlayTransparencyOpacity") }
     }
 
     var followCursorWhenUndocked: Bool {
-        didSet { UserDefaults.standard.set(followCursorWhenUndocked, forKey: "followCursorWhenUndocked") }
+        didSet { defaults.set(followCursorWhenUndocked, forKey: "followCursorWhenUndocked") }
     }
 
     var externalDisplayMode: ExternalDisplayMode {
-        didSet { UserDefaults.standard.set(externalDisplayMode.rawValue, forKey: "externalDisplayMode") }
+        didSet { defaults.set(externalDisplayMode.rawValue, forKey: "externalDisplayMode") }
     }
 
     var externalScreenID: UInt32 {
-        didSet { UserDefaults.standard.set(Int(externalScreenID), forKey: "externalScreenID") }
+        didSet { defaults.set(Int(externalScreenID), forKey: "externalScreenID") }
     }
 
     var mirrorAxis: MirrorAxis {
-        didSet { UserDefaults.standard.set(mirrorAxis.rawValue, forKey: "mirrorAxis") }
+        didSet { defaults.set(mirrorAxis.rawValue, forKey: "mirrorAxis") }
     }
 
     var listeningMode: ListeningMode {
-        didSet { UserDefaults.standard.set(listeningMode.rawValue, forKey: "listeningMode") }
+        didSet { defaults.set(listeningMode.rawValue, forKey: "listeningMode") }
     }
 
     /// Words per second for classic and silence-paused modes
     var scrollSpeed: Double {
-        didSet { UserDefaults.standard.set(scrollSpeed, forKey: "scrollSpeed") }
+        didSet { defaults.set(scrollSpeed, forKey: "scrollSpeed") }
     }
 
     var hideFromScreenShare: Bool {
-        didSet { UserDefaults.standard.set(hideFromScreenShare, forKey: "hideFromScreenShare") }
+        didSet { defaults.set(hideFromScreenShare, forKey: "hideFromScreenShare") }
     }
 
     var showElapsedTime: Bool {
-        didSet { UserDefaults.standard.set(showElapsedTime, forKey: "showElapsedTime") }
+        didSet { defaults.set(showElapsedTime, forKey: "showElapsedTime") }
     }
 
     var keepScreenAwake: Bool {
         didSet {
-            UserDefaults.standard.set(keepScreenAwake, forKey: "keepScreenAwake")
+            defaults.set(keepScreenAwake, forKey: "keepScreenAwake")
             TextreamService.shared.updateKeepAwakeActivity(enabled: keepScreenAwake)
         }
     }
 
     var readingPosition: ReadingPosition {
-        didSet { UserDefaults.standard.set(readingPosition.rawValue, forKey: "readingPosition") }
+        didSet { defaults.set(readingPosition.rawValue, forKey: "readingPosition") }
     }
 
     var showParagraphDividers: Bool {
-        didSet { UserDefaults.standard.set(showParagraphDividers, forKey: "showParagraphDividers") }
+        didSet { defaults.set(showParagraphDividers, forKey: "showParagraphDividers") }
     }
 
     var showLastSpokenWords: Bool {
-        didSet { UserDefaults.standard.set(showLastSpokenWords, forKey: "showLastSpokenWords") }
+        didSet { defaults.set(showLastSpokenWords, forKey: "showLastSpokenWords") }
     }
 
     var selectedMicUID: String {
-        didSet { UserDefaults.standard.set(selectedMicUID, forKey: "selectedMicUID") }
+        didSet { defaults.set(selectedMicUID, forKey: "selectedMicUID") }
     }
 
     var autoNextPage: Bool {
-        didSet { UserDefaults.standard.set(autoNextPage, forKey: "autoNextPage") }
+        didSet { defaults.set(autoNextPage, forKey: "autoNextPage") }
     }
 
     var autoNextPageDelay: Int {
-        didSet { UserDefaults.standard.set(autoNextPageDelay, forKey: "autoNextPageDelay") }
+        didSet { defaults.set(autoNextPageDelay, forKey: "autoNextPageDelay") }
     }
 
     var fullscreenScreenID: UInt32 {
-        didSet { UserDefaults.standard.set(Int(fullscreenScreenID), forKey: "fullscreenScreenID") }
+        didSet { defaults.set(Int(fullscreenScreenID), forKey: "fullscreenScreenID") }
     }
 
     var browserServerEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(browserServerEnabled, forKey: "browserServerEnabled")
+            defaults.set(browserServerEnabled, forKey: "browserServerEnabled")
             TextreamService.shared.updateBrowserServer()
         }
     }
 
     var browserServerPort: UInt16 {
-        didSet { UserDefaults.standard.set(Int(browserServerPort), forKey: "browserServerPort") }
+        didSet { defaults.set(Int(browserServerPort), forKey: "browserServerPort") }
     }
 
     var directorModeEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(directorModeEnabled, forKey: "directorModeEnabled")
+            defaults.set(directorModeEnabled, forKey: "directorModeEnabled")
             TextreamService.shared.updateDirectorServer()
         }
     }
 
     var directorServerPort: UInt16 {
-        didSet { UserDefaults.standard.set(Int(directorServerPort), forKey: "directorServerPort") }
+        didSet { defaults.set(Int(directorServerPort), forKey: "directorServerPort") }
     }
 
     var font: NSFont {
-        fontFamilyPreset.font(size: fontSizePreset.pointSize)
+        fontFamilyPreset.font(size: CGFloat(fontSize))
+    }
+
+    static let defaultFontSize: Double = 48
+    static let fontSizeRange: ClosedRange<Double> = 14...200
+
+    static func validFontSize(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultFontSize }
+        return min(fontSizeRange.upperBound, max(fontSizeRange.lowerBound, value))
+    }
+
+    static let defaultLineSpacingMultiplier: Double = 1
+    static let lineSpacingMultiplierRange: ClosedRange<Double> = 1...2.5
+
+    static func validLineSpacingMultiplier(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultLineSpacingMultiplier }
+        return min(lineSpacingMultiplierRange.upperBound, max(lineSpacingMultiplierRange.lowerBound, value))
     }
 
     static let defaultWidth: CGFloat = 340
@@ -497,57 +536,70 @@ class NotchSettings {
     static let minHeight: CGFloat = 100
     static let maxHeight: CGFloat = 400
 
-    init() {
-        let savedWidth = UserDefaults.standard.double(forKey: "notchWidth")
-        let savedHeight = UserDefaults.standard.double(forKey: "textAreaHeight")
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.floatingWindowFrame = defaults.string(forKey: "floatingWindowFrame")
+            .flatMap { FloatingWindowGeometry.decode($0) }
+        let legacyFontSize = defaults.string(forKey: "fontSizePreset")
+            .flatMap(FontSizePreset.init(rawValue:))
+            .map { Double($0.pointSize) }
+        self.storedFontSize = Self.validFontSize(
+            (defaults.object(forKey: "fontSize") as? Double)
+                ?? legacyFontSize
+                ?? Self.defaultFontSize
+        )
+        self.storedLineSpacingMultiplier = Self.validLineSpacingMultiplier(
+            (defaults.object(forKey: "lineSpacingMultiplier") as? Double)
+                ?? Self.defaultLineSpacingMultiplier
+        )
+        let savedWidth = defaults.double(forKey: "notchWidth")
+        let savedHeight = defaults.double(forKey: "textAreaHeight")
         self.notchWidth = savedWidth > 0 ? CGFloat(savedWidth) : Self.defaultWidth
         self.textAreaHeight = savedHeight > 0 ? CGFloat(savedHeight) : Self.defaultHeight
-        let preferredSpeechLocale = UserDefaults.standard.string(forKey: "speechLocale") ?? Self.defaultLocale
+        let preferredSpeechLocale = defaults.string(forKey: "speechLocale") ?? Self.defaultLocale
         self.speechLocale = SpeechLocaleSupport.closestSupportedLocale(to: preferredSpeechLocale)?.identifier
             ?? Self.defaultLocale
-        self.fontSizePreset = FontSizePreset(rawValue: UserDefaults.standard.string(forKey: "fontSizePreset") ?? "") ?? .lg
-        self.fontFamilyPreset = FontFamilyPreset(rawValue: UserDefaults.standard.string(forKey: "fontFamilyPreset") ?? "") ?? .sans
-        self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white
-        self.cueColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "cueColorPreset") ?? "") ?? .white
-        self.cueBrightness = CueBrightness(rawValue: UserDefaults.standard.string(forKey: "cueBrightness") ?? "") ?? .dim
-        self.overlayMode = OverlayMode(rawValue: UserDefaults.standard.string(forKey: "overlayMode") ?? "") ?? .pinned
-        self.notchDisplayMode = NotchDisplayMode(rawValue: UserDefaults.standard.string(forKey: "notchDisplayMode") ?? "") ?? .followMouse
-        let savedPinnedScreenID = UserDefaults.standard.integer(forKey: "pinnedScreenID")
+        self.fontFamilyPreset = FontFamilyPreset(rawValue: defaults.string(forKey: "fontFamilyPreset") ?? "") ?? .sans
+        self.fontColorPreset = FontColorPreset(rawValue: defaults.string(forKey: "fontColorPreset") ?? "") ?? .white
+        self.cueColorPreset = FontColorPreset(rawValue: defaults.string(forKey: "cueColorPreset") ?? "") ?? .white
+        self.cueBrightness = CueBrightness(rawValue: defaults.string(forKey: "cueBrightness") ?? "") ?? .dim
+        self.overlayMode = OverlayMode(rawValue: defaults.string(forKey: "overlayMode") ?? "") ?? .floating
+        self.notchDisplayMode = NotchDisplayMode(rawValue: defaults.string(forKey: "notchDisplayMode") ?? "") ?? .followMouse
+        let savedPinnedScreenID = defaults.integer(forKey: "pinnedScreenID")
         self.pinnedScreenID = UInt32(savedPinnedScreenID)
-        self.floatingGlassEffect = UserDefaults.standard.object(forKey: "floatingGlassEffect") as? Bool ?? false
-        let savedOpacity = UserDefaults.standard.double(forKey: "glassOpacity")
-        self.glassOpacity = savedOpacity > 0 ? savedOpacity : 0.15
-        self.overlayTransparency = UserDefaults.standard.object(forKey: "overlayTransparency") as? Bool ?? false
-        let savedTransparencyOpacity = UserDefaults.standard.double(forKey: "overlayTransparencyOpacity")
+        self.floatingGlassEffect = defaults.object(forKey: "floatingGlassEffect") as? Bool ?? false
+        self.glassOpacity = (defaults.object(forKey: "glassOpacity") as? Double) ?? 0.15
+        self.overlayTransparency = defaults.object(forKey: "overlayTransparency") as? Bool ?? false
+        let savedTransparencyOpacity = defaults.double(forKey: "overlayTransparencyOpacity")
         self.overlayTransparencyOpacity = savedTransparencyOpacity > 0 ? savedTransparencyOpacity : 0.85
-        self.followCursorWhenUndocked = UserDefaults.standard.object(forKey: "followCursorWhenUndocked") as? Bool ?? false
-        self.externalDisplayMode = ExternalDisplayMode(rawValue: UserDefaults.standard.string(forKey: "externalDisplayMode") ?? "") ?? .off
-        let savedScreenID = UserDefaults.standard.integer(forKey: "externalScreenID")
+        self.followCursorWhenUndocked = defaults.object(forKey: "followCursorWhenUndocked") as? Bool ?? false
+        self.externalDisplayMode = ExternalDisplayMode(rawValue: defaults.string(forKey: "externalDisplayMode") ?? "") ?? .off
+        let savedScreenID = defaults.integer(forKey: "externalScreenID")
         self.externalScreenID = UInt32(savedScreenID)
-        self.mirrorAxis = MirrorAxis(rawValue: UserDefaults.standard.string(forKey: "mirrorAxis") ?? "") ?? .horizontal
-        self.listeningMode = ListeningMode(rawValue: UserDefaults.standard.string(forKey: "listeningMode") ?? "") ?? .wordTracking
-        let savedSpeed = UserDefaults.standard.double(forKey: "scrollSpeed")
+        self.mirrorAxis = MirrorAxis(rawValue: defaults.string(forKey: "mirrorAxis") ?? "") ?? .horizontal
+        self.listeningMode = ListeningMode(rawValue: defaults.string(forKey: "listeningMode") ?? "") ?? .wordTracking
+        let savedSpeed = defaults.double(forKey: "scrollSpeed")
         self.scrollSpeed = savedSpeed > 0 ? savedSpeed : 3
-        self.hideFromScreenShare = UserDefaults.standard.object(forKey: "hideFromScreenShare") as? Bool ?? true
-        self.showElapsedTime = UserDefaults.standard.object(forKey: "showElapsedTime") as? Bool ?? true
-        self.keepScreenAwake = UserDefaults.standard.object(forKey: "keepScreenAwake") as? Bool ?? false
-        self.readingPosition = ReadingPosition(rawValue: UserDefaults.standard.string(forKey: "readingPosition") ?? "") ?? .centered
-        self.showParagraphDividers = UserDefaults.standard.object(forKey: "showParagraphDividers") as? Bool ?? false
-        self.showLastSpokenWords = UserDefaults.standard.object(forKey: "showLastSpokenWords") as? Bool ?? true
-        self.selectedMicUID = UserDefaults.standard.string(forKey: "selectedMicUID") ?? ""
-        self.autoNextPage = UserDefaults.standard.object(forKey: "autoNextPage") as? Bool ?? false
-        let savedDelay = UserDefaults.standard.integer(forKey: "autoNextPageDelay")
+        self.hideFromScreenShare = defaults.object(forKey: "hideFromScreenShare") as? Bool ?? true
+        self.showElapsedTime = defaults.object(forKey: "showElapsedTime") as? Bool ?? true
+        self.keepScreenAwake = defaults.object(forKey: "keepScreenAwake") as? Bool ?? false
+        self.readingPosition = ReadingPosition(rawValue: defaults.string(forKey: "readingPosition") ?? "") ?? .centered
+        self.showParagraphDividers = defaults.object(forKey: "showParagraphDividers") as? Bool ?? false
+        self.showLastSpokenWords = defaults.object(forKey: "showLastSpokenWords") as? Bool ?? true
+        self.selectedMicUID = defaults.string(forKey: "selectedMicUID") ?? ""
+        self.autoNextPage = defaults.object(forKey: "autoNextPage") as? Bool ?? false
+        let savedDelay = defaults.integer(forKey: "autoNextPageDelay")
         self.autoNextPageDelay = [0, 1, 3, 5].contains(savedDelay)
-            && UserDefaults.standard.object(forKey: "autoNextPageDelay") != nil
+            && defaults.object(forKey: "autoNextPageDelay") != nil
             ? savedDelay
             : 3
-        let savedFullscreenScreenID = UserDefaults.standard.integer(forKey: "fullscreenScreenID")
+        let savedFullscreenScreenID = defaults.integer(forKey: "fullscreenScreenID")
         self.fullscreenScreenID = UInt32(savedFullscreenScreenID)
-        self.browserServerEnabled = UserDefaults.standard.object(forKey: "browserServerEnabled") as? Bool ?? false
-        let savedPort = UserDefaults.standard.integer(forKey: "browserServerPort")
+        self.browserServerEnabled = defaults.object(forKey: "browserServerEnabled") as? Bool ?? false
+        let savedPort = defaults.integer(forKey: "browserServerPort")
         self.browserServerPort = (1024..<Int(UInt16.max)).contains(savedPort) ? UInt16(savedPort) : 7373
-        self.directorModeEnabled = UserDefaults.standard.object(forKey: "directorModeEnabled") as? Bool ?? false
-        let savedDirectorPort = UserDefaults.standard.integer(forKey: "directorServerPort")
+        self.directorModeEnabled = defaults.object(forKey: "directorModeEnabled") as? Bool ?? false
+        let savedDirectorPort = defaults.integer(forKey: "directorServerPort")
         self.directorServerPort = (1024..<Int(UInt16.max)).contains(savedDirectorPort) ? UInt16(savedDirectorPort) : 7575
     }
 }

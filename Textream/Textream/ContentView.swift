@@ -27,7 +27,7 @@ struct ContentView: View {
     @FocusState private var isTextFocused: Bool
 
     private let defaultText = """
-Welcome to Textream! This is your personal teleprompter that sits right below your MacBook's notch. [smile]
+Welcome to Textream! Move the floating teleprompter anywhere on your screen and resize it for comfortable reading. [smile]
 
 As you read aloud, the text will highlight in real-time, following your voice. The speech recognition matches your words and keeps track of your progress. [pause]
 

@@ -12,53 +12,11 @@ private let paragraphDividerDotSize: CGFloat = 3
 private let paragraphDividerDotSpacing: CGFloat = 5
 private let paragraphDividerDotOpacity: Double = 0.16
 
-// MARK: - CJK-aware word splitting
-
-extension Unicode.Scalar {
-    var isCJK: Bool {
-        let v = value
-        return (v >= 0x4E00 && v <= 0x9FFF)    // CJK Unified Ideographs
-            || (v >= 0x3400 && v <= 0x4DBF)    // CJK Extension A
-            || (v >= 0x20000 && v <= 0x2A6DF)  // CJK Extension B
-            || (v >= 0xF900 && v <= 0xFAFF)    // CJK Compatibility Ideographs
-            || (v >= 0x3040 && v <= 0x309F)    // Hiragana
-            || (v >= 0x30A0 && v <= 0x30FF)    // Katakana
-            || (v >= 0xAC00 && v <= 0xD7AF)    // Hangul Syllables
-    }
-}
-
-/// Splits text into display-ready words. CJK characters (Chinese, Japanese, Korean)
-/// are split into individual characters so the flow layout can wrap them properly.
-func splitTextIntoWords(_ text: String) -> [String] {
-    let tokens = text.replacingOccurrences(of: "\n", with: " ")
-        .split(omittingEmptySubsequences: true, whereSeparator: { $0.isWhitespace })
-        .map { String($0) }
-
-    var result: [String] = []
-    for token in tokens {
-        guard token.unicodeScalars.contains(where: { $0.isCJK }) else {
-            result.append(token)
-            continue
-        }
-        // Token contains CJK characters — split each CJK char individually;
-        // consecutive non-CJK chars (e.g. Latin letters, digits) stay grouped.
-        var buffer = ""
-        for char in token {
-            if char.unicodeScalars.first.map({ $0.isCJK }) == true {
-                if !buffer.isEmpty {
-                    result.append(buffer)
-                    buffer = ""
-                }
-                result.append(String(char))
-            } else {
-                buffer.append(char)
-            }
-        }
-        if !buffer.isEmpty {
-            result.append(buffer)
-        }
-    }
-    return result
+/// Keep rendering, viewport culling and reading anchors on the same row geometry.
+private func prompterLineSpacing(font: NSFont, multiplier: Double) -> CGFloat {
+    let intrinsicHeight = font.ascender - font.descender + font.leading
+    let baseGap: CGFloat = intrinsicHeight / font.pointSize > 1.5 ? 2 : 8
+    return baseGap + ceil(intrinsicHeight) * CGFloat(multiplier - 1)
 }
 
 /// Returns the word indices that begin a new paragraph. Consecutive and
@@ -120,6 +78,7 @@ struct SpeechScrollView: View {
     let words: [String]
     let highlightedCharCount: Int
     var font: NSFont = .systemFont(ofSize: 18, weight: .semibold)
+    var lineSpacingMultiplier: Double = 1
     var highlightColor: Color = .white
     var cueColor: Color = .white
     var cueUnreadOpacity: Double = 0.2
@@ -148,6 +107,7 @@ struct SpeechScrollView: View {
     @State private var allowsNextBackwardTrackingUpdate = false
     @State private var hasAppliedTrackingTarget = false
     @State private var anchoredLayoutWidth: CGFloat = 0
+    @State private var anchoredFontIdentity = ""
     @State private var anchoredParagraphBreakBeforeWordIndices: Set<Int> = []
     @State private var isAnimatingReadingPositionChange = false
     @State private var readingPositionAnimationGeneration = 0
@@ -166,12 +126,15 @@ struct SpeechScrollView: View {
         return smoothScroll ? .linear(duration: 0.06) : .easeOut(duration: 0.5)
     }
 
+    private var fontIdentity: String { "\(font.fontName)|\(font.pointSize)|\(lineSpacingMultiplier)" }
+
     var body: some View {
         GeometryReader { geo in
             WordFlowLayout(
                 words: words,
                 highlightedCharCount: highlightedCharCount,
                 font: font,
+                lineSpacingMultiplier: lineSpacingMultiplier,
                 highlightColor: highlightColor,
                 cueColor: cueColor,
                 cueUnreadOpacity: cueUnreadOpacity,
@@ -200,7 +163,12 @@ struct SpeechScrollView: View {
                 let widthChanged = abs(anchoredLayoutWidth - geo.size.width) > 0.5
                 let paragraphLayoutChanged = anchoredParagraphBreakBeforeWordIndices
                     != paragraphBreakBeforeWordIndices
-                if widthChanged || paragraphLayoutChanged {
+                let fontChanged = anchoredFontIdentity != fontIdentity
+                if fontChanged {
+                    stableTopLineCenter = nil
+                    stableLineAdvance = nil
+                }
+                if widthChanged || paragraphLayoutChanged || fontChanged {
                     hasAppliedTrackingTarget = false
                 }
                 captureStableLineMetrics(from: positions)
@@ -208,9 +176,10 @@ struct SpeechScrollView: View {
                 // Re-anchor after a page switch or any live layout reflow. Keep
                 // the stable vertical metrics during width changes: the visible
                 // preference values may be culled from the middle of the text.
-                if (wasEmpty || widthChanged || paragraphLayoutChanged),
+                if (wasEmpty || widthChanged || paragraphLayoutChanged || fontChanged),
                    !positions.isEmpty {
                     anchoredLayoutWidth = geo.size.width
+                    anchoredFontIdentity = fontIdentity
                     anchoredParagraphBreakBeforeWordIndices = paragraphBreakBeforeWordIndices
                     recalculateTracking(containerHeight: containerHeight)
                 }
@@ -254,6 +223,7 @@ struct SpeechScrollView: View {
                 allowsNextBackwardTrackingUpdate = false
                 hasAppliedTrackingTarget = false
                 anchoredLayoutWidth = 0
+                anchoredFontIdentity = ""
                 anchoredParagraphBreakBeforeWordIndices = []
             }
             .onChange(of: readingPosition) { _, _ in
@@ -443,7 +413,7 @@ struct SpeechScrollView: View {
 
     private var topReadingAnchor: CGFloat {
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
-        let fallbackAdvance = lineHeight + (lineHeight / font.pointSize > 1.5 ? 2 : 8)
+        let fallbackAdvance = lineHeight + prompterLineSpacing(font: font, multiplier: lineSpacingMultiplier)
 
         // The live notch briefly returns to offset zero before measuring Near Top,
         // so it always captures the document's first two rows. The animated
@@ -474,7 +444,9 @@ struct SpeechScrollView: View {
             }
         }
         guard let firstLineY = measuredLines.first?.y else { return }
-        if stableTopLineCenter == nil {
+        // After a live font/spacing change, the first visible row may be deep
+        // into the document. It is only the top-line anchor if word zero is present.
+        if stableTopLineCenter == nil, positions[0] != nil {
             stableTopLineCenter = firstLineY
         }
         if stableLineAdvance == nil, measuredLines.count > 1 {
@@ -577,6 +549,7 @@ struct WordFlowLayout: View {
     let words: [String]
     let highlightedCharCount: Int
     let font: NSFont
+    var lineSpacingMultiplier: Double = 1
     var highlightColor: Color = .white
     var cueColor: Color = .white
     var cueUnreadOpacity: Double = 0.2
@@ -588,13 +561,8 @@ struct WordFlowLayout: View {
     var scrollOffset: CGFloat = 0
     var viewportHeight: CGFloat = 0
 
-    // Compute line spacing based on font metrics — fonts with large built-in
-    // line height (e.g. OpenDyslexic) need less extra spacing
     private var lineSpacing: CGFloat {
-        let intrinsicHeight = font.ascender - font.descender + font.leading
-        let ratio = intrinsicHeight / font.pointSize
-        // System fonts: ratio ~1.2, OpenDyslexic: ratio ~1.7+
-        return ratio > 1.5 ? 2 : 8
+        prompterLineSpacing(font: font, multiplier: lineSpacingMultiplier)
     }
 
     // Simple layout cache to avoid re-measuring words on every highlight update
@@ -666,16 +634,15 @@ struct WordFlowLayout: View {
 
         // Estimate line height for visibility culling using actual font metrics
         let rowHeight = ceil(font.ascender - font.descender + font.leading)
-        let lineH = rowHeight + lineSpacing
-        let lineTop: (Int) -> CGFloat = { lineIndex in
-            CGFloat(lineIndex) * lineH
-                + CGFloat(paragraphPrefixCounts[lineIndex]) * paragraphDividerExtraSpacing
-        }
-        let lineRowHeight: (Int) -> CGFloat = { lineIndex in
-            let beginsParagraph = paragraphPrefixCounts[lineIndex + 1]
-                > paragraphPrefixCounts[lineIndex]
-            return rowHeight + (beginsParagraph ? paragraphDividerExtraSpacing : 0)
-        }
+        let lineGeometry = PrompterLineGeometry(
+            rowHeight: rowHeight,
+            lineSpacing: lineSpacing,
+            paragraphExtraSpacing: paragraphDividerExtraSpacing,
+            paragraphPrefixCounts: paragraphPrefixCounts
+        )
+        let lineH = lineGeometry.lineAdvance
+        let lineTop = lineGeometry.top(of:)
+        let lineRowHeight = lineGeometry.height(of:)
         let totalContentHeight = max(0, lineTop(totalLines) - lineSpacing)
 
         // Determine visible range of lines
@@ -760,6 +727,12 @@ struct WordFlowLayout: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
+        .transformPreference(WordYPreferenceKey.self) { positions in
+            // A speech recovery or skipped cue can jump beyond the rendered
+            // rows. Without its Y coordinate, tracking would remain stuck on
+            // the old viewport, so that row could never be rendered.
+            positions = lineGeometry.fillingMissingPositions(measured: positions, lines: lines)
+        }
         .coordinateSpace(name: "flowLayout")
     }
 

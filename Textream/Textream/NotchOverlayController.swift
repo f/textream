@@ -52,10 +52,11 @@ class OverlayContent {
     var jumpToPageIndex: Int? = nil
 }
 
-class NotchOverlayController: NSObject {
+class NotchOverlayController: NSObject, NSWindowDelegate {
     private let cursorOffset: CGFloat = 8
     private let screenEdgeMargin: CGFloat = 5
     private var panel: NSPanel?
+    private var savesFloatingFrame = false
     let speechRecognizer = SpeechRecognizer()
     let overlayContent = OverlayContent()
     var onComplete: (() -> Void)?
@@ -96,8 +97,6 @@ class NotchOverlayController: NSObject {
             screen = NSScreen.screens.first(where: { $0.displayID == settings.pinnedScreenID }) ?? NSScreen.main ?? NSScreen.screens[0]
         }
 
-        let screenFrame = screen.frame
-
         if settings.overlayMode == .fullscreen {
             let fsScreen: NSScreen
             if settings.fullscreenScreenID != 0,
@@ -114,7 +113,7 @@ class NotchOverlayController: NSObject {
             case .pinned:
                 showPinned(settings: settings, screen: screen)
             case .floating:
-                showFloating(settings: settings, screenFrame: screenFrame)
+                showFloating(settings: settings, screen: screen)
             case .fullscreen:
                 break // handled above
             }
@@ -303,7 +302,6 @@ class NotchOverlayController: NSObject {
         let floatingView = FloatingOverlayView(
             content: overlayContent,
             speechRecognizer: speechRecognizer,
-            baseHeight: panelHeight,
             followingCursor: true
         )
         let contentView = NSHostingView(rootView: floatingView)
@@ -362,22 +360,21 @@ class NotchOverlayController: NSObject {
         installKeyMonitor()
     }
 
-    private func showFloating(settings: NotchSettings, screenFrame: CGRect) {
-        let panelWidth = settings.notchWidth
-        let panelHeight = settings.textAreaHeight
-
-        let xPosition = screenFrame.midX - panelWidth / 2
-        let yPosition = screenFrame.midY - panelHeight / 2 + 100
+    private func showFloating(settings: NotchSettings, screen: NSScreen) {
+        let frame = FloatingWindowGeometry.restoredFrame(
+            saved: settings.floatingWindowFrame,
+            visibleFrames: NSScreen.screens.map(\.visibleFrame),
+            fallback: screen.visibleFrame
+        )
 
         let floatingView = FloatingOverlayView(
             content: overlayContent,
-            speechRecognizer: speechRecognizer,
-            baseHeight: panelHeight
+            speechRecognizer: speechRecognizer
         )
         let contentView = NSHostingView(rootView: floatingView)
 
         let panel = PrompterPanel(
-            contentRect: NSRect(x: xPosition, y: yPosition, width: panelWidth, height: panelHeight),
+            contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
@@ -389,20 +386,38 @@ class NotchOverlayController: NSObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.ignoresMouseEvents = false
         panel.isMovableByWindowBackground = true
-        panel.minSize = NSSize(width: 280, height: panelHeight)
-        panel.maxSize = NSSize(width: 500, height: panelHeight + 350)
+        panel.minSize = FloatingWindowGeometry.minimumSize
+        panel.title = "Textream — Teleprompter"
+        panel.identifier = NSUserInterfaceItemIdentifier("floatingPrompter")
         panel.sharingType = NotchSettings.shared.hideFromScreenShare ? .none : .readOnly
         panel.contentView = contentView
 
         panel.orderFrontRegardless()
         self.panel = panel
+        panel.delegate = self
+        savesFloatingFrame = true
 
         installKeyMonitor()
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        saveFloatingFrame()
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        saveFloatingFrame()
+    }
+
+    private func saveFloatingFrame() {
+        guard savesFloatingFrame, let panel,
+              FloatingWindowGeometry.isValid(panel.frame) else { return }
+        NotchSettings.shared.floatingWindowFrame = panel.frame
     }
 
     func dismiss() {
         guard !isDismissing else { return }
         isDismissing = true
+        saveFloatingFrame()
 
         // Trigger the shrink animation
         speechRecognizer.shouldDismiss = true
@@ -416,8 +431,10 @@ class NotchOverlayController: NSObject {
             self.removeStopButton()
             self.removeEscMonitor()
             self.cancellables.removeAll()
+            self.panel?.delegate = nil
             self.panel?.orderOut(nil)
             self.panel = nil
+            self.savesFloatingFrame = false
             self.frameTracker = nil
             self.endKeepAwakeActivity()
             self.speechRecognizer.shouldDismiss = false
@@ -443,6 +460,7 @@ class NotchOverlayController: NSObject {
     }
 
     private func forceClose() {
+        saveFloatingFrame()
         stopMouseTracking()
         stopCursorTracking()
         removeStopButton()
@@ -450,8 +468,10 @@ class NotchOverlayController: NSObject {
         cancellables.removeAll()
         speechRecognizer.forceStop()
         speechRecognizer.recognizedCharCount = 0
+        panel?.delegate = nil
         panel?.orderOut(nil)
         panel = nil
+        savesFloatingFrame = false
         frameTracker = nil
         endKeepAwakeActivity()
         speechRecognizer.shouldDismiss = false
@@ -924,6 +944,7 @@ struct NotchOverlayView: View {
                 words: words,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
+                lineSpacingMultiplier: NotchSettings.shared.lineSpacingMultiplier,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
                 cueColor: NotchSettings.shared.cueColorPreset.color,
                 cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
@@ -1274,7 +1295,6 @@ struct GlassEffectView: NSViewRepresentable {
 struct FloatingOverlayView: View {
     @Bindable var content: OverlayContent
     @Bindable var speechRecognizer: SpeechRecognizer
-    let baseHeight: CGFloat
     var followingCursor: Bool = false
 
     private var words: [String] { content.words }
@@ -1349,6 +1369,9 @@ struct FloatingOverlayView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !followingCursor {
+                FloatingWindowHeader(settings: NotchSettings.shared)
+            }
             if content.showPagePicker {
                 floatingPagePickerView
             } else if isDone && (listeningMode == .wordTracking || hasNextPage) {
@@ -1359,7 +1382,7 @@ struct FloatingOverlayView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
-            if NotchSettings.shared.showElapsedTime {
+            if followingCursor && NotchSettings.shared.showElapsedTime {
                 ElapsedTimeView(fontSize: 11)
                     .padding(.top, 6)
                     .padding(.trailing, 10)
@@ -1381,6 +1404,13 @@ struct FloatingOverlayView: View {
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(alignment: .bottomTrailing) {
+            if !followingCursor {
+                FloatingWindowResizeGrip()
+                    .frame(width: 20, height: 20)
+                    .padding(2)
+            }
+        }
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.9)
         .onAppear {
@@ -1445,6 +1475,7 @@ struct FloatingOverlayView: View {
                 words: words,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
+                lineSpacingMultiplier: NotchSettings.shared.lineSpacingMultiplier,
                 highlightColor: NotchSettings.shared.fontColorPreset.color,
                 cueColor: NotchSettings.shared.cueColorPreset.color,
                 cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,

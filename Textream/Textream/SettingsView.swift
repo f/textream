@@ -190,7 +190,8 @@ struct NotchPreviewContent: View {
         [
             settings.listeningMode.rawValue,
             settings.fontFamilyPreset.rawValue,
-            settings.fontSizePreset.rawValue,
+            String(settings.fontSize),
+            String(settings.lineSpacingMultiplier),
             settings.showParagraphDividers ? "dividers" : "continuous"
         ].joined(separator: "|")
     }
@@ -270,6 +271,7 @@ struct NotchPreviewContent: View {
                             ? Self.highlightedCount
                             : Self.previewWords.count * 5,
                         font: settings.font,
+                        lineSpacingMultiplier: settings.lineSpacingMultiplier,
                         highlightColor: settings.fontColorPreset.color,
                         cueColor: settings.cueColorPreset.color,
                         cueUnreadOpacity: settings.cueBrightness.unreadOpacity,
@@ -484,50 +486,22 @@ struct SettingsView: View {
         } message: {
             Text("This will restore all settings to their defaults.")
         }
-        .onAppear {
-            if settings.overlayMode != .fullscreen {
-                previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
-            }
-        }
-        .onDisappear {
-            previewController.dismiss()
-        }
+        .onAppear { updatePreview() }
+        .onDisappear { previewController.dismiss() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             previewController.hide()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            if settings.overlayMode != .fullscreen {
-                previewController.show(settings: settings)
-                if settings.followCursorWhenUndocked && settings.overlayMode == .floating {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        previewController.animateToCursor(settings: settings)
-                    }
-                }
-            }
+            updatePreview()
         }
-        .onChange(of: settings.followCursorWhenUndocked) { _, follow in
-            if follow && settings.overlayMode == .floating {
-                previewController.animateToCursor(settings: settings)
-            } else {
-                previewController.animateFromCursor()
-            }
-        }
-        .onChange(of: settings.overlayMode) { _, mode in
-            if mode == .fullscreen {
-                previewController.hide()
-            } else {
-                previewController.show(settings: settings)
-                if mode == .floating && settings.followCursorWhenUndocked {
-                    previewController.animateToCursor(settings: settings)
-                } else if previewController.isAtCursor {
-                    previewController.animateFromCursor()
-                }
-            }
+        .onChange(of: settings.overlayMode) { _, _ in updatePreview() }
+    }
+
+    private func updatePreview() {
+        if settings.overlayMode == .pinned && !TextreamService.shared.overlayController.isShowing {
+            previewController.show(settings: settings)
+        } else {
+            previewController.dismiss()
         }
     }
 
@@ -570,39 +544,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // Text Size
-                Text("Size")
-                    .font(.system(size: 13, weight: .medium))
-
-                HStack(spacing: 8) {
-                    ForEach(FontSizePreset.allCases) { preset in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.fontSizePreset = preset
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text("Ag")
-                                    .font(Font(settings.fontFamilyPreset.font(size: preset.pointSize * 0.7)))
-                                    .foregroundStyle(settings.fontSizePreset == preset ? Color.accentColor : .primary)
-                                Text(preset.label)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(settings.fontSizePreset == preset ? Color.accentColor : .secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.fontSizePreset == preset ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.fontSizePreset == preset ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                PrompterTextControls(settings: settings)
 
                 Divider()
 
@@ -710,43 +652,49 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Dimensions
-                Text("Dimensions")
-                    .font(.system(size: 13, weight: .medium))
+                if settings.overlayMode == .floating && !settings.followCursorWhenUndocked {
+                    Text("Drag the prompter’s top bar to move it. Drag an edge or the bottom-right grip to resize it. Your position and size are remembered automatically.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                } else if settings.overlayMode != .fullscreen {
+                    // Dimensions
+                    Text("Dimensions")
+                        .font(.system(size: 13, weight: .medium))
 
-                VStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Width")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(Int(settings.notchWidth))px")
-                                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.tertiary)
+                    VStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Width")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(settings.notchWidth))px")
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Slider(
+                                value: $settings.notchWidth,
+                                in: NotchSettings.minWidth...NotchSettings.maxWidth,
+                                step: 10
+                            )
                         }
-                        Slider(
-                            value: $settings.notchWidth,
-                            in: NotchSettings.minWidth...NotchSettings.maxWidth,
-                            step: 10
-                        )
-                    }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Height")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(Int(settings.textAreaHeight))px")
-                                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.tertiary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Height")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(settings.textAreaHeight))px")
+                                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Slider(
+                                value: $settings.textAreaHeight,
+                                in: NotchSettings.minHeight...NotchSettings.maxHeight,
+                                step: 10
+                            )
                         }
-                        Slider(
-                            value: $settings.textAreaHeight,
-                            in: NotchSettings.minHeight...NotchSettings.maxHeight,
-                            step: 10
-                        )
                     }
                 }
             }
@@ -1514,12 +1462,14 @@ struct SettingsView: View {
         settings.notchWidth = NotchSettings.defaultWidth
         settings.textAreaHeight = NotchSettings.defaultHeight
         settings.speechLocale = NotchSettings.defaultLocale
-        settings.fontSizePreset = .lg
+        settings.fontSize = NotchSettings.defaultFontSize
+        settings.lineSpacingMultiplier = NotchSettings.defaultLineSpacingMultiplier
         settings.fontFamilyPreset = .sans
         settings.fontColorPreset = .white
         settings.cueColorPreset = .white
         settings.cueBrightness = .dim
-        settings.overlayMode = .pinned
+        settings.overlayMode = .floating
+        settings.floatingWindowFrame = nil
         settings.notchDisplayMode = .followMouse
         settings.pinnedScreenID = 0
         settings.floatingGlassEffect = false

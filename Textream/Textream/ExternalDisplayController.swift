@@ -238,7 +238,6 @@ struct ExternalDisplayView: View {
 
     private var prompterView: some View {
         GeometryReader { geo in
-            let fontSize = max(48, min(96, geo.size.width / 14))
             let hPad = max(40, geo.size.width * 0.08)
 
             VStack(spacing: 0) {
@@ -247,7 +246,8 @@ struct ExternalDisplayView: View {
                 SpeechScrollView(
                     words: words,
                     highlightedCharCount: effectiveCharCount,
-                    font: .systemFont(ofSize: fontSize, weight: .semibold),
+                    font: NotchSettings.shared.font,
+                    lineSpacingMultiplier: NotchSettings.shared.lineSpacingMultiplier,
                     highlightColor: NotchSettings.shared.fontColorPreset.color,
                     cueColor: NotchSettings.shared.cueColorPreset.color,
                     cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,

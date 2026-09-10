@@ -69,6 +69,7 @@ The Textream companion for iPhone and iPad is part of the same universal App Sto
 
 - **Scroll speed** — Adjustable 0.5–8 words/s for Classic and Voice-Activated modes.
 - **Speech language** — Choose your preferred speech recognition language for Word Tracking mode.
+- **Tracking recovery** — A clear nearby phrase can restore tracking after skipped or misrecognized words. Longer skips require a longer matching phrase; silence does not advance the prompt.
 - **Mouse scroll to catch up** — In Classic and Voice-Activated modes, scroll with your mouse to jump ahead or back. The timer pauses while you scroll and resumes from the new position.
 
 ### Overlay Modes
@@ -76,7 +77,7 @@ The Textream companion for iPhone and iPad is part of the same universal App Sto
 | Mode | Description |
 |---|---|
 | **Pinned to Notch** | A Dynamic Island–shaped overlay anchored below the MacBook notch. Sits above all apps. |
-| **Floating Window** | A draggable window you can place anywhere on screen. Always on top. |
+| **Floating Window** (default for new installations) | A draggable, resizable window you can place anywhere on screen. Always on top. |
 | **Fullscreen** | Fullscreen teleprompter on any display. Press **Esc** to stop. |
 
 #### Pinned to Notch options
@@ -86,6 +87,8 @@ The Textream companion for iPhone and iPad is part of the same universal App Sto
 
 #### Floating Window options
 
+- **Move and resize** — Drag the top bar to move the window, or an edge or the bottom-right grip to resize it. Position and size are restored between sessions and kept within an available display.
+- **Live text controls** — Open the text-size button in the top bar to adjust font size and line spacing while reading.
 - **Follow Cursor** — The window follows your mouse cursor. A floating stop button lets you dismiss it.
 - **Glass Effect** — Translucent frosted glass background with adjustable opacity (0–60%).
 
@@ -96,16 +99,20 @@ The Textream companion for iPhone and iPad is part of the same universal App Sto
 
 ### Size
 
-- **Width** — Adjustable overlay width (280–500 px).
-- **Height** — Adjustable text area height (100–400 px).
+- **Floating window** — Starts at 720 × 420 points and can be freely resized, with a minimum size of 280 × 180 points. Follow Cursor retains its own dimensions.
+- **Pinned and Follow Cursor width** — Adjustable overlay width (310–500 points).
+- **Pinned and Follow Cursor height** — Adjustable text area height (100–400 points).
 
 ### Font & Color
 
 | Setting | Options |
 |---|---|
 | **Font Family** | Sans, Serif, Mono, OpenDyslexic (dyslexia-friendly) |
-| **Font Size** | XS (14 pt), SM (16 pt), LG (20 pt), XL (24 pt) |
+| **Font Size** | 14–200 pt; 48 pt for new installations. Existing XS/SM/LG/XL selections migrate to their equivalent point sizes. |
+| **Line Spacing** | 1.0–2.5×; 1.0× preserves the original spacing. |
 | **Highlight Color** | White, Yellow, Green, Blue, Pink, Orange |
+
+Font size and line spacing are saved automatically and shared by Settings and the live controls. Fullscreen and external displays use the same typography preferences.
 
 ### External Display & Sidecar
 
@@ -172,7 +179,7 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 ## How It Works
 
 1. **Paste your script** — Drop your talking points, interview questions, or full script into the text editor.
-2. **Hit play** — The Dynamic Island overlay slides down from the top of your screen.
+2. **Hit play** — The prompter opens in your selected overlay mode.
 3. **Start speaking** — Words highlight in real-time as you read. When you finish, the overlay closes automatically.
 
 ## Building from Source
@@ -201,6 +208,10 @@ open Textream.xcodeproj
 ```
 
 Choose the **Textream** scheme for macOS or **TextreamiOS** for iOS, select a compatible destination, then build and run with ⌘R in Xcode. The **TextreamiOS** scheme also includes the iOS unit tests.
+
+### macOS regression checks
+
+Run `./script/test_preferences.sh` from the repository root to check preference persistence, floating-window geometry, offscreen scroll coordinates, and speech-recovery matching. The checks use an isolated temporary preferences domain and do not start microphone capture or network servers.
 
 ### Install on an iPhone or iPad with Xcode
 

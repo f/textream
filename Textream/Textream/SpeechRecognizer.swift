@@ -118,6 +118,7 @@ class SpeechRecognizer {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine = AVAudioEngine()
     private var sourceText: String = ""
+    private var recoveryMatcher = SpeechRecoveryMatcher(text: "", locale: .current)
     private var normalizedSource: String = ""
     private var annotationRanges: [Range<Int>] = []
     private var voiceActivityDetector = VoiceActivityDetector()
@@ -154,6 +155,7 @@ class SpeechRecognizer {
         let words = splitTextIntoWords(text)
         let collapsed = words.joined(separator: " ")
         sourceText = collapsed
+        recoveryMatcher = SpeechRecoveryMatcher(text: collapsed, locale: Locale(identifier: NotchSettings.shared.speechLocale))
         normalizedSource = Self.normalize(collapsed)
         annotationRanges = SpeechTextAlignment.annotationRanges(in: collapsed)
         recognizedCharCount = min(preservingCharCount, collapsed.count)
@@ -196,6 +198,7 @@ class SpeechRecognizer {
         let words = splitTextIntoWords(text)
         let collapsed = words.joined(separator: " ")
         sourceText = collapsed
+        recoveryMatcher = SpeechRecoveryMatcher(text: collapsed, locale: Locale(identifier: NotchSettings.shared.speechLocale))
         normalizedSource = Self.normalize(collapsed)
         annotationRanges = SpeechTextAlignment.annotationRanges(in: collapsed)
         recognizedCharCount = advancePastAnnotations(from: 0)
@@ -798,7 +801,8 @@ class SpeechRecognizer {
 
     // MARK: - Fuzzy character-level matching
 
-    private func matchCharacters(spoken fullSpoken: String) {
+    /// Applies a transcript without depending on the audio capture lifecycle.
+    func matchCharacters(spoken fullSpoken: String) {
         // Results computed before a jump can be delivered just after it —
         // don't match pre-jump speech against the text at the new offset.
         guard Date().timeIntervalSince(lastJumpAt) > 0.3 else { return }
@@ -829,7 +833,10 @@ class SpeechRecognizer {
 
         let rawCandidate = min(matchStartOffset + best, sourceText.count)
         let candidate = advancePastAnnotations(from: rawCandidate)
-        guard candidate > recognizedCharCount else { return }
+        guard candidate > recognizedCharCount else {
+            recoverTracking(spoken: spoken, fullTranscript: fullSpoken)
+            return
+        }
 
         // Confidence gating: require 2-of-3 recent results to agree on
         // forward movement to avoid single-result false-positive jumps.
@@ -863,6 +870,19 @@ class SpeechRecognizer {
         ) {
             recognizedCharCount = candidate
         }
+        recoverTracking(spoken: spoken, fullTranscript: fullSpoken)
+    }
+
+    private func recoverTracking(spoken: String, fullTranscript: String) {
+        guard let offset = recoveryMatcher.recoveredOffset(
+            spoken: spoken,
+            currentOffset: recognizedCharCount
+        ) else { return }
+
+        recognizedCharCount = advancePastAnnotations(from: offset)
+        matchStartOffset = recognizedCharCount
+        spokenAnchorPrefix = fullTranscript
+        recentMatchPositions.removeAll()
     }
 
     private func advancePastAnnotations(from offset: Int) -> Int {
