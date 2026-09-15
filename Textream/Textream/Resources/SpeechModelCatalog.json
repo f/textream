@@ -9,6 +9,7 @@
       "description": "99-language speech-to-text with translation, auto language detection, segment-level timestamps.",
       "architecture": "whisper",
       "parameters": "38M",
+      "base_model": "openai/whisper-tiny",
       "license": "apache-2.0",
       "languages": [
         "en",
@@ -166,6 +167,7 @@
       "description": "99-language speech-to-text with translation, auto language detection, segment-level timestamps.",
       "architecture": "whisper",
       "parameters": "73M",
+      "base_model": "openai/whisper-base",
       "license": "apache-2.0",
       "languages": [
         "en",
@@ -323,6 +325,7 @@
       "description": "99-language speech-to-text with translation, auto language detection, segment-level timestamps.",
       "architecture": "whisper",
       "parameters": "242M",
+      "base_model": "openai/whisper-small",
       "license": "apache-2.0",
       "languages": [
         "en",
@@ -480,6 +483,7 @@
       "description": "Broadest language, but may run a bit slow",
       "architecture": "whisper",
       "parameters": "764M",
+      "base_model": "openai/whisper-medium",
       "license": "apache-2.0",
       "languages": [
         "en",
@@ -637,6 +641,7 @@
       "description": "100-language speech-to-text with auto language detection, segment-level timestamps.",
       "architecture": "whisper",
       "parameters": "809M",
+      "base_model": "openai/whisper-large-v3-turbo",
       "license": "apache-2.0",
       "languages": [
         "en",
@@ -789,6 +794,7 @@
       "description": "English speech-to-text with streaming.",
       "architecture": "moonshine_streaming",
       "parameters": "44M",
+      "base_model": "UsefulSensors/moonshine-streaming-tiny",
       "license": "mit",
       "languages": [
         "en"
@@ -830,6 +836,7 @@
       "description": "English speech-to-text with streaming.",
       "architecture": "moonshine_streaming",
       "parameters": "140M",
+      "base_model": "UsefulSensors/moonshine-streaming-small",
       "license": "mit",
       "languages": [
         "en"
@@ -871,6 +878,7 @@
       "description": "Fast, accurate live English transcription",
       "architecture": "parakeet",
       "parameters": "0.6B",
+      "base_model": "nvidia/parakeet-unified-en-0.6b",
       "license": "cc-by-4.0",
       "languages": [
         "en"
@@ -930,6 +938,7 @@
       "description": "Fast and accurate. Supports 25 European languages",
       "architecture": "parakeet",
       "parameters": "0.6B",
+      "base_model": "nvidia/parakeet-tdt-0.6b-v3",
       "license": "cc-by-4.0",
       "languages": [
         "bg",
@@ -1013,6 +1022,7 @@
       "description": "Tiny and instant, runs well on any hardware",
       "architecture": "canary",
       "parameters": "180M",
+      "base_model": "nvidia/canary-180m-flash",
       "license": "cc-by-4.0",
       "languages": [
         "en",

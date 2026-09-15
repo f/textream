@@ -182,6 +182,11 @@ struct ModelManagerSheet: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Text("Weights belong to their original authors, listed on each model. GGUF conversions are published by handy-computer and run through transcribe.cpp.")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
     }
@@ -358,6 +363,8 @@ private struct CatalogModelRow: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            attributionLine
+
             HStack(spacing: 10) {
                 Picker("", selection: Binding(get: { quant }, set: onQuantChange)) {
                     ForEach(model.files) { candidate in
@@ -377,6 +384,23 @@ private struct CatalogModelRow: View {
             progressArea
         }
         .padding(.vertical, 8)
+    }
+
+    /// Credits the repo the weights come from, the upstream model, and the
+    /// license. Several of these models are CC-BY-4.0, where attribution is a
+    /// condition of use rather than a courtesy.
+    private var attributionLine: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "link")
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+            Link(model.attribution, destination: model.repoURL)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help("Open \(model.repoID) on Hugging Face")
+        }
     }
 
     @ViewBuilder

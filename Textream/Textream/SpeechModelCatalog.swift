@@ -44,6 +44,9 @@ struct CatalogModel: Codable, Hashable, Identifiable {
     let description: String
     let architecture: String?
     let parameters: String?
+    /// The upstream model these weights were converted from. Shown in the model
+    /// card so the original authors are credited, not just the GGUF publisher.
+    let baseModel: String?
     let license: String?
     let languages: [String]
     let capabilities: CatalogCapabilities
@@ -56,6 +59,7 @@ struct CatalogModel: Codable, Hashable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case repoID = "repo_id"
         case revision, name, description, architecture, parameters, license, languages, capabilities, files, recommended
+        case baseModel = "base_model"
         case speedScore = "speed_score"
         case accuracyScore = "accuracy_score"
         case defaultQuant = "default_quant"
@@ -66,6 +70,26 @@ struct CatalogModel: Codable, Hashable, Identifiable {
     /// Catalog scores are 0–100; the settings bars use 0.0–1.0.
     var normalizedSpeed: Double { (speedScore ?? 0) / 100 }
     var normalizedAccuracy: Double { (accuracyScore ?? 0) / 100 }
+
+    /// The Hugging Face page for the repo these weights come from.
+    var repoURL: URL {
+        URL(string: "https://huggingface.co/\(repoID)")!
+    }
+
+    /// The Hugging Face page for the upstream model, when the catalog names one.
+    var baseModelURL: URL? {
+        baseModel.flatMap { URL(string: "https://huggingface.co/\($0)") }
+    }
+
+    /// Source and license credit for the model card. The license is part of the
+    /// terms for several of these models (the NVIDIA ones are CC-BY-4.0, which
+    /// requires attribution), so it is shown rather than only recorded.
+    var attribution: String {
+        var parts = [repoID]
+        if let baseModel { parts.append("from \(baseModel)") }
+        if let license { parts.append(license.uppercased()) }
+        return parts.joined(separator: " · ")
+    }
 
     var defaultFile: CatalogQuantFile {
         files.first { $0.quant == defaultQuant } ?? files[0]
