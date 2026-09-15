@@ -36,9 +36,9 @@ struct LocalModelSettingsSection: View {
                     .frame(width: 7, height: 7)
                 Text(statusText)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                    .foregroundStyle(failureMessage == nil ? Color.secondary : Color.red)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if store.models.isEmpty {
@@ -72,8 +72,18 @@ struct LocalModelSettingsSection: View {
         downloads.states.values.filter(\.isActive).count
     }
 
+    /// The first failure still on record, so a download that failed while the
+    /// manager sheet was closed is not silently swallowed.
+    private var failureMessage: String? {
+        downloads.states
+            .sorted { $0.key < $1.key }
+            .compactMap { if case .failed(let message) = $0.value { return message } else { return nil } }
+            .first
+    }
+
     private var statusColor: Color {
         if activeDownloadCount > 0 { return .accentColor }
+        if failureMessage != nil { return .red }
         if store.model(named: settings.localModelFilename) != nil { return .green }
         return .secondary
     }
@@ -85,6 +95,7 @@ struct LocalModelSettingsSection: View {
                 ? "Downloading \(Int(overall * 100))%"
                 : "Downloading \(activeDownloadCount) models — \(Int(overall * 100))%"
         }
+        if let failureMessage { return failureMessage }
         if let installed = store.model(named: settings.localModelFilename) {
             return "\(installed.displayName) ready — \(installed.sizeMB) MB"
         }

@@ -42,7 +42,14 @@ final class ModelDownloadManager {
     /// Live state per catalog filename. Absence means "not downloading".
     private(set) var states: [String: ModelDownloadState] = [:]
 
+    /// The task per filename, kept until the transfer's own teardown removes
+    /// it. A cancelled task stays here while it unwinds, which is what lets a
+    /// restart wait for the file handle to close instead of racing it.
     private var tasks: [String: Task<Void, Never>] = [:]
+
+    /// Cancelled tasks that have not finished unwinding yet. A restart or a
+    /// partial delete awaits these before touching the file on disk.
+    private var retiring: [String: Task<Void, Never>] = [:]
 
     private init() {}
 
@@ -72,55 +79,89 @@ final class ModelDownloadManager {
 
     // MARK: - Control
 
+    /// Starts (or restarts) the transfer for one quant file.
+    ///
+    /// A previous task for the same file is awaited before the new one touches
+    /// the partial: `Task.cancel()` only *requests* a stop, so starting
+    /// immediately would give two writers the same `.partial` file handle, and
+    /// the second one's `truncate` would corrupt what the first is still
+    /// writing.
     func download(_ model: CatalogModel, file: CatalogQuantFile) {
-        guard tasks[file.filename] == nil else { return }
-        states[file.filename] = .queued
+        let filename = file.filename
+        guard tasks[filename] == nil else { return }
+        states[filename] = .queued
 
+        let previous = retiring[filename]
         let task = Task { [weak self] in
+            if let previous {
+                previous.cancel()
+                _ = await previous.value
+            }
+            guard !Task.isCancelled else {
+                await MainActor.run { self?.finish(filename, state: nil) }
+                return
+            }
             do {
                 try await Self.perform(model: model, file: file) { received, total, speed in
                     Task { @MainActor [weak self] in
-                        guard self?.tasks[file.filename] != nil else { return }
-                        self?.states[file.filename] = .downloading(received: received, total: total, bytesPerSecond: speed)
+                        guard self?.tasks[filename] != nil else { return }
+                        self?.states[filename] = .downloading(received: received, total: total, bytesPerSecond: speed)
                     }
                 } onVerify: {
                     Task { @MainActor [weak self] in
-                        guard self?.tasks[file.filename] != nil else { return }
-                        self?.states[file.filename] = .verifying
+                        guard self?.tasks[filename] != nil else { return }
+                        self?.states[filename] = .verifying
                     }
                 }
                 await MainActor.run { [weak self] in
-                    self?.tasks[file.filename] = nil
-                    self?.states[file.filename] = nil
+                    self?.finish(filename, state: nil)
                     LocalSpeechModelStore.shared.refresh()
+                    // Downloading a model is a request to use it, so the first
+                    // one to arrive becomes the selection without a second click.
+                    let settings = NotchSettings.shared
+                    if settings.localModelFilename.isEmpty
+                        || LocalSpeechModelStore.shared.model(named: settings.localModelFilename) == nil {
+                        settings.localModelFilename = filename
+                    }
                 }
             } catch is CancellationError {
-                await MainActor.run { [weak self] in
-                    self?.tasks[file.filename] = nil
-                    self?.states[file.filename] = nil
-                }
+                await MainActor.run { [weak self] in self?.finish(filename, state: nil) }
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                await MainActor.run { [weak self] in
-                    self?.tasks[file.filename] = nil
-                    self?.states[file.filename] = .failed(message)
-                }
+                await MainActor.run { [weak self] in self?.finish(filename, state: .failed(message)) }
             }
         }
-        tasks[file.filename] = task
+        tasks[filename] = task
+        retiring[filename] = nil
     }
 
-    /// Stops the transfer but keeps the partial file, so the next attempt resumes.
-    func cancel(_ filename: String) {
-        tasks[filename]?.cancel()
+    /// Clears the bookkeeping for a transfer that has fully unwound.
+    private func finish(_ filename: String, state: ModelDownloadState?) {
         tasks[filename] = nil
+        retiring[filename] = nil
+        states[filename] = state
+    }
+
+    /// Stops the transfer but keeps the partial file, so the next attempt
+    /// resumes. The task is retained as `retiring` so a restart can await it.
+    func cancel(_ filename: String) {
+        guard let task = tasks[filename] else { return }
+        task.cancel()
+        tasks[filename] = nil
+        retiring[filename] = task
         states[filename] = nil
     }
 
     /// Cancels and removes the partial file, discarding the downloaded bytes.
+    /// The delete waits for the writer to unwind, so it cannot race a write.
     func discardPartial(_ filename: String) {
+        let task = tasks[filename] ?? retiring[filename]
         cancel(filename)
-        try? FileManager.default.removeItem(at: Self.partialURL(for: filename))
+        Task {
+            await task?.value
+            try? FileManager.default.removeItem(at: Self.partialURL(for: filename))
+            retiring[filename] = nil
+        }
     }
 
     func clearError(_ filename: String) {

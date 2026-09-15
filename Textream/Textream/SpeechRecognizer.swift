@@ -265,12 +265,12 @@ class SpeechRecognizer {
         guard shouldListen, sessionGeneration == generation else { return }
         let filename = NotchSettings.shared.localModelFilename
         guard !filename.isEmpty else {
-            failListening("Select a local model in Settings → Guidance, or import one first.")
+            failListening("No local model selected. Open Settings → Guidance → Manage Models to download one.")
             return
         }
         let modelURL = LocalSpeechModelStore.modelsDirectory.appendingPathComponent(filename)
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
-            failListening("The selected local model \"\(filename)\" was not found in the models folder. Re-import it in Settings → Guidance.")
+            failListening("The local model \"\(filename)\" is missing from the models folder. Download it again in Settings → Guidance → Manage Models.")
             return
         }
 
