@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A20000000000000000000003 /* TranscribeCpp in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000002 /* TranscribeCpp */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A10000000000000000000015 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -45,6 +49,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000003 /* TranscribeCpp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -105,6 +110,7 @@
 			);
 			name = Textream;
 			packageProductDependencies = (
+				A20000000000000000000002 /* TranscribeCpp */,
 			);
 			productName = Textream;
 			productReference = 446966B42F37E47300AF141F /* Textream.app */;
@@ -186,6 +192,9 @@
 			);
 			mainGroup = 446966AB2F37E47300AF141F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A20000000000000000000001 /* XCLocalSwiftPackageReference "Vendor/TranscribeCpp" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 446966B52F37E47300AF141F /* Products */;
 			projectDirPath = "";
@@ -807,6 +816,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A20000000000000000000001 /* XCLocalSwiftPackageReference "Vendor/TranscribeCpp" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/TranscribeCpp;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A20000000000000000000002 /* TranscribeCpp */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TranscribeCpp;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 446966AC2F37E47300AF141F /* Project object */;
 }

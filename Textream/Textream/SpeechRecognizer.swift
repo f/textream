@@ -132,6 +132,13 @@ class SpeechRecognizer {
     private var suppressConfigChange: Bool = false
     private var requestLock = NSLock()
     private var preemptiveRestartTimer: Timer?
+
+    // Local (custom model) engine state
+    private var localEngineInfo: LocalSpeechEngineInfo?
+    private var currentLocalEngineIsActive = false
+    private var localAudioConverter: AVAudioConverter?
+    private var localConverterInputFormat: AVAudioFormat?
+    private var localConverterOutputFormat: AVAudioFormat?
     /// Sliding window of recent match positions for confidence gating.
     /// We require 2-of-3 recent results to agree before committing a forward jump.
     private var recentMatchPositions: [Int] = []
@@ -241,9 +248,46 @@ class SpeechRecognizer {
     private func beginAfterMicrophoneAccess(for generation: Int) {
         guard shouldListen, sessionGeneration == generation else { return }
         if NotchSettings.shared.listeningMode == .wordTracking {
-            requestSpeechAuthAndBegin(for: generation)
+            if NotchSettings.shared.speechEngine == .local {
+                prepareLocalRecognition(for: generation)
+            } else {
+                requestSpeechAuthAndBegin(for: generation)
+            }
         } else {
             beginRecognition()
+        }
+    }
+
+    /// Loads (or reuses) the selected custom model before starting recognition.
+    /// The model stays loaded inside the engine for the app's lifetime so
+    /// restarts are fast; switching models reloads on the next session.
+    private func prepareLocalRecognition(for generation: Int) {
+        guard shouldListen, sessionGeneration == generation else { return }
+        let filename = NotchSettings.shared.localModelFilename
+        guard !filename.isEmpty else {
+            failListening("No local model selected. Open Settings → Guidance → Manage Models to download one.")
+            return
+        }
+        let modelURL = LocalSpeechModelStore.modelsDirectory.appendingPathComponent(filename)
+        guard FileManager.default.fileExists(atPath: modelURL.path) else {
+            failListening("The local model \"\(filename)\" is missing from the models folder. Download it again in Settings → Guidance → Manage Models.")
+            return
+        }
+
+        let engine = LocalSpeechEngine.shared
+        isStarting = true
+        engine.loadModel(at: modelURL.path) { [weak self] result in
+            guard let self,
+                  self.shouldListen,
+                  self.sessionGeneration == generation else { return }
+            switch result {
+            case .success(let info):
+                self.localEngineInfo = info
+                self.beginRecognition()
+            case .failure(let error):
+                self.localEngineInfo = nil
+                self.failListening("Couldn't load the local model \"\(filename)\": \(error.localizedDescription)")
+            }
         }
     }
 
@@ -283,6 +327,14 @@ class SpeechRecognizer {
         isStarting = false
         error = message
         cleanupRecognition()
+        releaseLocalModel()
+    }
+
+    /// Frees the local model's RAM once a reading session has truly ended.
+    /// Pauses (`stop()`/`resume()`) keep the model loaded; only real ends
+    /// (dismiss, force close, failure) release it.
+    private func releaseLocalModel() {
+        LocalSpeechEngine.shared.unloadModel()
     }
 
     func stop() {
@@ -303,6 +355,7 @@ class SpeechRecognizer {
         retryCount = maxRetries
         recentMatchPositions = []
         cleanupRecognition()
+        releaseLocalModel()
     }
 
     func resume() {
@@ -352,6 +405,20 @@ class SpeechRecognizer {
         cleanupRecognitionTask()
         cleanupAudioEngine()
         voiceActivityDetector.reset()
+        stopLocalEngineSession()
+    }
+
+    /// Ends the active local engine session without unloading the model.
+    private func stopLocalEngineSession() {
+        guard currentLocalEngineIsActive else { return }
+        currentLocalEngineIsActive = false
+        LocalSpeechEngine.shared.onText = nil
+        LocalSpeechEngine.shared.onError = nil
+        LocalSpeechEngine.shared.onFinished = nil
+        LocalSpeechEngine.shared.stop()
+        localAudioConverter = nil
+        localConverterInputFormat = nil
+        localConverterOutputFormat = nil
     }
 
     /// Coalesces all delayed beginRecognition() calls into a single pending work item.
@@ -380,8 +447,20 @@ class SpeechRecognizer {
             isStarting = false
             return
         }
+        // Engine switched to Local mid-session (or a restart raced the first
+        // load): load the model before starting, rather than falling back to
+        // Apple Speech while the user selected local.
+        if NotchSettings.shared.listeningMode == .wordTracking,
+           NotchSettings.shared.speechEngine == .local,
+           localEngineInfo == nil {
+            prepareLocalRecognition(for: sessionGeneration)
+            return
+        }
         let expectedSessionGeneration = sessionGeneration
         let requiresSpeechRecognition = NotchSettings.shared.listeningMode == .wordTracking
+        let usesLocalEngine = requiresSpeechRecognition
+            && NotchSettings.shared.speechEngine == .local
+            && localEngineInfo != nil
         // Ensure clean state
         cleanupRecognition()
         guard shouldListen, sessionGeneration == expectedSessionGeneration else {
@@ -431,7 +510,12 @@ class SpeechRecognizer {
             }
         }
 
-        if requiresSpeechRecognition {
+        if usesLocalEngine {
+            // Custom local models replace SFSpeechRecognizer entirely; the
+            // same audio tap below feeds the local engine instead.
+            speechRecognizer = nil
+            recognitionRequest = nil
+        } else if requiresSpeechRecognition {
             speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
             guard let speechRecognizer else {
                 // nil means the locale isn't supported for speech recognition —
@@ -614,7 +698,9 @@ class SpeechRecognizer {
             error = nil
             isStarting = false
             isListening = true
-            if requiresSpeechRecognition {
+            if usesLocalEngine {
+                startLocalEngineSession()
+            } else if requiresSpeechRecognition {
                 startPreemptiveTimer()
             }
         } catch {
@@ -654,9 +740,154 @@ class SpeechRecognizer {
     }
 
     private func appendBufferToRequest(_ buffer: AVAudioPCMBuffer) {
+        if currentLocalEngineIsActive {
+            feedLocalEngine(buffer)
+            return
+        }
         requestLock.lock()
         recognitionRequest?.append(buffer)
         requestLock.unlock()
+    }
+
+    // MARK: - Local engine
+
+    private func startLocalEngineSession() {
+        guard let info = localEngineInfo else { return }
+        let engine = LocalSpeechEngine.shared
+        currentLocalEngineIsActive = true
+
+        let generation = sessionGeneration
+        let language = Self.localLanguageHint(
+            for: info,
+            preferredLocale: NotchSettings.shared.speechLocale
+        )
+        let prompt = localInitialPrompt()
+
+        engine.onText = { [weak self] text, isNewWindow in
+            guard let self,
+                  self.shouldListen,
+                  self.sessionGeneration == generation,
+                  !self.sourceText.isEmpty else { return }
+            if isNewWindow {
+                // Rolling window rolled over: re-anchor matching at the current
+                // progress so old transcripts can't be re-matched.
+                self.matchStartOffset = self.recognizedCharCount
+                self.recentMatchPositions = []
+            }
+            self.retryCount = 0
+            self.lastSpokenText = text
+            self.matchCharacters(spoken: text)
+        }
+        engine.onError = { [weak self] message in
+            guard let self,
+                  self.shouldListen,
+                  self.sessionGeneration == generation else { return }
+            self.failListening(message)
+        }
+        engine.onFinished = { [weak self] in
+            guard let self,
+                  self.shouldListen,
+                  self.sessionGeneration == generation else { return }
+            self.retryCount = 0
+        }
+
+        engine.start(language: language, initialPrompt: prompt)
+    }
+
+    /// Converts the hardware-rate tap buffers to the 16 kHz mono float32 the
+    /// local engine expects, then hands them over without blocking the tap.
+    private func feedLocalEngine(_ buffer: AVAudioPCMBuffer) {
+        guard buffer.frameLength > 0 else { return }
+        let engine = LocalSpeechEngine.shared
+        let inputFormat = buffer.format
+
+        if localAudioConverter == nil
+            || localConverterInputFormat?.sampleRate != inputFormat.sampleRate
+            || localConverterInputFormat?.channelCount != inputFormat.channelCount {
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 16_000,
+                channels: 1,
+                interleaved: false
+            ), let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else { return }
+            localConverterOutputFormat = outputFormat
+            localConverterInputFormat = inputFormat
+            localAudioConverter = converter
+        }
+
+        guard let converter = localAudioConverter,
+              let outputFormat = localConverterOutputFormat else { return }
+
+        let ratio = outputFormat.sampleRate / inputFormat.sampleRate
+        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
+        guard let output = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
+
+        var conversionError: NSError?
+        var suppliedInput = false
+        converter.convert(to: output, error: &conversionError) { _, status in
+            if suppliedInput {
+                status.pointee = .noDataNow
+                return nil
+            }
+            suppliedInput = true
+            status.pointee = .haveData
+            return buffer
+        }
+
+        guard conversionError == nil,
+              output.frameLength > 0,
+              let channel = output.floatChannelData?[0] else { return }
+        engine.feed(Array(UnsafeBufferPointer(start: channel, count: Int(output.frameLength))))
+    }
+
+    private func localInitialPrompt() -> String? {
+        // Vocabulary hint, not a script echo: pasting the upcoming sentence as
+        // the prompt can make Whisper skip words it assumes are already
+        // transcribed. Distinctive words only (Handy's custom-words approach).
+        let upcoming = String(sourceText.dropFirst(matchStartOffset))
+        var seen = Set<String>()
+        var words: [String] = []
+        for raw in upcoming.split(separator: " ").prefix(80) {
+            let word = raw.trimmingCharacters(in: .punctuationCharacters)
+            guard word.count >= 6, seen.insert(word.lowercased()).inserted else { continue }
+            words.append(word)
+            if words.count >= 15 { break }
+        }
+        return words.isEmpty ? nil : words.joined(separator: ", ")
+    }
+
+    private static func localLanguageHint(
+        for info: LocalSpeechEngineInfo,
+        preferredLocale: String
+    ) -> String? {
+        // Mirrors Handy's run-plan language resolution: only ever pass a
+        // language the model advertises, using the model's own concrete code
+        // (Nemotron wants "en-US", not "en"); let the model auto-detect when
+        // it can, and pin a fallback when it can't.
+        guard !info.languages.isEmpty else { return nil }
+        let preferred = baseLanguageCode(preferredLocale)
+        if !preferred.isEmpty {
+            if let exact = info.languages.first(where: {
+                $0.caseInsensitiveCompare(preferredLocale) == .orderedSame
+            }) {
+                return exact
+            }
+            if let sameLanguage = info.languages.first(where: { baseLanguageCode($0) == preferred }) {
+                return sameLanguage
+            }
+        }
+        if info.supportsLanguageDetection { return nil }
+        if let english = info.languages.first(where: { baseLanguageCode($0) == "en" }) {
+            return english
+        }
+        return info.languages.first
+    }
+
+    private static func baseLanguageCode(_ identifier: String) -> String {
+        identifier
+            .split(whereSeparator: { $0 == "-" || $0 == "_" })
+            .first
+            .map { String($0).lowercased() } ?? ""
     }
 
     // MARK: - Soft restart (task only, keeps audio engine running)

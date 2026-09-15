@@ -313,6 +313,30 @@ enum ListeningMode: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Speech Engine
+
+enum SpeechEngine: String, CaseIterable, Identifiable {
+    case apple, local
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .apple: return "Apple Speech"
+        case .local: return "Local Model"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .apple:
+            return "Uses macOS speech recognition. Audio may be processed by Apple."
+        case .local:
+            return "Runs a custom Whisper-family model on this Mac. Audio never leaves the device."
+        }
+    }
+}
+
 // MARK: - Reading Position
 
 enum ReadingPosition: String, CaseIterable, Identifiable {
@@ -411,6 +435,16 @@ class NotchSettings {
 
     var listeningMode: ListeningMode {
         didSet { UserDefaults.standard.set(listeningMode.rawValue, forKey: "listeningMode") }
+    }
+
+    /// Which speech recognition engine drives Word Tracking.
+    var speechEngine: SpeechEngine {
+        didSet { UserDefaults.standard.set(speechEngine.rawValue, forKey: "speechEngine") }
+    }
+
+    /// Filename of the selected custom model inside the local models directory.
+    var localModelFilename: String {
+        didSet { UserDefaults.standard.set(localModelFilename, forKey: "localModelFilename") }
     }
 
     /// Words per second for classic and silence-paused modes
@@ -526,6 +560,8 @@ class NotchSettings {
         self.externalScreenID = UInt32(savedScreenID)
         self.mirrorAxis = MirrorAxis(rawValue: UserDefaults.standard.string(forKey: "mirrorAxis") ?? "") ?? .horizontal
         self.listeningMode = ListeningMode(rawValue: UserDefaults.standard.string(forKey: "listeningMode") ?? "") ?? .wordTracking
+        self.speechEngine = SpeechEngine(rawValue: UserDefaults.standard.string(forKey: "speechEngine") ?? "") ?? .apple
+        self.localModelFilename = UserDefaults.standard.string(forKey: "localModelFilename") ?? ""
         let savedSpeed = UserDefaults.standard.double(forKey: "scrollSpeed")
         self.scrollSpeed = savedSpeed > 0 ? savedSpeed : 3
         self.hideFromScreenShare = UserDefaults.standard.object(forKey: "hideFromScreenShare") as? Bool ?? true
