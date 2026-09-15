@@ -118,10 +118,13 @@ struct ModelManagerSheet: View {
 
     @State private var store = LocalSpeechModelStore.shared
     @State private var downloads = ModelDownloadManager.shared
+    @State private var repositories = ModelRepositoryStore.shared
     @State private var quantSelection: [String: String] = [:]
     @State private var isImporting = false
     @State private var errorMessage: String?
     @State private var showInstalledOnly = false
+    @State private var repoInput = ""
+    @State private var isResolvingRepo = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -140,7 +143,8 @@ struct ModelManagerSheet: View {
                             onDownload: { download(model) },
                             onCancel: { downloads.cancel(selectedFile(for: model).filename) },
                             onDelete: { deleteInstalled(selectedFile(for: model).filename) },
-                            onSelect: { settings.localModelFilename = selectedFile(for: model).filename }
+                            onSelect: { settings.localModelFilename = selectedFile(for: model).filename },
+                            onRemoveRepository: model.isUserAdded ? { removeRepository(model) } : nil
                         )
                         .padding(.horizontal, 16)
                     }
@@ -187,9 +191,49 @@ struct ModelManagerSheet: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            addRepositoryField
         }
         .padding(16)
     }
+
+    /// Adds any public Hugging Face repo that holds GGUF speech models. The
+    /// bundled list is a starting set, not the limit: other people publish
+    /// conversions too.
+    private var addRepositoryField: some View {
+        HStack(spacing: 6) {
+            TextField("Add a Hugging Face repo — owner/name", text: $repoInput)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .disabled(isResolvingRepo)
+                .onSubmit { addRepository() }
+
+            if isResolvingRepo {
+                ProgressView().controlSize(.small)
+            } else {
+                Button("Add") { addRepository() }
+                    .controlSize(.small)
+                    .disabled(repoInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+    }
+
+    private func addRepository() {
+        let input = repoInput
+        guard !input.trimmingCharacters(in: .whitespaces).isEmpty, !isResolvingRepo else { return }
+        Task {
+            isResolvingRepo = true
+            defer { isResolvingRepo = false }
+            do {
+                _ = try await repositories.add(repoID: input)
+                repoInput = ""
+                errorMessage = nil
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
+        }
+    }
+
 
     private var footer: some View {
         HStack(spacing: 8) {
@@ -248,9 +292,14 @@ struct ModelManagerSheet: View {
 
     // MARK: - Model resolution
 
+    /// The bundled catalog followed by the repos the user added.
+    private var allModels: [CatalogModel] {
+        SpeechModelCatalog.models + repositories.models
+    }
+
     private var visibleModels: [CatalogModel] {
-        guard showInstalledOnly else { return SpeechModelCatalog.models }
-        return SpeechModelCatalog.models.filter { model in
+        guard showInstalledOnly else { return allModels }
+        return allModels.filter { model in
             model.files.contains { store.model(named: $0.filename) != nil }
         }
     }
@@ -267,9 +316,10 @@ struct ModelManagerSheet: View {
         model.file(quant: quant(for: model)) ?? model.defaultFile
     }
 
-    /// Installed files the catalog does not know about — user imports.
+    /// Installed files no listed model claims — files the user imported by hand.
     private var customModels: [LocalSpeechModel] {
-        store.models.filter { SpeechModelCatalog.model(containing: $0.filename) == nil }
+        let known = Set(allModels.flatMap { $0.files.map(\.filename) })
+        return store.models.filter { !known.contains($0.filename) }
     }
 
     // MARK: - Actions
@@ -294,6 +344,14 @@ struct ModelManagerSheet: View {
             errorMessage = error.localizedDescription
         }
     }
+
+    /// Drops a user-added repo from the list. Files already downloaded from it
+    /// stay on disk and keep working; they simply move to the imported section.
+    private func removeRepository(_ model: CatalogModel) {
+        repositories.remove(model)
+        errorMessage = nil
+    }
+
 
     private func importModel() {
         let panel = NSOpenPanel()
@@ -330,6 +388,8 @@ private struct CatalogModelRow: View {
     let onCancel: () -> Void
     let onDelete: () -> Void
     let onSelect: () -> Void
+    /// Present only for user-added repos, which can be removed from the list.
+    let onRemoveRepository: (() -> Void)?
 
     @State private var store = LocalSpeechModelStore.shared
     @State private var downloads = ModelDownloadManager.shared
@@ -354,11 +414,14 @@ private struct CatalogModelRow: View {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
+                if model.isUserAdded {
+                    Text("ADDED")
+                }
                 Spacer()
                 actionButtons
             }
 
-            Text("\(model.description) — \(model.languageSummary)")
+            Text(model.languageSummary.isEmpty ? model.description : "\(model.description) — \(model.languageSummary)")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -456,6 +519,17 @@ private struct CatalogModelRow: View {
         } else {
             Button(state == nil ? "Download" : "Retry") { onDownload() }
                 .controlSize(.small)
+        }
+        if let onRemoveRepository, state?.isActive != true {
+            Button {
+                onRemoveRepository()
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Remove \(model.repoID) from the list")
         }
     }
 }

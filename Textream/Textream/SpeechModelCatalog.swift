@@ -55,10 +55,14 @@ struct CatalogModel: Codable, Hashable, Identifiable {
     let defaultQuant: String?
     let files: [CatalogQuantFile]
     let recommended: Bool
+    /// Set for repos the user added themselves. Absent from the bundled
+    /// catalog's JSON, where it decodes as nil and reads as false.
+    let userAdded: Bool?
 
     enum CodingKeys: String, CodingKey {
         case repoID = "repo_id"
         case revision, name, description, architecture, parameters, license, languages, capabilities, files, recommended
+        case userAdded = "user_added"
         case baseModel = "base_model"
         case speedScore = "speed_score"
         case accuracyScore = "accuracy_score"
@@ -66,6 +70,8 @@ struct CatalogModel: Codable, Hashable, Identifiable {
     }
 
     var id: String { repoID }
+
+    var isUserAdded: Bool { userAdded == true }
 
     /// Catalog scores are 0–100; the settings bars use 0.0–1.0.
     var normalizedSpeed: Double { (speedScore ?? 0) / 100 }
