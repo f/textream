@@ -36,3 +36,6 @@ Pods/
 *~
 *.orig
 *.log
+
+# Agent screenshots
+docs/ss/
