@@ -491,8 +491,13 @@ struct SpeechScrollView: View {
     /// corrections from speech recognition must not produce a down/up bounce.
     /// Explicit taps and manual scrolling opt into one backward reposition.
     private func applyTrackingTarget(_ target: CGFloat, force: Bool = false) {
+        // The recogniser only moves backward on a deliberate jump or a
+        // confirmed re-read, never by jitter, so a backward target of a line
+        // or more is a real regression and the view should follow it.
+        let regressionThreshold = (stableLineAdvance ?? 40) * 0.9
         if !hasAppliedTrackingTarget
             || target < scrollOffset - 1
+            || target > scrollOffset + regressionThreshold
             || allowsNextBackwardTrackingUpdate
             || force {
             scrollOffset = target

@@ -829,7 +829,14 @@ class SpeechRecognizer {
 
         let rawCandidate = min(matchStartOffset + best, sourceText.count)
         let candidate = advancePastAnnotations(from: rawCandidate)
-        guard candidate > recognizedCharCount else { return }
+        guard candidate > recognizedCharCount else {
+            // No forward progress: the reader may have gone back to re-read
+            // an earlier line. Look behind the current position for the
+            // last few spoken words.
+            checkForRegression(spoken: spoken, fullSpoken: fullSpoken)
+            return
+        }
+        regressionCandidates = []
 
         // Confidence gating: require 2-of-3 recent results to agree on
         // forward movement to avoid single-result false-positive jumps.
@@ -863,6 +870,75 @@ class SpeechRecognizer {
         ) {
             recognizedCharCount = candidate
         }
+    }
+
+    // MARK: - Regression (re-reading an earlier line)
+
+    private var regressionCandidates: [Int] = []
+    private static let regressionWindowChars = 700
+    private static let regressionMinWords = 4
+
+    /// If the tail of what was just spoken matches a run of words behind the
+    /// current position, jump back there. Requires two consecutive results to
+    /// agree so a single misheard phrase cannot yank the prompter backwards.
+    private func checkForRegression(spoken: String, fullSpoken: String) {
+        let spokenWords = splitTextIntoWords(spoken.lowercased())
+            .map { $0.filter { $0.isLetter || $0.isNumber } }
+            .filter { !$0.isEmpty }
+        guard spokenWords.count >= Self.regressionMinWords else { return }
+        let tail = Array(spokenWords.suffix(Self.regressionMinWords + 2))
+
+        let windowStart = max(0, recognizedCharCount - Self.regressionWindowChars)
+        guard windowStart < recognizedCharCount else { return }
+
+        // Source words with their char offsets, restricted to the window.
+        var offsets: [(word: String, start: Int)] = []
+        var pos = 0
+        for w in sourceText.split(separator: " ", omittingEmptySubsequences: false) {
+            let word = String(w)
+            if pos >= windowStart, pos < recognizedCharCount, !Self.isAnnotationWord(word) {
+                let clean = word.lowercased().filter { $0.isLetter || $0.isNumber }
+                if !clean.isEmpty { offsets.append((clean, pos)) }
+            }
+            pos += word.count + 1
+        }
+        guard offsets.count >= Self.regressionMinWords else { return }
+
+        // Best run: longest consecutive match of the spoken tail inside the window.
+        var bestStart: Int? = nil
+        var bestLen = 0
+        for i in 0..<offsets.count {
+            var len = 0
+            var j = 0
+            while i + len < offsets.count, j < tail.count {
+                let src = offsets[i + len].word, spk = tail[j]
+                if src == spk || isFuzzyMatch(src, spk) { len += 1 }
+                j += 1
+            }
+            if len > bestLen { bestLen = len; bestStart = offsets[i].start }
+        }
+        guard bestLen >= Self.regressionMinWords, let start = bestStart,
+              start < recognizedCharCount - 20 else {
+            regressionCandidates = []
+            return
+        }
+
+        regressionCandidates.append(start)
+        if regressionCandidates.count > 2 { regressionCandidates.removeFirst() }
+        guard regressionCandidates.count == 2,
+              abs(regressionCandidates[0] - regressionCandidates[1]) <= 15 else { return }
+        regressionCandidates = []
+
+        // Land at the start of the re-read run; matching resumes from there
+        // with only the re-read words left in the transcript.
+        let target = advancePastAnnotations(from: start)
+        recognizedCharCount = target
+        matchStartOffset = target
+        recentMatchPositions = []
+        let keep = max(0, fullSpoken.count - spoken.count)
+        let tailChars = tail.reduce(0) { $0 + $1.count + 1 }
+        spokenAnchorPrefix = String(fullSpoken.prefix(max(keep, fullSpoken.count - tailChars)))
+        lastJumpAt = Date()
     }
 
     private func advancePastAnnotations(from offset: Int) -> Int {
