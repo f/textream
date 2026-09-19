@@ -7,6 +7,7 @@ struct RootView: View {
     @State private var isShowingExpandedScriptEditor = false
     @State private var isInlineScriptEditorFocused = false
     @State private var languageSuggestions = SpeechLanguageSuggestionCoordinator()
+    @State private var isShowingMacScanner = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -69,6 +70,7 @@ struct RootView: View {
         .fullScreenCover(isPresented: $model.isShowingSession) {
             PromptSessionView(
                 configuration: model.configuration(),
+                macFollower: model.followMode == .followMac ? model.macFollower : nil,
                 onScrollSpeedChanged: { speed in
                     model.scrollSpeed = speed
                 },
@@ -268,7 +270,11 @@ struct RootView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if model.followMode != .wordTracking {
+            if model.followMode == .followMac {
+                macConnectPanel
+            }
+
+            if model.followMode == .classic || model.followMode == .voiceActivated {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Speed")
@@ -386,13 +392,80 @@ struct RootView: View {
         .accessibilityIdentifier("startSessionButton")
     }
 
+    /// Follow Mac: address entry, QR scan, and live connection state.
+    private var macConnectPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                TextField("Mac address, e.g. 192.168.0.12:7373", text: $model.macAddress)
+                    .textFieldStyle(.roundedBorder)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit { model.macFollower.connect(to: model.macAddress) }
+                    .accessibilityIdentifier("macAddressField")
+
+                Button {
+                    isShowingMacScanner = true
+                } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 40, height: 34)
+                }
+                .buttonStyle(.glass)
+                .accessibilityLabel("Scan the Mac's QR code")
+            }
+
+            HStack(spacing: 10) {
+                Button(model.macFollower.isConnected ? "Disconnect" : "Connect") {
+                    if model.macFollower.isConnected {
+                        model.macFollower.disconnect()
+                    } else {
+                        model.macFollower.connect(to: model.macAddress)
+                    }
+                }
+                .buttonStyle(.glass)
+                .disabled(model.macAddress.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                Text(model.macFollower.statusText)
+                    .font(.caption)
+                    .foregroundStyle(model.macFollower.isConnected ? Color.green : Color.secondary)
+                    .lineLimit(2)
+            }
+
+            Text("On the Mac: Settings → Remote → enable Remote Connection, then scan its QR code. The Mac's microphone does the word tracking.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .sheet(isPresented: $isShowingMacScanner) {
+            MacQRScannerView { code in
+                isShowingMacScanner = false
+                model.macAddress = code
+                    .replacingOccurrences(of: "http://", with: "")
+                    .replacingOccurrences(of: "https://", with: "")
+                model.macFollower.connect(to: code)
+            }
+            .ignoresSafeArea()
+            .overlay(alignment: .top) {
+                Text("Point at the QR code in Settings → Remote on the Mac")
+                    .font(.footnote.weight(.semibold))
+                    .padding(10)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .foregroundStyle(.white)
+                    .padding(.top, 16)
+            }
+        }
+    }
+
     private var startSessionIcon: String {
         if model.sessionMode == .record { return "camera.fill" }
+        if model.followMode == .followMac { return "desktopcomputer" }
         return model.mirrorEnabled ? "arrow.left.and.right" : "play.fill"
     }
 
     private var startSessionLabel: String {
         if model.sessionMode == .record { return "Open Camera" }
+        if model.followMode == .followMac { return "Follow the Mac" }
         return model.mirrorEnabled ? "Start Mirror Mode" : "Start Prompter"
     }
 

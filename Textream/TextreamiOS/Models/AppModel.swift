@@ -21,6 +21,7 @@ final class AppModel {
         static let cueBrightness = "ios.cueBrightness"
         static let overlayOpacity = "ios.overlayOpacity"
         static let speechLocale = "ios.speechLocale"
+        static let macAddress = "ios.macAddress"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -44,6 +45,11 @@ final class AppModel {
     var speechLocaleIdentifier: String { didSet { defaults.set(speechLocaleIdentifier, forKey: Key.speechLocale) } }
     var isShowingSession = false
     var isShowingSettings = false
+
+    /// Follow Mac: the live feed from Textream on the Mac.
+    let macFollower = MacFollower()
+    /// Last Mac address used, so reconnecting is one tap.
+    var macAddress: String { didSet { defaults.set(macAddress, forKey: Key.macAddress) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -71,6 +77,7 @@ final class AppModel {
         cueBrightness = CueBrightness(rawValue: defaults.string(forKey: Key.cueBrightness) ?? "") ?? .dim
         let savedOpacity = defaults.double(forKey: Key.overlayOpacity)
         overlayOpacity = savedOpacity > 0 ? savedOpacity : 0.52
+        macAddress = defaults.string(forKey: Key.macAddress) ?? ""
         if let savedLocale = defaults.string(forKey: Key.speechLocale), !savedLocale.isEmpty {
             speechLocaleIdentifier = savedLocale
         } else {
@@ -86,16 +93,29 @@ final class AppModel {
     }
 
     var normalizedScript: PromptScript { PromptScript(script) }
-    var canStart: Bool { !normalizedScript.text.isEmpty }
+    var canStart: Bool {
+        if followMode == .followMac { return macFollower.isConnected && macFollower.hasScript }
+        return !normalizedScript.text.isEmpty
+    }
 
     func startSession() {
         guard canStart else { return }
+        if followMode == .followMac {
+            // The session renders the Mac's script; keep the local draft as is.
+            sessionScriptOverride = macFollower.scriptText
+        } else {
+            sessionScriptOverride = nil
+        }
         isShowingSession = true
     }
 
+    /// Script the current session was started with when it did not come
+    /// from the editor (Follow Mac).
+    @ObservationIgnored private var sessionScriptOverride: String?
+
     func configuration() -> PromptSessionConfiguration {
         PromptSessionConfiguration(
-            script: script,
+            script: sessionScriptOverride ?? script,
             sessionMode: sessionMode,
             cameraEnabled: cameraEnabled,
             followMode: followMode,

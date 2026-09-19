@@ -6,22 +6,24 @@
 	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Textream uses the camera to preview and record your teleprompter videos.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Textream connects to Textream on your Mac over your local network to follow its script.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Textream uses the microphone to record video audio, detect when you speak, and follow your script.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Textream saves completed videos to your Photos library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Textream shows only the videos you recorded with Textream from your Photos library.</string>
-	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
-	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Textream uses Apple Speech Recognition to follow and highlight the words you read aloud.</string>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>OpenDyslexic3-Regular.ttf</string>
 	</array>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

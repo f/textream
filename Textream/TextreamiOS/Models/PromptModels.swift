@@ -27,6 +27,7 @@ enum FollowMode: String, CaseIterable, Identifiable, Codable {
     case wordTracking
     case classic
     case voiceActivated
+    case followMac
 
     var id: String { rawValue }
 
@@ -35,6 +36,7 @@ enum FollowMode: String, CaseIterable, Identifiable, Codable {
         case .wordTracking: "Word Tracking"
         case .classic: "Classic"
         case .voiceActivated: "Voice-Activated"
+        case .followMac: "Follow Mac"
         }
     }
 
@@ -43,6 +45,7 @@ enum FollowMode: String, CaseIterable, Identifiable, Codable {
         case .wordTracking: "Follow"
         case .classic: "Auto"
         case .voiceActivated: "Voice"
+        case .followMac: "Mac"
         }
     }
 
@@ -51,6 +54,7 @@ enum FollowMode: String, CaseIterable, Identifiable, Codable {
         case .wordTracking: "Follows and highlights the words you say."
         case .classic: "Scrolls at a constant speed without the microphone."
         case .voiceActivated: "Scrolls while you speak and pauses in silence."
+        case .followMac: "Shows the script from Textream on your Mac and follows its word tracking."
         }
     }
 
@@ -59,10 +63,15 @@ enum FollowMode: String, CaseIterable, Identifiable, Codable {
         case .wordTracking: "text.word.spacing"
         case .classic: "arrow.down.circle"
         case .voiceActivated: "waveform.circle"
+        case .followMac: "desktopcomputer"
         }
     }
 
-    var requiresMicrophone: Bool { self != .classic }
+    /// Follow Mac uses the Mac's microphone, not the phone's.
+    var requiresMicrophone: Bool { self == .wordTracking || self == .voiceActivated }
+
+    /// Highlighting per word, whether tracked here or on the Mac.
+    var highlightsWords: Bool { self == .wordTracking || self == .followMac }
 }
 
 enum PromptReadingPosition: String, CaseIterable, Identifiable, Codable {

@@ -22,12 +22,16 @@ struct PromptSessionView: View {
 
     init(
         configuration: PromptSessionConfiguration,
+        macFollower: MacFollower? = nil,
         onScrollSpeedChanged: @escaping (Double) -> Void = { _ in },
         onDisplaySettingsChanged: @escaping (PromptDisplaySettings) -> Void = { _ in }
     ) {
         self.onScrollSpeedChanged = onScrollSpeedChanged
         self.onDisplaySettingsChanged = onDisplaySettingsChanged
-        _controller = State(initialValue: PromptSessionController(configuration: configuration))
+        _controller = State(initialValue: PromptSessionController(
+            configuration: configuration,
+            macFollower: macFollower
+        ))
         _displaySettings = State(
             initialValue: PromptDisplaySettings(configuration: configuration)
         )
@@ -61,7 +65,7 @@ struct PromptSessionView: View {
                     cueColor: controller.configuration.cueColor.uiColor,
                     cueUnreadOpacity: controller.configuration.cueBrightness.unreadOpacity,
                     cueReadOpacity: controller.configuration.cueBrightness.readOpacity,
-                    wordTracking: controller.configuration.followMode == .wordTracking,
+                    wordTracking: controller.configuration.followMode.highlightsWords,
                     continuousWordProgress: controller.continuousWordProgress,
                     allowsHorizontalSpeedAdjustment: controller.canAdjustScrollSpeed,
                     readingPosition: displaySettings.readingPosition,
