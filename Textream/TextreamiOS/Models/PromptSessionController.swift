@@ -44,6 +44,8 @@ final class PromptSessionController {
     let prompt: PromptScript
     let speechFollower: SpeechFollower
     let captureController: CaptureController
+    /// Present in Follow Mac mode: the phone renders the Mac's session.
+    let macFollower: MacFollower?
 
     private(set) var isPrepared = false
     private(set) var isPromptRunning = false
@@ -60,8 +62,9 @@ final class PromptSessionController {
     @ObservationIgnored private var wasRunningBeforeManualScroll = false
     @ObservationIgnored private var scrollSpeedAtGestureStart: Double
 
-    init(configuration: PromptSessionConfiguration) {
+    init(configuration: PromptSessionConfiguration, macFollower: MacFollower? = nil) {
         self.configuration = configuration
+        self.macFollower = macFollower
         prompt = PromptScript(configuration.script)
         showsCamera = configuration.usesCamera
         let initialScrollSpeed = min(
@@ -79,6 +82,8 @@ final class PromptSessionController {
         switch configuration.followMode {
         case .wordTracking:
             speechFollower.recognizedCharacterCount
+        case .followMac:
+            min(prompt.characterCount, macFollower?.highlightedCharacterCount ?? 0)
         case .classic, .voiceActivated:
             prompt.characterOffset(forWordProgress: timerWordProgress)
         }
@@ -91,7 +96,7 @@ final class PromptSessionController {
         switch configuration.followMode {
         case .classic, .voiceActivated:
             timerWordProgress
-        case .wordTracking:
+        case .wordTracking, .followMac:
             nil
         }
     }
@@ -119,6 +124,7 @@ final class PromptSessionController {
     var canStartPrompt: Bool {
         isPrepared
             && (configuration.followMode != .wordTracking || isSpeechReady)
+            && (configuration.followMode != .followMac || macFollower?.isConnected == true)
             && (!configuration.requiresAudioCapture || captureController.isAudioAvailable)
     }
 
@@ -154,17 +160,24 @@ final class PromptSessionController {
             return speechFollower.isSpeaking ? "Following your voice" : "Waiting for your voice"
         case .wordTracking:
             return speechFollower.isStarting ? "Starting speech recognition…" : "Following your words"
+        case .followMac:
+            return macFollower?.statusText ?? "Not connected"
         }
     }
 
     func prepare() async {
         guard !isPrepared else { return }
-        preparationMessage = "Preparing speech…"
-        let speechReady = await speechFollower.prepare(
-            source: prompt,
-            mode: configuration.followMode,
-            localeIdentifier: configuration.speechLocaleIdentifier
-        )
+        let speechReady: Bool
+        if configuration.followMode == .followMac {
+            speechReady = false   // the Mac listens; the phone only renders
+        } else {
+            preparationMessage = "Preparing speech…"
+            speechReady = await speechFollower.prepare(
+                source: prompt,
+                mode: configuration.followMode,
+                localeIdentifier: configuration.speechLocaleIdentifier
+            )
+        }
 
         preparationMessage = showsCamera ? "Preparing camera…" : "Preparing microphone…"
         let captureReady = await captureController.prepare(
@@ -243,6 +256,8 @@ final class PromptSessionController {
         switch configuration.followMode {
         case .wordTracking:
             speechFollower.jump(to: clamped)
+        case .followMac:
+            break   // position is owned by the Mac
         case .classic, .voiceActivated:
             timerWordProgress = prompt.wordProgress(forCharacterOffset: clamped)
         }
@@ -310,7 +325,7 @@ final class PromptSessionController {
         isPromptRunning = true
         lastTickTime = ProcessInfo.processInfo.systemUptime
         switch configuration.followMode {
-        case .classic:
+        case .classic, .followMac:
             break
         case .wordTracking, .voiceActivated:
             if speechFollower.isListening {
@@ -324,7 +339,7 @@ final class PromptSessionController {
     private func pausePrompt() {
         isPromptRunning = false
         lastTickTime = nil
-        if configuration.followMode != .classic { speechFollower.pause() }
+        if configuration.followMode.requiresMicrophone { speechFollower.pause() }
     }
 
     private func startProgressTimer() {
@@ -358,7 +373,7 @@ final class PromptSessionController {
                     timerWordProgress + scrollSpeed * elapsed
                 )
             }
-        case .wordTracking:
+        case .wordTracking, .followMac:
             break
         }
     }
