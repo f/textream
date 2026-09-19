@@ -147,6 +147,8 @@ struct TextreamiOSApp: App {
             mirrorEnabled: true,
             mirrorAxis: .horizontal,
             readingPosition: .nearCamera,
+            textWidth: .full,
+            horizontalPosition: .center,
             scrollSpeed: 0.5,
             fontFamily: .sans,
             fontSize: .lg,

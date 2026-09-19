@@ -47,6 +47,27 @@ struct SettingsView: View {
                     Text("Near Camera keeps the active line just below the camera and controls for better eye contact. Center keeps it in the middle of the screen.")
                 }
 
+                Section {
+                    Picker("Column width", selection: $model.textWidth) {
+                        ForEach(PromptTextWidth.allCases) { width in
+                            Text(width.label).tag(width)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("textWidthPicker")
+
+                    Picker("Column position", selection: $model.horizontalPosition) {
+                        ForEach(PromptHorizontalPosition.allCases) { position in
+                            Text(position.label).tag(position)
+                        }
+                    }
+                    .accessibilityIdentifier("horizontalPositionPicker")
+                } header: {
+                    Text("Column")
+                } footer: {
+                    Text(model.horizontalPosition.description + " A narrower column means less eye movement.")
+                }
+
                 Section("Font") {
                     Picker("Family", selection: $model.fontFamily) {
                         ForEach(PromptFontFamily.allCases) { family in
