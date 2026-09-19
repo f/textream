@@ -13,6 +13,8 @@ final class AppModel {
         static let mirrorEnabled = "ios.mirrorEnabled"
         static let mirrorAxis = "ios.mirrorAxis"
         static let readingPosition = "ios.readingPosition"
+        static let textWidth = "ios.textWidth"
+        static let horizontalPosition = "ios.horizontalPosition"
         static let scrollSpeed = "ios.scrollSpeed"
         static let fontFamily = "ios.fontFamily"
         static let fontSize = "ios.fontSize"
@@ -33,6 +35,10 @@ final class AppModel {
     var mirrorAxis: PromptMirrorAxis { didSet { defaults.set(mirrorAxis.rawValue, forKey: Key.mirrorAxis) } }
     var readingPosition: PromptReadingPosition {
         didSet { defaults.set(readingPosition.rawValue, forKey: Key.readingPosition) }
+    }
+    var textWidth: PromptTextWidth { didSet { defaults.set(textWidth.rawValue, forKey: Key.textWidth) } }
+    var horizontalPosition: PromptHorizontalPosition {
+        didSet { defaults.set(horizontalPosition.rawValue, forKey: Key.horizontalPosition) }
     }
     var scrollSpeed: Double { didSet { defaults.set(scrollSpeed, forKey: Key.scrollSpeed) } }
     var fontFamily: PromptFontFamily { didSet { defaults.set(fontFamily.rawValue, forKey: Key.fontFamily) } }
@@ -62,6 +68,10 @@ final class AppModel {
         readingPosition = PromptReadingPosition(
             rawValue: defaults.string(forKey: Key.readingPosition) ?? ""
         ) ?? .nearCamera
+        textWidth = PromptTextWidth(rawValue: defaults.string(forKey: Key.textWidth) ?? "") ?? .full
+        horizontalPosition = PromptHorizontalPosition(
+            rawValue: defaults.string(forKey: Key.horizontalPosition) ?? ""
+        ) ?? .center
         let savedSpeed = defaults.double(forKey: Key.scrollSpeed)
         scrollSpeed = savedSpeed > 0 ? savedSpeed : 3
         fontFamily = PromptFontFamily(rawValue: defaults.string(forKey: Key.fontFamily) ?? "") ?? .sans
@@ -102,6 +112,8 @@ final class AppModel {
             mirrorEnabled: mirrorEnabled,
             mirrorAxis: mirrorAxis,
             readingPosition: readingPosition,
+            textWidth: textWidth,
+            horizontalPosition: horizontalPosition,
             scrollSpeed: scrollSpeed,
             fontFamily: fontFamily,
             fontSize: fontSize,

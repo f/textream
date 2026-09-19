@@ -76,6 +76,8 @@ struct RootView: View {
                     model.mirrorEnabled = settings.mirrorEnabled
                     model.mirrorAxis = settings.mirrorAxis
                     model.readingPosition = settings.readingPosition
+                    model.textWidth = settings.textWidth
+                    model.horizontalPosition = settings.horizontalPosition
                     model.fontSize = settings.fontSize
                 }
             )

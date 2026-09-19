@@ -71,6 +71,16 @@ private final class FirstResponderTextViewSpy: UITextView {
 @Suite("Prompt core")
 struct PromptCoreTests {
     @MainActor
+
+@Test @MainActor
+func nearCameraColumnFollowsTheCameraEdgeInLandscape() {
+    #expect(PromptHorizontalPosition.nearCamera.resolvedAlignment(orientation: .landscapeLeft) == .leading)
+    #expect(PromptHorizontalPosition.nearCamera.resolvedAlignment(orientation: .landscapeRight) == .trailing)
+    #expect(PromptHorizontalPosition.nearCamera.resolvedAlignment(orientation: .portrait) == .center)
+    #expect(PromptHorizontalPosition.trailing.resolvedAlignment(orientation: .landscapeLeft) == .trailing)
+    #expect(PromptTextWidth.narrow.fraction == 0.5)
+}
+
     @Test
     func scriptEditorKeepsFocusAndSelectionAcrossEveryTypingBindingEcho() {
         let harness = EditorBindingHarness(text: "Start", isFocused: true)
@@ -1953,6 +1963,8 @@ struct PromptCoreTests {
         mirrorEnabled: Bool = false,
         mirrorAxis: PromptMirrorAxis = .horizontal,
         readingPosition: PromptReadingPosition = .nearCamera,
+        textWidth: PromptTextWidth = .full,
+        horizontalPosition: PromptHorizontalPosition = .center,
         fontSize: PromptFontSize = .lg
     ) -> PromptSessionConfiguration {
         PromptSessionConfiguration(
@@ -1963,6 +1975,8 @@ struct PromptCoreTests {
             mirrorEnabled: mirrorEnabled,
             mirrorAxis: mirrorAxis,
             readingPosition: readingPosition,
+            textWidth: textWidth,
+            horizontalPosition: horizontalPosition,
             scrollSpeed: 3,
             fontFamily: .sans,
             fontSize: fontSize,

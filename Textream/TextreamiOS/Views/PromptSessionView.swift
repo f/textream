@@ -17,6 +17,7 @@ struct PromptSessionView: View {
     @State private var isPromptSessionVisible = false
     @State private var isShowingMirrorSettings = false
     @State private var showsSessionControls = true
+    @State private var deviceOrientation = UIDevice.current.orientation
     private let onScrollSpeedChanged: (Double) -> Void
     private let onDisplaySettingsChanged: (PromptDisplaySettings) -> Void
 
@@ -92,7 +93,16 @@ struct PromptSessionView: View {
                     },
                     onSpeedAdjustmentEnded: finishScrollSpeedAdjustment
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Column width and side: a narrow column beside the camera
+                // keeps the eyes close to the lens in landscape.
+                .frame(maxWidth: geometry.size.width * displaySettings.textWidth.fraction)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: displaySettings.horizontalPosition.resolvedAlignment(
+                        orientation: deviceOrientation
+                    )
+                )
                 .ignoresSafeArea()
                 .scaleEffect(
                     x: isMirrorActive ? displaySettings.mirrorAxis.scaleX : 1,
@@ -236,6 +246,13 @@ struct PromptSessionView: View {
             updateIdleTimer(for: scenePhase)
         }
         .task { await controller.prepare() }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            let orientation = UIDevice.current.orientation
+            // Face-up/face-down and unknown keep the last known side.
+            if orientation.isPortrait || orientation.isLandscape {
+                deviceOrientation = orientation
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             updateIdleTimer(for: phase)
             if phase != .active {
@@ -803,6 +820,30 @@ private struct MirrorSessionSettingsPanel: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("sessionReadingPositionPicker")
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                settingLabel("COLUMN WIDTH")
+
+                Picker("Column width", selection: $settings.textWidth) {
+                    ForEach(PromptTextWidth.allCases) { width in
+                        Text(width.label).tag(width)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("sessionTextWidthPicker")
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                settingLabel("COLUMN SIDE")
+
+                Picker("Column side", selection: $settings.horizontalPosition) {
+                    ForEach(PromptHorizontalPosition.allCases) { position in
+                        Text(position.label).tag(position)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("sessionHorizontalPositionPicker")
             }
 
             VStack(alignment: .leading, spacing: 6) {

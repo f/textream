@@ -86,6 +86,77 @@ enum PromptReadingPosition: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum PromptTextWidth: String, CaseIterable, Identifiable, Codable {
+    case full
+    case wide
+    case medium
+    case narrow
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .full: "Full"
+        case .wide: "80%"
+        case .medium: "65%"
+        case .narrow: "50%"
+        }
+    }
+
+    /// Fraction of the stage width the text column may use.
+    var fraction: CGFloat {
+        switch self {
+        case .full: 1
+        case .wide: 0.8
+        case .medium: 0.65
+        case .narrow: 0.5
+        }
+    }
+}
+
+enum PromptHorizontalPosition: String, CaseIterable, Identifiable, Codable {
+    case nearCamera
+    case leading
+    case center
+    case trailing
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .nearCamera: "Near Camera"
+        case .leading: "Left"
+        case .center: "Center"
+        case .trailing: "Right"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .nearCamera: "In landscape, keeps a narrow column on the same side as the front camera, whichever way the phone is held."
+        case .leading: "Keeps the column on the left of the screen."
+        case .center: "Keeps the column in the middle."
+        case .trailing: "Keeps the column on the right of the screen."
+        }
+    }
+
+    /// Resolves Near Camera against the physical orientation. Landscape-left
+    /// puts the camera on the left edge; landscape-right puts it on the right.
+    func resolvedAlignment(orientation: UIDeviceOrientation) -> Alignment {
+        switch self {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        case .nearCamera:
+            switch orientation {
+            case .landscapeLeft: .leading
+            case .landscapeRight: .trailing
+            default: .center
+            }
+        }
+    }
+}
+
 enum PromptMirrorAxis: String, CaseIterable, Identifiable, Codable {
     case horizontal
     case vertical
@@ -282,6 +353,8 @@ struct PromptSessionConfiguration: Equatable {
     let mirrorEnabled: Bool
     let mirrorAxis: PromptMirrorAxis
     let readingPosition: PromptReadingPosition
+    let textWidth: PromptTextWidth
+    let horizontalPosition: PromptHorizontalPosition
     let scrollSpeed: Double
     let fontFamily: PromptFontFamily
     let fontSize: PromptFontSize
@@ -303,12 +376,16 @@ struct PromptDisplaySettings: Equatable {
     var mirrorEnabled: Bool
     var mirrorAxis: PromptMirrorAxis
     var readingPosition: PromptReadingPosition
+    var textWidth: PromptTextWidth
+    var horizontalPosition: PromptHorizontalPosition
     var fontSize: PromptFontSize
 
     init(configuration: PromptSessionConfiguration) {
         mirrorEnabled = configuration.mirrorEnabled
         mirrorAxis = configuration.mirrorAxis
         readingPosition = configuration.readingPosition
+        textWidth = configuration.textWidth
+        horizontalPosition = configuration.horizontalPosition
         fontSize = configuration.fontSize
     }
 }
