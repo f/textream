@@ -1,10 +1,12 @@
 import Speech
+import AVFoundation
 import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: AppModel
     @State private var locales: [Locale] = []
+    @State private var microphones: [(uid: String, name: String)] = []
 
     var body: some View {
         NavigationStack {
@@ -87,6 +89,23 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 38, alignment: .trailing)
                     }
+                }
+
+                Section {
+                    Picker("Microphone", selection: $model.microphoneUID) {
+                        Text("Automatic").tag("")
+                        ForEach(microphones, id: \.uid) { mic in
+                            Text(mic.name).tag(mic.uid)
+                        }
+                    }
+                    .accessibilityIdentifier("microphonePicker")
+                } header: {
+                    Text("Microphone")
+                } footer: {
+                    Text("Automatic uses an external microphone when one is connected — AirPods, a wireless receiver, or a wired headset — and the built-in microphone otherwise.")
+                }
+                .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { _ in
+                    refreshMicrophones()
                 }
 
                 Section {
@@ -193,6 +212,7 @@ struct SettingsView: View {
         }
         .preferredColorScheme(.dark)
         .task {
+            refreshMicrophones()
             guard locales.isEmpty else { return }
             let supported = await Task.detached(priority: .userInitiated) {
                 let currentLocale = Locale.current
@@ -349,5 +369,19 @@ private struct ColorPresetPicker: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+extension SettingsView {
+    /// Inputs the audio session can route from right now. Listing needs the
+    /// record category active, which the capture session sets while a
+    /// session runs; outside one we activate briefly so the picker is useful.
+    fileprivate func refreshMicrophones() {
+        let audioSession = AVAudioSession.sharedInstance()
+        if audioSession.availableInputs?.isEmpty ?? true {
+            try? audioSession.setCategory(.playAndRecord, mode: .videoRecording,
+                                          options: [.allowBluetoothHFP, .defaultToSpeaker])
+        }
+        microphones = (audioSession.availableInputs ?? []).map { ($0.uid, $0.portName) }
     }
 }

@@ -140,6 +140,8 @@ final class CaptureController: NSObject, AVCaptureAudioDataOutputSampleBufferDel
     @ObservationIgnored private var elapsedTimer: Timer?
     @ObservationIgnored private var recordingStartedAt: Date?
     @ObservationIgnored private var notificationTokens: [NSObjectProtocol] = []
+    /// Name of the microphone currently feeding the session, for the UI.
+    private(set) var activeMicrophoneName: String?
     @ObservationIgnored private var configurationGeneration = 0
     @ObservationIgnored private var stopRequested = false
     @ObservationIgnored private var recordingAttemptURL: URL?
@@ -537,6 +539,11 @@ final class CaptureController: NSObject, AVCaptureAudioDataOutputSampleBufferDel
                     if !self.session.isRunning, cameraEnabled || audioEnabled {
                         self.session.startRunning()
                     }
+                    if audioEnabled {
+                        // The capture session has now configured the audio
+                        // session; route the input to the chosen microphone.
+                        MicrophoneSelection.apply(MicrophoneSelection.load())
+                    }
                     let hasMovieAudio = !cameraEnabled || self.movieOutput.connection(with: .audio) != nil
                     continuation.resume(
                         returning: .success((device, audioEnabled && self.audioInput != nil && hasMovieAudio))
@@ -557,6 +564,7 @@ final class CaptureController: NSObject, AVCaptureAudioDataOutputSampleBufferDel
             isCameraAvailable = device != nil
             isAudioAvailable = audioConfigured
             isAudioAnalysisEnabled = audioConfigured && audioAnalysisEnabled
+            activeMicrophoneName = audioConfigured ? MicrophoneSelection.activeInputName : nil
             isSessionRunning = session.isRunning
             if let device { cameraPosition = device.position }
             return (cameraEnabled ? device != nil : true) && (audioEnabled ? audioConfigured : true)
@@ -860,6 +868,25 @@ final class CaptureController: NSObject, AVCaptureAudioDataOutputSampleBufferDel
     }
 
     private func installSessionObservers() {
+        notificationTokens.append(
+            NotificationCenter.default.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] notification in
+                let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+                    .flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
+                // A new device arriving or the old one leaving is when the
+                // preferred input needs re-resolving. Ignore category changes
+                // and overrides so we do not fight the capture session.
+                guard reason == .newDeviceAvailable || reason == .oldDeviceUnavailable else { return }
+                Task { @MainActor [weak self] in
+                    guard let self, self.session.isRunning, self.audioInput != nil else { return }
+                    MicrophoneSelection.apply(MicrophoneSelection.load())
+                    self.activeMicrophoneName = MicrophoneSelection.activeInputName
+                }
+            }
+        )
         notificationTokens.append(
             NotificationCenter.default.addObserver(
                 forName: AVCaptureSession.wasInterruptedNotification,
