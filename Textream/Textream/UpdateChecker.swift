@@ -32,7 +32,7 @@ class UpdateChecker {
             DispatchQueue.main.async {
                 if let error {
                     if !silent {
-                        self.showError("Could not check for updates.\n\(error.localizedDescription)")
+                        self.showError(L10n.format("update.check.failed.message", error.localizedDescription))
                     }
                     return
                 }
@@ -42,7 +42,7 @@ class UpdateChecker {
                       let tagName = json["tag_name"] as? String,
                       let htmlURL = json["html_url"] as? String else {
                     if !silent {
-                        self.showError("Could not parse the release information.")
+                        self.showError(L10n.string("update.parse.failed.message"))
                     }
                     return
                 }
@@ -77,11 +77,11 @@ class UpdateChecker {
 
     private func showUpdateAvailable(latestVersion: String, releaseURL: String) {
         let alert = NSAlert()
-        alert.messageText = "Update Available"
-        alert.informativeText = "Textream \(latestVersion) is available. You are currently running \(currentVersion)."
+        alert.messageText = L10n.string("update.available.title")
+        alert.informativeText = L10n.format("update.available.message", latestVersion, currentVersion)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Download")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: L10n.string("update.download"))
+        alert.addButton(withTitle: L10n.string("update.later"))
 
         if alert.runModal() == .alertFirstButtonReturn {
             if let url = URL(string: releaseURL) {
@@ -92,19 +92,19 @@ class UpdateChecker {
 
     private func showUpToDate() {
         let alert = NSAlert()
-        alert.messageText = "You're Up to Date"
-        alert.informativeText = "Textream \(currentVersion) is the latest version."
+        alert.messageText = L10n.string("update.upToDate.title")
+        alert.informativeText = L10n.format("update.upToDate.message", currentVersion)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: L10n.string("common.ok"))
         alert.runModal()
     }
 
     private func showError(_ message: String) {
         let alert = NSAlert()
-        alert.messageText = "Update Check Failed"
+        alert.messageText = L10n.string("update.failed.title")
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: L10n.string("common.ok"))
         alert.runModal()
     }
 }

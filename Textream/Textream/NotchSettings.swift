@@ -42,10 +42,10 @@ enum FontFamilyPreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .sans:     return "Sans"
-        case .serif:    return "Serif"
-        case .mono:     return "Mono"
-        case .dyslexia: return "Dyslexia"
+        case .sans:     return L10n.string("fontFamily.sans")
+        case .serif:    return L10n.string("fontFamily.serif")
+        case .mono:     return L10n.string("fontFamily.mono")
+        case .dyslexia: return L10n.string("fontFamily.dyslexia")
         }
     }
 
@@ -107,12 +107,12 @@ enum FontColorPreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .white:  return "White"
-        case .yellow: return "Yellow"
-        case .green:  return "Green"
-        case .blue:   return "Blue"
-        case .pink:   return "Pink"
-        case .orange: return "Orange"
+        case .white:  return L10n.string("color.white")
+        case .yellow: return L10n.string("color.yellow")
+        case .green:  return L10n.string("color.green")
+        case .blue:   return L10n.string("color.blue")
+        case .pink:   return L10n.string("color.pink")
+        case .orange: return L10n.string("color.orange")
         }
     }
 
@@ -137,10 +137,10 @@ enum CueBrightness: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .dim:    return "Dim"
-        case .low:    return "Low"
-        case .medium: return "Medium"
-        case .bright: return "Bright"
+        case .dim:    return L10n.string("cueBrightness.dim")
+        case .low:    return L10n.string("cueBrightness.low")
+        case .medium: return L10n.string("cueBrightness.medium")
+        case .bright: return L10n.string("cueBrightness.bright")
         }
     }
 
@@ -174,17 +174,17 @@ enum OverlayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .pinned:     return "Pinned to Notch"
-        case .floating:   return "Floating Window"
-        case .fullscreen: return "Fullscreen"
+        case .pinned:     return L10n.string("overlayMode.pinned")
+        case .floating:   return L10n.string("overlayMode.floating")
+        case .fullscreen: return L10n.string("overlayMode.fullscreen")
         }
     }
 
     var description: String {
         switch self {
-        case .pinned:     return "Anchored below the notch at the top of your screen."
-        case .floating:   return "A draggable window you can place anywhere. Always on top."
-        case .fullscreen: return "Fullscreen teleprompter on the selected display. Press Esc to stop."
+        case .pinned:     return L10n.string("overlayMode.pinned.description")
+        case .floating:   return L10n.string("overlayMode.floating.description")
+        case .fullscreen: return L10n.string("overlayMode.fullscreen.description")
         }
     }
 
@@ -206,15 +206,15 @@ enum NotchDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .followMouse:  return "Follow Mouse"
-        case .fixedDisplay: return "Fixed Display"
+        case .followMouse:  return L10n.string("notchDisplayMode.followMouse")
+        case .fixedDisplay: return L10n.string("notchDisplayMode.fixedDisplay")
         }
     }
 
     var description: String {
         switch self {
-        case .followMouse:  return "The notch moves to whichever display your mouse is on."
-        case .fixedDisplay: return "The notch stays on the selected display."
+        case .followMouse:  return L10n.string("notchDisplayMode.followMouse.description")
+        case .fixedDisplay: return L10n.string("notchDisplayMode.fixedDisplay.description")
         }
     }
 }
@@ -228,17 +228,17 @@ enum ExternalDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .off:          return "Off"
-        case .teleprompter: return "Teleprompter"
-        case .mirror:       return "Mirror"
+        case .off:          return L10n.string("externalDisplayMode.off")
+        case .teleprompter: return L10n.string("externalDisplayMode.teleprompter")
+        case .mirror:       return L10n.string("externalDisplayMode.mirror")
         }
     }
 
     var description: String {
         switch self {
-        case .off:          return "No external display output."
-        case .teleprompter: return "Fullscreen teleprompter on the selected display."
-        case .mirror:       return "Horizontally flipped for use with a prompter mirror rig."
+        case .off:          return L10n.string("externalDisplayMode.off.description")
+        case .teleprompter: return L10n.string("externalDisplayMode.teleprompter.description")
+        case .mirror:       return L10n.string("externalDisplayMode.mirror.description")
         }
     }
 }
@@ -252,17 +252,17 @@ enum MirrorAxis: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .horizontal: return "Horizontal"
-        case .vertical:   return "Vertical"
-        case .both:       return "Both"
+        case .horizontal: return L10n.string("mirrorAxis.horizontal")
+        case .vertical:   return L10n.string("mirrorAxis.vertical")
+        case .both:       return L10n.string("mirrorAxis.both")
         }
     }
 
     var description: String {
         switch self {
-        case .horizontal: return "Flipped left-to-right. Standard for prompter mirror rigs."
-        case .vertical:   return "Flipped top-to-bottom."
-        case .both:       return "Flipped on both axes (rotated 180°)."
+        case .horizontal: return L10n.string("mirrorAxis.horizontal.description")
+        case .vertical:   return L10n.string("mirrorAxis.vertical.description")
+        case .both:       return L10n.string("mirrorAxis.both.description")
         }
     }
 
@@ -290,17 +290,17 @@ enum ListeningMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .classic:        return "Classic"
-        case .silencePaused:  return "Voice-Activated"
-        case .wordTracking:   return "Word Tracking"
+        case .classic:        return L10n.string("listeningMode.classic")
+        case .silencePaused:  return L10n.string("listeningMode.silencePaused")
+        case .wordTracking:   return L10n.string("listeningMode.wordTracking")
         }
     }
 
     var description: String {
         switch self {
-        case .classic:        return "Auto-scrolls at a constant speed. No microphone needed."
-        case .silencePaused:  return "Scrolls while you speak, pauses when you're silent."
-        case .wordTracking:   return "Tracks each word you say and highlights it in real time."
+        case .classic:        return L10n.string("listeningMode.classic.description")
+        case .silencePaused:  return L10n.string("listeningMode.silencePaused.description")
+        case .wordTracking:   return L10n.string("listeningMode.wordTracking.description")
         }
     }
 
