@@ -65,7 +65,7 @@ class DictationManager {
         // Check microphone permission
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            fail("Microphone access denied. Open System Settings → Privacy & Security → Microphone.")
+            fail(L10n.string("speech.microphoneDenied.short"))
             openMicrophoneSettings()
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
@@ -76,14 +76,14 @@ class DictationManager {
                     if granted {
                         self.requestSpeechAuthAndBegin(for: generation)
                     } else {
-                        self.fail("Microphone access denied. Open System Settings → Privacy & Security → Microphone.")
+                        self.fail(L10n.string("speech.microphoneDenied.short"))
                     }
                 }
             }
         case .authorized:
             requestSpeechAuthAndBegin(for: generation)
         @unknown default:
-            fail("Microphone authorization is unavailable.")
+            fail(L10n.string("speech.microphoneAuthUnavailable"))
         }
     }
 
@@ -97,7 +97,7 @@ class DictationManager {
                 case .authorized:
                     self.beginRecognition()
                 default:
-                    self.fail("Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition.")
+                    self.fail(L10n.string("speech.recognitionDenied.short"))
                     self.openSpeechRecognitionSettings()
                 }
             }
@@ -179,7 +179,7 @@ class DictationManager {
 
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: NotchSettings.shared.speechLocale))
         guard let speechRecognizer else {
-            fail("Speech recognition isn't supported for the selected language.")
+            fail(L10n.string("speech.unsupportedLanguage"))
             return
         }
         guard speechRecognizer.isAvailable else {
@@ -187,14 +187,14 @@ class DictationManager {
                 retryCount += 1
                 scheduleRestart(after: 0.5)
             } else {
-                fail("Speech recognizer is not available.")
+                fail(L10n.string("speech.recognizerUnavailable"))
             }
             return
         }
 
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest else {
-            fail("Unable to create a speech recognition request.")
+            fail(L10n.string("speech.requestUnavailable"))
             return
         }
         recognitionRequest.shouldReportPartialResults = true
@@ -208,13 +208,13 @@ class DictationManager {
                 retryCount += 1
                 scheduleRestart(after: 0.5)
             } else {
-                fail("Audio input is unavailable.")
+                fail(L10n.string("speech.audioInputUnavailable"))
             }
             return
         }
 
         guard let tapFormat = speechCaptureFormat(for: recordingFormat) else {
-            fail("Audio input format is unsupported.")
+            fail(L10n.string("speech.unsupportedAudioFormat"))
             return
         }
 
@@ -309,7 +309,7 @@ class DictationManager {
                 retryCount += 1
                 scheduleRestart(after: 0.5)
             } else {
-                fail("Audio engine failed: \(error.localizedDescription)")
+                fail(L10n.format("speech.audioEngineFailed", error.localizedDescription))
             }
         }
     }

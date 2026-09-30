@@ -18,7 +18,7 @@ struct ContentView: View {
     @State private var editorCaretPosition: Int = 0
     @State private var isDroppingPresentation = false
     @State private var dropError: String?
-    @State private var dropAlertTitle: String = "Import Error"
+    @State private var dropAlertTitle: String = L10n.string("import.error.title")
     @State private var showSettings = false
     @State private var showAbout = false
     @State private var languageSuggestion: SpeechLanguageSuggestion?
@@ -26,17 +26,9 @@ struct ContentView: View {
     @State private var languageDetectionTask: Task<Void, Never>?
     @FocusState private var isTextFocused: Bool
 
-    private let defaultText = """
-Welcome to Textream! This is your personal teleprompter that sits right below your MacBook's notch. [smile]
-
-As you read aloud, the text will highlight in real-time, following your voice. The speech recognition matches your words and keeps track of your progress. [pause]
-
-You can pause at any time, go back and re-read sections, and the highlighting will follow along. When you finish reading all the text, the overlay will automatically close with a smooth animation. [nod]
-
-Try reading this passage out loud to see how the highlighting works. The waveform at the bottom shows your voice activity, and you'll see the last few words you spoke displayed next to it.
-
-Happy presenting! [wave]
-"""
+    private var defaultText: String {
+        L10n.string("defaultScript")
+    }
 
     private var languageLabel: String {
         let locale = NotchSettings.shared.speechLocale
@@ -152,20 +144,8 @@ Happy presenting! [wave]
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
 
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
-            pill
-                .glassEffect(in: .capsule)
-        } else {
-            pill
-                .background(.ultraThinMaterial, in: Capsule())
-                .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        }
-        #else
         pill
-            .background(.ultraThinMaterial, in: Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        #endif
+            .textreamGlass(in: Capsule(), tint: .red.opacity(0.05))
     }
 
     @State private var highlightClearTimer: Timer?
@@ -378,10 +358,10 @@ Happy presenting! [wave]
                     Image(systemName: "doc.text")
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(Color.accentColor)
-                    Text("Drop PowerPoint (.pptx) file")
+                    Text("dropZone.title")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
-                    Text("For Keynote or Google Slides,\nexport as PPTX first.")
+                    Text("dropZone.subtitle")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -405,15 +385,15 @@ Happy presenting! [wave]
                         let ext = url.pathExtension.lowercased()
                         if ext == "key" {
                             DispatchQueue.main.async {
-                                dropAlertTitle = "Conversion Required"
-                                dropError = "Keynote files can't be imported directly. Please export your Keynote presentation as PowerPoint (.pptx) first, then drop the exported file here."
+                                dropAlertTitle = L10n.string("import.keynote.conversionRequired.title")
+                                dropError = L10n.string("import.keynote.drop.message")
                             }
                             return
                         }
                         guard ext == "pptx" else {
                             DispatchQueue.main.async {
-                                dropAlertTitle = "Import Error"
-                                dropError = "Unsupported file. Drop a PowerPoint (.pptx) file."
+                                dropAlertTitle = L10n.string("import.error.title")
+                                dropError = L10n.string("import.unsupportedDrop.message")
                             }
                             return
                         }
@@ -436,10 +416,10 @@ Happy presenting! [wave]
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.secondary)
 
-            Text("Director Mode")
+            Text("directorMode.title")
                 .font(.system(size: 22, weight: .bold))
 
-            Text(service.directorIsReading ? "Reading from director…" : "Waiting for director to send script…")
+            Text(service.directorIsReading ? L10n.string("directorMode.reading") : L10n.string("directorMode.waiting"))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
@@ -478,7 +458,7 @@ Happy presenting! [wave]
             Button {
                 showSettings = true
             } label: {
-                Text("Open Settings")
+                Text("settings.open")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -514,7 +494,7 @@ Happy presenting! [wave]
             }
         }
         .alert(dropAlertTitle, isPresented: Binding(get: { dropError != nil }, set: { if !$0 { dropError = nil } })) {
-            Button("OK") { dropError = nil }
+            Button("common.ok") { dropError = nil }
         } message: {
             Text(dropError ?? "")
         }
@@ -527,7 +507,7 @@ Happy presenting! [wave]
             Text(dictation.error ?? "")
         }
         .frame(minWidth: 360, minHeight: 240)
-        .background(.ultraThinMaterial)
+        .textreamWindowGlass()
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 8) {
@@ -543,7 +523,7 @@ Happy presenting! [wave]
                                     .fill(.orange)
                                     .frame(width: 6, height: 6)
                             }
-                            Text(service.currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
+                            Text(service.currentFileURL?.deletingPathExtension().lastPathComponent ?? L10n.string("document.untitled"))
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                         }
@@ -564,7 +544,7 @@ Happy presenting! [wave]
                         HStack(spacing: 3) {
                             Image(systemName: "plus")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text("Page")
+                            Text("page.singular")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundStyle(.secondary)
@@ -661,7 +641,7 @@ Happy presenting! [wave]
 
     private func pagePreview(_ page: String) -> String {
         let trimmed = page.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "Empty" }
+        if trimmed.isEmpty { return L10n.string("page.empty") }
         let words = trimmed.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         let preview = words.prefix(5).joined(separator: " ")
         return preview.count > 30 ? String(preview.prefix(30)) + "…" : preview
@@ -705,7 +685,7 @@ Happy presenting! [wave]
                         Button(role: .destructive) {
                             removePage(at: index)
                         } label: {
-                            Label("Delete Page", systemImage: "trash")
+                            Label(L10n.string("page.delete"), systemImage: "trash")
                         }
                     }
                 }
@@ -722,7 +702,7 @@ Happy presenting! [wave]
                     service.currentPageIndex = service.pages.count - 1
                 }
             } label: {
-                Label("Add Page", systemImage: "plus")
+                Label(L10n.string("page.add"), systemImage: "plus")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -832,13 +812,13 @@ struct AboutView: View {
             VStack(spacing: 4) {
                 Text("Textream")
                     .font(.system(size: 20, weight: .bold))
-                Text("Version \(appVersion)")
+                Text(L10n.format("about.version", appVersion))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
             // Description
-            Text("A free, open-source teleprompter that highlights your script in real-time as you speak.")
+            Text("about.description")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -880,7 +860,7 @@ struct AboutView: View {
                         Image(systemName: "heart.fill")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.pink)
-                        Text("Donate")
+                        Text("about.donate")
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundStyle(.primary)
@@ -895,15 +875,15 @@ struct AboutView: View {
             Divider().padding(.horizontal, 20)
 
             VStack(spacing: 4) {
-                Text("Made by Fatih Kadir Akin")
+                Text("about.madeBy")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text("Original idea by Semih Kışlar")
+                Text("about.originalIdeaBy")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
 
-            Button("OK") {
+            Button("common.ok") {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
@@ -912,7 +892,7 @@ struct AboutView: View {
         }
         .padding(24)
         .frame(width: 320)
-        .background(.ultraThinMaterial)
+        .textreamGlass(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

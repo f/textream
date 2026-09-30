@@ -216,7 +216,7 @@ class SpeechRecognizer {
         // Check microphone permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .denied, .restricted:
-            failListening("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
+            failListening(L10n.string("speech.microphoneDenied"))
             openMicrophoneSettings()
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
@@ -227,14 +227,14 @@ class SpeechRecognizer {
                     if granted {
                         self.beginAfterMicrophoneAccess(for: generation)
                     } else {
-                        self.failListening("Microphone access denied. Open System Settings → Privacy & Security → Microphone to allow Textream.")
+                        self.failListening(L10n.string("speech.microphoneDenied"))
                     }
                 }
             }
         case .authorized:
             beginAfterMicrophoneAccess(for: generation)
         @unknown default:
-            failListening("Microphone authorization is unavailable.")
+            failListening(L10n.string("speech.microphoneAuthUnavailable"))
         }
     }
 
@@ -257,7 +257,7 @@ class SpeechRecognizer {
                 case .authorized:
                     self.beginRecognition()
                 default:
-                    self.failListening("Speech recognition not authorized. Open System Settings → Privacy & Security → Speech Recognition to allow Textream.")
+                    self.failListening(L10n.string("speech.recognitionDenied"))
                     self.openSpeechRecognitionSettings()
                 }
             }
@@ -436,7 +436,7 @@ class SpeechRecognizer {
             guard let speechRecognizer else {
                 // nil means the locale isn't supported for speech recognition —
                 // that's permanent, so fail immediately instead of retrying.
-                failListening("Speech recognition isn't supported for the selected language.")
+                failListening(L10n.string("speech.unsupportedLanguage"))
                 return
             }
             guard speechRecognizer.isAvailable else {
@@ -448,14 +448,14 @@ class SpeechRecognizer {
                     retryCount += 1
                     scheduleBeginRecognition(after: 0.5)
                 } else {
-                    failListening("Speech recognizer is not available.")
+                    failListening(L10n.string("speech.recognizerUnavailable"))
                 }
                 return
             }
 
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             guard let recognitionRequest else {
-                failListening("Unable to create a speech recognition request.")
+                failListening(L10n.string("speech.requestUnavailable"))
                 return
             }
             recognitionRequest.shouldReportPartialResults = true
@@ -485,7 +485,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                failListening("Audio input is unavailable.")
+                failListening(L10n.string("speech.audioInputUnavailable"))
             }
             return
         }
@@ -493,7 +493,7 @@ class SpeechRecognizer {
         // SFSpeechRecognizer expects mono voice audio. Downmix multi-channel
         // devices without changing the input node's hardware sample rate.
         guard let tapFormat = speechCaptureFormat(for: hardwareFormat) else {
-            failListening("Audio input format is unsupported.")
+            failListening(L10n.string("speech.unsupportedAudioFormat"))
             return
         }
 
@@ -623,7 +623,7 @@ class SpeechRecognizer {
                 retryCount += 1
                 scheduleBeginRecognition(after: 0.5)
             } else {
-                failListening("Audio engine failed: \(error.localizedDescription)")
+                failListening(L10n.format("speech.audioEngineFailed", error.localizedDescription))
             }
         }
     }
@@ -726,7 +726,7 @@ class SpeechRecognizer {
                 scheduleBeginRecognition(after: 0.5)
             } else {
                 // Don't leave the mic hot with no session consuming it
-                failListening("Speech recognizer is not available.")
+                failListening(L10n.string("speech.recognizerUnavailable"))
             }
             return
         }

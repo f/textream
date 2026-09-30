@@ -1,0 +1,41 @@
+name: macOS checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'codex/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            xcode: /Applications/Xcode_16.2.app/Contents/Developer
+          - runner: macos-26
+            xcode: /Applications/Xcode_26.0.app/Contents/Developer
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check localization keys
+        run: python3 scripts/check-localizations.py
+      - name: Lint localization resources
+        run: plutil -lint Textream/Textream/{en,zh-Hans}.lproj/{Localizable,InfoPlist}.strings
+      - name: Build macOS app without signing
+        env:
+          DEVELOPER_DIR: ${{ matrix.xcode }}
+        run: >-
+          xcodebuild build
+          -project Textream/Textream.xcodeproj
+          -scheme Textream
+          -configuration Debug
+          -destination 'generic/platform=macOS'
+          ARCHS='arm64 x86_64'
+          ONLY_ACTIVE_ARCH=NO
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
