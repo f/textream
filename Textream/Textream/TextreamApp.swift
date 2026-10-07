@@ -124,8 +124,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
-            if url.pathExtension == "textream" {
-                TextreamService.shared.openFileAtURL(url)
+            let lowercasedExt = url.pathExtension.lowercased()
+            if lowercasedExt == "textream" || lowercasedExt == "pptx" || TextreamService.scriptExtensions.contains(lowercasedExt) {
+                TextreamService.shared.openScriptFile(url)
                 // Show the main window for file opens
                 for window in NSApp.windows where !(window is NSPanel) {
                     window.makeKeyAndOrderFront(nil)
@@ -152,8 +153,9 @@ struct TextreamApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    if url.pathExtension == "textream" {
-                        TextreamService.shared.openFileAtURL(url)
+                    let lowercasedExt = url.pathExtension.lowercased()
+                    if lowercasedExt == "textream" || lowercasedExt == "pptx" || TextreamService.scriptExtensions.contains(lowercasedExt) {
+                        TextreamService.shared.openScriptFile(url)
                     } else {
                         TextreamService.shared.handleURL(url)
                     }

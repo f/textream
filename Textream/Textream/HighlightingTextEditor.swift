@@ -25,6 +25,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
     @Binding var caretPosition: Int?
     /// Continuously reported current caret position in the editor
     @Binding var editorCaretPosition: Int
+    var isEditable: Bool = true
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -39,7 +40,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
         scrollView.drawsBackground = false
 
         let textView = NSTextView()
-        textView.isEditable = true
+        textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.isRichText = false
@@ -69,6 +70,7 @@ struct HighlightingTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        textView.isEditable = isEditable
 
         if textView.string != text {
             let selectedRanges = textView.selectedRanges

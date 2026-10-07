@@ -61,6 +61,8 @@ Happy presenting! [wave]
         service.pages.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
+    private var canPlay: Bool { hasAnyContent || service.isScriptLinked }
+
     private var isRecording: Bool {
         dictation.isRecording || dictation.isStarting
     }
@@ -268,10 +270,56 @@ Happy presenting! [wave]
         dictation.onNewSegment = nil
     }
 
+    private var linkedScriptBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "link")
+                .foregroundStyle(Color.accentColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let url = service.linkedScriptURL {
+                    Text("Linked to \(url.lastPathComponent)")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                if let warning = service.linkedScriptWarning {
+                    Text(warning)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("Re-read from the file each time you press Play.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Button("Unlink") {
+                service.unlinkScript()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("Stop reading from the file and keep the pages as editable text")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.accentColor.opacity(0.2))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+    }
+
     private var mainContent: some View {
         VStack(spacing: 0) {
             if let languageSuggestion {
                 languageSuggestionBanner(languageSuggestion)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if service.isScriptLinked {
+                linkedScriptBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
@@ -281,7 +329,8 @@ Happy presenting! [wave]
                     font: .systemFont(ofSize: 16, weight: .regular).rounded,
                     highlightRange: dictationHighlightRange,
                     caretPosition: $dictationCaretPosition,
-                    editorCaretPosition: $editorCaretPosition
+                    editorCaretPosition: $editorCaretPosition,
+                    isEditable: !service.isScriptLinked
                 )
                 .onChange(of: editorCaretPosition) { _, newPos in
                     guard isRecording else { return }
@@ -345,8 +394,8 @@ Happy presenting! [wave]
                                 .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                             }
                             .buttonStyle(.plain)
-                            .disabled(isRunning)
-                            .opacity(isRunning ? 0.4 : 1)
+                            .disabled(isRunning || service.isScriptLinked)
+                            .opacity(isRunning || service.isScriptLinked ? 0.4 : 1)
 
                             Button {
                                 if isRunning {
@@ -364,8 +413,8 @@ Happy presenting! [wave]
                                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                             }
                             .buttonStyle(.plain)
-                            .disabled((!isRunning && !hasAnyContent) || isRecording)
-                            .opacity((!hasAnyContent && !isRunning) || isRecording ? 0.4 : 1)
+                            .disabled((!isRunning && !canPlay) || isRecording)
+                            .opacity((!canPlay && !isRunning) || isRecording ? 0.4 : 1)
                         }
                     }
                     .padding(20)
@@ -378,7 +427,7 @@ Happy presenting! [wave]
                     Image(systemName: "doc.text")
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(Color.accentColor)
-                    Text("Drop PowerPoint (.pptx) file")
+                    Text("Drop a script (.md, .txt) or PowerPoint (.pptx)")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
                     Text("For Keynote or Google Slides,\nexport as PPTX first.")
@@ -403,6 +452,12 @@ Happy presenting! [wave]
                     _ = provider.loadObject(ofClass: URL.self) { url, _ in
                         guard let url else { return }
                         let ext = url.pathExtension.lowercased()
+                        if TextreamService.scriptExtensions.contains(ext) {
+                            DispatchQueue.main.async {
+                                handleScriptDrop(url: url)
+                            }
+                            return
+                        }
                         if ext == "key" {
                             DispatchQueue.main.async {
                                 dropAlertTitle = "Conversion Required"
@@ -413,7 +468,7 @@ Happy presenting! [wave]
                         guard ext == "pptx" else {
                             DispatchQueue.main.async {
                                 dropAlertTitle = "Import Error"
-                                dropError = "Unsupported file. Drop a PowerPoint (.pptx) file."
+                                dropError = "Unsupported file. Drop a PowerPoint (.pptx), Markdown (.md) or text (.txt) file."
                             }
                             return
                         }
@@ -538,12 +593,13 @@ Happy presenting! [wave]
                         service.openFile()
                     } label: {
                         HStack(spacing: 4) {
-                            if service.currentFileURL != nil && service.pages != service.savedPages {
+                            if !service.isScriptLinked && service.currentFileURL != nil && service.pages != service.savedPages {
                                 Circle()
                                     .fill(.orange)
                                     .frame(width: 6, height: 6)
                             }
-                            Text(service.currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
+                            Text((service.isScriptLinked ? service.linkedScriptURL?.deletingPathExtension().lastPathComponent : nil)
+                                 ?? service.currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                         }
@@ -570,6 +626,8 @@ Happy presenting! [wave]
                         .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .disabled(service.isScriptLinked)
+                    .opacity(service.isScriptLinked ? 0.4 : 1)
 
                     Button {
                         showSettings = true
@@ -599,7 +657,7 @@ Happy presenting! [wave]
         .onReceive(NotificationCenter.default.publisher(for: .startPrompter)) { _ in
             // ⌘↩ from the editor. The main window hides while the prompter runs,
             // so this only ever starts; Esc stops from the overlay.
-            guard !isRunning, !isRecording, hasAnyContent else { return }
+            guard !isRunning, !isRecording, canPlay else { return }
             isTextFocused = false
             run()
         }
@@ -637,8 +695,9 @@ Happy presenting! [wave]
             }
         }
         .onAppear {
+            service.restoreLinkedScript()
             // Set default text for the first page if empty
-            if service.pages.count == 1 && service.pages[0].isEmpty {
+            if !service.isScriptLinked && service.pages.count == 1 && service.pages[0].isEmpty {
                 service.pages[0] = defaultText
             }
             // Sync button state with overlay
@@ -701,7 +760,7 @@ Happy presenting! [wave]
                 }
                 .tag(index)
                 .contextMenu {
-                    if service.pages.count > 1 {
+                    if service.pages.count > 1 && !service.isScriptLinked {
                         Button(role: .destructive) {
                             removePage(at: index)
                         } label: {
@@ -730,6 +789,8 @@ Happy presenting! [wave]
                     .padding(.vertical, 8)
             }
             .buttonStyle(.plain)
+            .disabled(service.isScriptLinked)
+            .opacity(service.isScriptLinked ? 0.4 : 1)
         }
     }
 
@@ -751,6 +812,9 @@ Happy presenting! [wave]
     }
 
     private func run() {
+        guard canPlay else { return }
+        // Re-read the linked file (if any) so edits made elsewhere are picked up
+        service.refreshLinkedScript()
         guard hasAnyContent else { return }
         // Resign text editor focus before hiding the window to avoid ViewBridge crashes
         isTextFocused = false
@@ -774,6 +838,13 @@ Happy presenting! [wave]
 
     @State private var isImporting = false
 
+    private func handleScriptDrop(url: URL) {
+        if isRecording {
+            stopRecording()
+        }
+        service.linkScript(url)
+    }
+
     private func handlePresentationDrop(url: URL) {
         guard service.confirmDiscardIfNeeded() else { return }
         if isRecording {
@@ -790,6 +861,7 @@ Happy presenting! [wave]
                     service.currentPageIndex = 0
                     service.readPages.removeAll()
                     service.currentFileURL = nil
+                    service.unlinkScript()
                     service.rememberDocumentURL(url)
                     isImporting = false
                 }

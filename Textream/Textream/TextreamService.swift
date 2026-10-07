@@ -172,6 +172,11 @@ class TextreamService: NSObject, ObservableObject {
 
     @Published var currentFileURL: URL?
     @Published var savedPages: [String] = [""]
+    @Published var linkedScriptURL: URL?
+    @Published var linkedScriptWarning: String?
+    var isScriptLinked: Bool { linkedScriptURL != nil }
+    static let scriptExtensions: Set<String> = ["md", "markdown", "txt"]
+    private static let linkedScriptBookmarkDefaultsKey = "linkedScriptBookmark"
 
     // MARK: - File Operations
 
@@ -222,8 +227,11 @@ class TextreamService: NSObject, ObservableObject {
         do {
             let data = try JSONEncoder().encode(pages)
             try data.write(to: url, options: .atomic)
-            currentFileURL = url
-            savedPages = pages
+            // While linked, the script file is the source of truth: the snapshot is just an export.
+            if !isScriptLinked {
+                currentFileURL = url
+                savedPages = pages
+            }
             rememberDocumentURL(url)
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
@@ -246,7 +254,7 @@ class TextreamService: NSObject, ObservableObject {
             .init(filenameExtension: "textream")!,
             .init(filenameExtension: "key")!,
             .init(filenameExtension: "pptx")!,
-        ]
+        ] + ["md", "markdown", "txt"].compactMap { UTType(filenameExtension: $0) }
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.directoryURL = currentFileURL?.deletingLastPathComponent()
@@ -254,18 +262,7 @@ class TextreamService: NSObject, ObservableObject {
 
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
-            let ext = url.pathExtension.lowercased()
-            if ext == "key" {
-                let alert = NSAlert()
-                alert.messageText = "Keynote files can't be imported directly"
-                alert.informativeText = "Please export your Keynote presentation as PowerPoint (.pptx) first:\n\nIn Keynote: File → Export To → PowerPoint"
-                alert.alertStyle = .informational
-                alert.runModal()
-            } else if ext == "pptx" {
-                self?.importPresentation(from: url)
-            } else {
-                self?.openFileAtURL(url)
-            }
+            self?.openScriptFile(url)
         }
     }
 
@@ -279,6 +276,7 @@ class TextreamService: NSObject, ObservableObject {
                     self?.currentPageIndex = 0
                     self?.readPages.removeAll()
                     self?.currentFileURL = nil
+                    self?.unlinkScript()
                     self?.rememberDocumentURL(url)
                 }
             } catch {
@@ -327,6 +325,7 @@ class TextreamService: NSObject, ObservableObject {
             currentPageIndex = 0
             readPages.removeAll()
             currentFileURL = url
+            unlinkScript()
             rememberDocumentURL(url)
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
@@ -334,6 +333,130 @@ class TextreamService: NSObject, ObservableObject {
             alert.messageText = "Failed to open file"
             alert.informativeText = error.localizedDescription
             alert.runModal()
+        }
+    }
+
+    // MARK: - Linked Scripts
+
+    private func linkedScriptBookmarkData() -> Data? {
+        UserDefaults.standard.data(forKey: Self.linkedScriptBookmarkDefaultsKey)
+    }
+
+    private func storeBookmark(for url: URL) {
+        let started = url.startAccessingSecurityScopedResource()
+        defer { if started { url.stopAccessingSecurityScopedResource() } }
+        if let data = try? LinkedScriptStore.makeBookmark(for: url) {
+            UserDefaults.standard.set(data, forKey: Self.linkedScriptBookmarkDefaultsKey)
+        }
+    }
+
+    /// Routes a file to the right importer based on its extension.
+    func openScriptFile(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
+        if ext == "textream" {
+            openFileAtURL(url)
+        } else if ext == "pptx" {
+            importPresentation(from: url)
+        } else if ext == "key" {
+            let alert = NSAlert()
+            alert.messageText = "Keynote files can't be imported directly"
+            alert.informativeText = "Please export your Keynote presentation as PowerPoint (.pptx) first:\n\nIn Keynote: File → Export To → PowerPoint"
+            alert.alertStyle = .informational
+            alert.runModal()
+        } else if Self.scriptExtensions.contains(ext) {
+            linkScript(url)
+        } else {
+            let alert = NSAlert()
+            alert.messageText = "Unsupported file"
+            alert.informativeText = "Textream can open .textream, .pptx, .md, .markdown and .txt files."
+            alert.alertStyle = .informational
+            alert.runModal()
+        }
+    }
+
+    func linkScript(_ url: URL) {
+        if overlayController.isShowing { return }
+        guard confirmDiscardIfNeeded() else { return }
+        let loaded: [String]
+        do {
+            loaded = try LinkedScriptStore.loadPages(from: url)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Failed to link script"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+            return
+        }
+        pages = loaded
+        savedPages = loaded
+        currentPageIndex = 0
+        readPages.removeAll()
+        currentFileURL = nil
+        linkedScriptURL = url
+        linkedScriptWarning = nil
+        storeBookmark(for: url)
+        rememberDocumentURL(url)
+        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+    }
+
+    /// Re-reads the linked file. Returns true if pages were reloaded (or there was nothing to do).
+    @discardableResult
+    func refreshLinkedScript() -> Bool {
+        guard let linkedURL = linkedScriptURL else { return true }
+        if overlayController.isShowing { return true }
+        var url = linkedURL
+        var needsRestore = false
+        if let data = linkedScriptBookmarkData(),
+           let resolved = try? LinkedScriptStore.resolveBookmark(data) {
+            url = resolved.url
+            needsRestore = resolved.isStale
+        }
+        do {
+            let newPages = try LinkedScriptStore.loadPages(from: url)
+            if newPages != pages {
+                pages = newPages
+                savedPages = newPages
+                currentPageIndex = min(currentPageIndex, max(pages.count - 1, 0))
+            }
+            if url != linkedURL { linkedScriptURL = url }
+            if needsRestore { storeBookmark(for: url) }
+            linkedScriptWarning = nil
+            return true
+        } catch {
+            linkedScriptWarning = "Couldn't re-read \(linkedURL.lastPathComponent): \(error.localizedDescription). Using the last version."
+            return false
+        }
+    }
+
+    func unlinkScript() {
+        linkedScriptURL = nil
+        linkedScriptWarning = nil
+        UserDefaults.standard.removeObject(forKey: Self.linkedScriptBookmarkDefaultsKey)
+    }
+
+    /// Restores the link from the stored bookmark. Silent on failure; safe to call repeatedly.
+    func restoreLinkedScript() {
+        guard linkedScriptURL == nil, !overlayController.isShowing,
+              let data = linkedScriptBookmarkData() else { return }
+        let resolved: (url: URL, isStale: Bool)
+        do {
+            resolved = try LinkedScriptStore.resolveBookmark(data)
+        } catch LinkedScriptError.bookmarkInvalid {
+            UserDefaults.standard.removeObject(forKey: Self.linkedScriptBookmarkDefaultsKey)
+            return
+        } catch {
+            return
+        }
+        do {
+            let loaded = try LinkedScriptStore.loadPages(from: resolved.url)
+            pages = loaded
+            savedPages = loaded
+            currentPageIndex = 0
+            linkedScriptURL = resolved.url
+            if resolved.isStale { storeBookmark(for: resolved.url) }
+        } catch {
+            linkedScriptURL = resolved.url
+            linkedScriptWarning = "Couldn't read \(resolved.url.lastPathComponent): \(error.localizedDescription). It will be re-read when you press Play."
         }
     }
 
@@ -379,6 +502,8 @@ class TextreamService: NSObject, ObservableObject {
     }
 
     func setTextFromDirector(_ text: String) {
+        // Director text is ignored while a script is linked: it would replace the linked pages.
+        if isScriptLinked { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -432,6 +557,8 @@ class TextreamService: NSObject, ObservableObject {
 
     func updateTextFromDirector(_ text: String, readCharCount: Int) {
         guard directorIsReading else { return }
+        // Director text is ignored while a script is linked: it would replace the linked pages.
+        if isScriptLinked { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
