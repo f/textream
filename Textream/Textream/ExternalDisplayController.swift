@@ -247,7 +247,7 @@ struct ExternalDisplayView: View {
                 SpeechScrollView(
                     words: words,
                     highlightedCharCount: effectiveCharCount,
-                    font: .systemFont(ofSize: fontSize, weight: .semibold),
+                    font: NotchSettings.shared.fontFamilyPreset.font(size: fontSize),
                     highlightColor: NotchSettings.shared.fontColorPreset.color,
                     cueColor: NotchSettings.shared.cueColorPreset.color,
                     cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
