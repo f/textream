@@ -876,7 +876,7 @@ class SpeechRecognizer {
     private func charLevelMatch(spoken: String) -> Int {
         let remainingSource = String(sourceText.dropFirst(matchStartOffset))
         // Use Character arrays (not unicodeScalars) so counts match sourceText.count
-        let src = Array(remainingSource.lowercased())
+        let src = Array(Self.foldCase(remainingSource))
         let spk = Array(Self.normalize(spoken))
 
         var si = 0
@@ -975,7 +975,7 @@ class SpeechRecognizer {
     private func wordLevelMatch(spoken: String) -> Int {
         let remainingSource = String(sourceText.dropFirst(matchStartOffset))
         let sourceWords = remainingSource.split(separator: " ").map { String($0) }
-        let spokenWords = splitTextIntoWords(spoken.lowercased())
+        let spokenWords = splitTextIntoWords(Self.foldCase(spoken))
 
         var si = 0 // source word index
         var ri = 0 // spoken word index
@@ -1000,7 +1000,7 @@ class SpeechRecognizer {
                 continue
             }
 
-            let srcWord = sourceWords[si].lowercased()
+            let srcWord = Self.foldCase(sourceWords[si])
                 .filter { $0.isLetter || $0.isNumber }
             let spkWord = spokenWords[ri]
                 .filter { $0.isLetter || $0.isNumber }
@@ -1033,7 +1033,7 @@ class SpeechRecognizer {
                 var foundSrc = false
                 let maxSrcSkip = min(5, sourceWords.count - si - 1)
                 for skip in 1...max(1, maxSrcSkip) where skip <= maxSrcSkip {
-                    let nextSrc = sourceWords[si + skip].lowercased().filter { $0.isLetter || $0.isNumber }
+                    let nextSrc = Self.foldCase(sourceWords[si + skip]).filter { $0.isLetter || $0.isNumber }
                     if nextSrc == spkWord || isFuzzyMatch(nextSrc, spkWord) {
                         // Add all skipped source words' char counts
                         for s in 0..<skip {
@@ -1112,8 +1112,28 @@ class SpeechRecognizer {
         return dp[b.count]
     }
 
+    /// Lowercases `text` and folds the Turkish dotted and dotless I (I, İ, i, ı)
+    /// to a plain `i`, whatever the script's language. Plain `lowercased()` maps
+    /// `I` to `i` (Turkish expects `ı`) and `İ` to `i` + U+0307, so "Işık" never
+    /// matched "ışık" and "İstanbul" never matched "istanbul". Each Character
+    /// stays one Character, so offsets into the original text remain valid.
+    private static func foldCase(_ text: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in text.lowercased().unicodeScalars {
+            switch scalar {
+            case "\u{0131}":
+                scalars.append("i")
+            case "\u{0307}" where scalars.last == "i":
+                break
+            default:
+                scalars.append(scalar)
+            }
+        }
+        return String(scalars)
+    }
+
     private static func normalize(_ text: String) -> String {
-        text.lowercased()
+        foldCase(text)
             .filter { $0.isLetter || $0.isNumber || $0.isWhitespace }
     }
 }

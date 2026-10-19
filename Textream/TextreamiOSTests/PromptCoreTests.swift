@@ -969,6 +969,27 @@ struct PromptCoreTests {
     }
 
     @Test
+    func foldCaseUnifiesTheTurkishI() {
+        #expect(PromptMatcher.foldCase("IŞIK") == PromptMatcher.foldCase("ışık"))
+        #expect(PromptMatcher.foldCase("İSTANBUL") == "istanbul")
+        #expect(PromptMatcher.foldCase("I\u{0307}stanbul") == "istanbul")
+        #expect(PromptMatcher.foldCase("Iğdır") == "iğdir")
+        for letter in ["İ", "I", "ı", "Ş", "Ğ", "Ö", "Ü", "Ç"] {
+            #expect(PromptMatcher.foldCase(letter).count == 1)
+        }
+        // U+0307 after a letter other than i is real content and must survive.
+        #expect(PromptMatcher.foldCase("a\u{0307}") == "a\u{0307}")
+    }
+
+    @Test
+    func matcherFollowsTurkishTextWhateverTheCaseOfI() {
+        var matcher = PromptMatcher(source: PromptScript("IŞIK ılık İş bitti"))
+        let progress = matcher.match(transcript: "ışık ılık iş")
+
+        #expect(progress >= "IŞIK ılık".count)
+    }
+
+    @Test
     func matcherNeverMovesBackward() {
         var matcher = PromptMatcher(source: PromptScript("one two three four five six"))
         let forward = matcher.match(transcript: "one two three four")
