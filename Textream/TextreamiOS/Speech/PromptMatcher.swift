@@ -79,7 +79,7 @@ struct PromptMatcher {
 
     private func characterLevelMatch(spoken: String) -> Int {
         let remainingSource = String(source.text.dropFirst(matchStartOffset))
-        let sourceCharacters = Array(remainingSource.lowercased())
+        let sourceCharacters = Array(Self.foldCase(remainingSource))
         let spokenCharacters = Array(Self.normalize(spoken))
         var sourceIndex = 0
         var spokenIndex = 0
@@ -152,7 +152,7 @@ struct PromptMatcher {
     private func wordLevelMatch(spoken: String) -> Int {
         let remainingSource = String(source.text.dropFirst(matchStartOffset))
         let sourceWords = remainingSource.split(separator: " ").map(String.init)
-        let spokenWords = splitPromptTextIntoWords(spoken.lowercased())
+        let spokenWords = splitPromptTextIntoWords(Self.foldCase(spoken))
         var sourceIndex = 0
         var spokenIndex = 0
         var matchedCharacterCount = 0
@@ -171,7 +171,7 @@ struct PromptMatcher {
                 continue
             }
 
-            let sourceWord = sourceWords[sourceIndex].lowercased().filter { $0.isLetter || $0.isNumber }
+            let sourceWord = Self.foldCase(sourceWords[sourceIndex]).filter { $0.isLetter || $0.isNumber }
             let spokenWord = spokenWords[spokenIndex].filter { $0.isLetter || $0.isNumber }
             if sourceWord == spokenWord || Self.isFuzzyMatch(sourceWord, spokenWord) {
                 matchedCharacterCount += sourceWords[sourceIndex].count
@@ -199,7 +199,7 @@ struct PromptMatcher {
             let maximumSourceSkip = min(5, sourceWords.count - sourceIndex - 1)
             if maximumSourceSkip >= 1 {
                 for skip in 1...maximumSourceSkip {
-                    let next = sourceWords[sourceIndex + skip].lowercased().filter { $0.isLetter || $0.isNumber }
+                    let next = Self.foldCase(sourceWords[sourceIndex + skip]).filter { $0.isLetter || $0.isNumber }
                     if next == spokenWord || Self.isFuzzyMatch(next, spokenWord) {
                         for skippedIndex in 0..<skip {
                             matchedCharacterCount += sourceWords[sourceIndex + skippedIndex].count + 1
@@ -274,7 +274,27 @@ struct PromptMatcher {
             || word.allSatisfy { !$0.isLetter && !$0.isNumber }
     }
 
+    /// Lowercases `text` and folds the Turkish dotted and dotless I (I, İ, i, ı)
+    /// to a plain `i`, whatever the script's language. Plain `lowercased()` maps
+    /// `I` to `i` (Turkish expects `ı`) and `İ` to `i` + U+0307, so "Işık" never
+    /// matched "ışık" and "İstanbul" never matched "istanbul". Each Character
+    /// stays one Character, so offsets into the original text remain valid.
+    static func foldCase(_ text: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in text.lowercased().unicodeScalars {
+            switch scalar {
+            case "\u{0131}":
+                scalars.append("i")
+            case "\u{0307}" where scalars.last == "i":
+                break
+            default:
+                scalars.append(scalar)
+            }
+        }
+        return String(scalars)
+    }
+
     private static func normalize(_ text: String) -> String {
-        text.lowercased().filter { $0.isLetter || $0.isNumber || $0.isWhitespace }
+        foldCase(text).filter { $0.isLetter || $0.isNumber || $0.isWhitespace }
     }
 }
