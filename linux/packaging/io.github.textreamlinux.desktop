@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Textream Linux
+Comment=Floating teleprompter for Linux
+Exec=textream-linux
+Terminal=false
+Categories=Office;Utility;
