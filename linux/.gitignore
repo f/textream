@@ -3,3 +3,9 @@
 .cache/
 *.user
 *.bak-*
+
+# Local development backups and caches
+*.bak
+*.backup
+__pycache__/
+*.pyc
