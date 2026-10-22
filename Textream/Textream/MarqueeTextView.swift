@@ -103,6 +103,7 @@ struct WordItem: Identifiable {
     let word: String
     let charOffset: Int // char offset of this word in the full text (counting spaces)
     let isAnnotation: Bool // true for [bracket] words and emoji-only words
+    let displayWidth: CGFloat
 }
 
 // MARK: - Preference key to report word Y positions
@@ -598,17 +599,22 @@ struct WordFlowLayout: View {
     }
 
     // Simple layout cache to avoid re-measuring words on every highlight update
-    private static var _cacheKey: String = ""
+    private struct LayoutCacheKey: Equatable {
+        let words: [String]
+        let font: NSFont
+        let containerWidth: CGFloat
+        let paragraphBreaks: Set<Int>
+    }
+
+    private static var _cacheKey: LayoutCacheKey?
     private static var _cachedItems: [WordItem] = []
     private static var _cachedLines: [[WordItem]] = []
     private static var _cachedParagraphPrefixCounts: [Int] = []
 
     private func cachedLayout() -> ([WordItem], [[WordItem]], [Int]) {
-        let paragraphKey = paragraphBreakBeforeWordIndices.sorted()
-            .map(String.init)
-            .joined(separator: ",")
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|"
-            + "\(font.fontName)|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
+        let key = LayoutCacheKey(words: words, font: font,
+                                 containerWidth: containerWidth,
+                                 paragraphBreaks: paragraphBreakBeforeWordIndices)
         if key == Self._cacheKey {
             return (Self._cachedItems, Self._cachedLines, Self._cachedParagraphPrefixCounts)
         }
@@ -722,6 +728,9 @@ struct WordFlowLayout: View {
                 HStack(spacing: 0) {
                     ForEach(lines[lineIdx], id: \.id) { item in
                         wordView(for: item, isNextWord: item.id == nextIdx)
+                            // Preserve words that fit on their own; an overfull row
+                            // must not compress a number into an ellipsis.
+                            .fixedSize(horizontal: item.displayWidth <= containerWidth, vertical: false)
                             .id(item.id)
                     }
                 }
@@ -849,7 +858,15 @@ struct WordFlowLayout: View {
         let annotationFlags = SpeechTextAlignment.annotationFlags(for: words)
         for (i, word) in words.enumerated() {
             let isAnnotation = annotationFlags[i] || Self.isAnnotationWord(word)
-            items.append(WordItem(id: i, word: word, charOffset: offset, isAnnotation: isAnnotation))
+            let displayFont = isAnnotation
+                ? NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
+                : font
+            // Measure the same string that Text renders, including its trailing
+            // space, and round each item up before accumulating line widths.
+            let displayWidth = ceil(((word + " ") as NSString)
+                .size(withAttributes: [.font: displayFont]).width)
+            items.append(WordItem(id: i, word: word, charOffset: offset,
+                                  isAnnotation: isAnnotation, displayWidth: displayWidth))
             offset += word.count + 1 // +1 for space
         }
         return items
@@ -867,7 +884,6 @@ struct WordFlowLayout: View {
     private func buildLines(items: [WordItem]) -> [[WordItem]] {
         var lines: [[WordItem]] = [[]]
         var currentLineWidth: CGFloat = 0
-        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
 
         for item in items {
             if paragraphBreakBeforeWordIndices.contains(item.id),
@@ -875,7 +891,7 @@ struct WordFlowLayout: View {
                 lines.append([])
                 currentLineWidth = 0
             }
-            let wordWidth = (item.word as NSString).size(withAttributes: [.font: font]).width + spaceWidth
+            let wordWidth = item.displayWidth
             if currentLineWidth + wordWidth > containerWidth && !lines[lines.count - 1].isEmpty {
                 lines.append([])
                 currentLineWidth = 0

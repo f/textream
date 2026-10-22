@@ -532,7 +532,7 @@ class BrowserServer {
                 hcc=s.highlightedCharCount||0;
 
           // Rebuild spans only when words change
-          const wordKey=words.length+'|'+(words[0]||'')+'|'+(words[words.length-1]||'');
+          const wordKey=JSON.stringify(words);
           if(wordKey!==prevWordKey){
             c.innerHTML='';
             let cp=0;
