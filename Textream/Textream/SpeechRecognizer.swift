@@ -99,6 +99,7 @@ struct AudioInputDevice: Identifiable, Hashable {
 
 @Observable
 class SpeechRecognizer {
+    let playback = PrompterPlayback()
     var recognizedCharCount: Int = 0
     var isListening: Bool = false
     var isStarting: Bool = false
@@ -117,6 +118,7 @@ class SpeechRecognizer {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine = AVAudioEngine()
+    private var tappedInputNode: AVAudioInputNode?
     private var sourceText: String = ""
     private var normalizedSource: String = ""
     private var annotationRanges: [Range<Int>] = []
@@ -345,7 +347,11 @@ class SpeechRecognizer {
         if audioEngine.isRunning {
             audioEngine.stop()
         }
-        audioEngine.inputNode.removeTap(onBus: 0)
+        // Reading can stop before the microphone has ever been used (Classic
+        // mode, denied permission, or a cancelled startup). Accessing inputNode
+        // here would initialize the device just to remove a nonexistent tap.
+        tappedInputNode?.removeTap(onBus: 0)
+        tappedInputNode = nil
     }
 
     private func cleanupRecognition() {
@@ -545,6 +551,8 @@ class SpeechRecognizer {
                 self.recordAudioLevel(level)
             }
         }
+
+        tappedInputNode = inputNode
 
         if let speechRecognizer, let recognitionRequest {
             recognitionGeneration &+= 1

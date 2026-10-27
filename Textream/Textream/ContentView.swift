@@ -758,7 +758,9 @@ Happy presenting! [wave]
             isRunning = false
             service.readPages.removeAll()
             NSApp.activate(ignoringOtherApps: true)
-            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+            // Reading panels can become key for arrow navigation. Restore
+            // the editor explicitly when the reading session ends.
+            NSApp.windows.first(where: { !($0 is NSPanel) })?.makeKeyAndOrderFront(nil)
         }
         service.readPages.removeAll()
         // If the current page is empty, find the first non-empty page

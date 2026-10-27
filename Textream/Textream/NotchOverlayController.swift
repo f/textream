@@ -77,6 +77,8 @@ class NotchOverlayController: NSObject {
         }
         self.isDismissing = false
         forceClose()
+        speechRecognizer.playback.seek(to: 0)
+        speechRecognizer.playback.isPaused = false
         observeDismiss()
 
         // Populate overlay content
@@ -135,6 +137,7 @@ class NotchOverlayController: NSObject {
 
     func updateContent(text: String, hasNextPage: Bool) {
         let normalized = splitTextIntoWords(text)
+        speechRecognizer.playback.seek(to: 0)
 
         // Fully reset speech state for new page
         speechRecognizer.recognizedCharCount = 0
@@ -279,6 +282,7 @@ class NotchOverlayController: NSObject {
 
         panel.orderFrontRegardless()
         self.panel = panel
+        panel.makeKey()
 
         // Start mouse tracking for follow-mouse mode
         if settings.notchDisplayMode == .followMouse {
@@ -325,6 +329,7 @@ class NotchOverlayController: NSObject {
 
         panel.orderFrontRegardless()
         self.panel = panel
+        panel.makeKey()
 
         startCursorTracking()
         installKeyMonitor()
@@ -358,6 +363,7 @@ class NotchOverlayController: NSObject {
         panel.setFrame(screenFrame, display: true)
         panel.orderFrontRegardless()
         self.panel = panel
+        panel.makeKey()
 
         installKeyMonitor()
     }
@@ -396,6 +402,7 @@ class NotchOverlayController: NSObject {
 
         panel.orderFrontRegardless()
         self.panel = panel
+        panel.makeKey()
 
         installKeyMonitor()
     }
@@ -430,6 +437,11 @@ class NotchOverlayController: NSObject {
         removeEscMonitor()
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            let isReadingWindow = event.window is PrompterPanel || NSApp.keyWindow is PrompterPanel
+            if isReadingWindow, let command = PrompterKeyboardShortcuts.command(keyCode: event.keyCode, modifiers: event.modifierFlags) {
+                TextreamService.shared.navigatePrompter(command)
+                return nil
+            }
             if event.keyCode == 53 { // ESC
                 if self.overlayContent.showPagePicker {
                     self.overlayContent.showPagePicker = false
@@ -692,9 +704,18 @@ struct NotchOverlayView: View {
     @State private var dragStartHeight: CGFloat = -1
 
     // Timer-based scroll for classic & silence-paused modes
-    @State private var timerWordProgress: Double = 0
-    @State private var isPaused: Bool = false
-    @State private var isUserScrolling: Bool = false
+    private var timerWordProgress: Double {
+        get { speechRecognizer.playback.wordProgress }
+        nonmutating set { speechRecognizer.playback.wordProgress = newValue }
+    }
+    private var isPaused: Bool {
+        get { speechRecognizer.playback.isPaused }
+        nonmutating set { speechRecognizer.playback.isPaused = newValue }
+    }
+    private var isUserScrolling: Bool {
+        get { speechRecognizer.playback.isUserScrolling }
+        nonmutating set { speechRecognizer.playback.isUserScrolling = newValue }
+    }
     private let scrollTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     // Auto next page countdown
@@ -931,20 +952,23 @@ struct NotchOverlayView: View {
                 onWordTap: { charOffset in
                     if listeningMode == .wordTracking {
                         speechRecognizer.jumpTo(charOffset: charOffset)
+                        speechRecognizer.playback.seek(to: wordProgressForCharOffset(charOffset))
                     } else {
-                        timerWordProgress = wordProgressForCharOffset(charOffset)
+                        speechRecognizer.playback.seek(to: wordProgressForCharOffset(charOffset))
                     }
                 },
                 onManualScroll: { scrolling, newProgress in
                     isUserScrolling = scrolling
                     if !scrolling {
-                        timerWordProgress = max(0, min(Double(words.count), newProgress))
+                        speechRecognizer.playback.seek(to: max(0, min(Double(words.count), newProgress)))
                     }
                 },
                 smoothScroll: listeningMode != .wordTracking,
                 smoothWordProgress: timerWordProgress,
                 isListening: isEffectivelyListening,
                 readingPosition: NotchSettings.shared.readingPosition,
+                navigationRevision: speechRecognizer.playback.positionRevision,
+                handlesNavigation: { !TextreamService.shared.externalDisplayController.isShowing },
                 paragraphBreakBeforeWordIndices: NotchSettings.shared.showParagraphDividers
                     ? content.paragraphBreakBeforeWordIndices
                     : []
@@ -995,6 +1019,8 @@ struct NotchOverlayView: View {
                 } else {
                     Spacer(minLength: 0)
                 }
+
+                PrompterNavigationControls()
 
                 if content.pageCount > 1 {
                     if hasNextPage {
@@ -1288,9 +1314,18 @@ struct FloatingOverlayView: View {
     @State private var countdownTimer: Timer? = nil
 
     // Timer-based scroll for classic & silence-paused modes
-    @State private var timerWordProgress: Double = 0
-    @State private var isPaused: Bool = false
-    @State private var isUserScrolling: Bool = false
+    private var timerWordProgress: Double {
+        get { speechRecognizer.playback.wordProgress }
+        nonmutating set { speechRecognizer.playback.wordProgress = newValue }
+    }
+    private var isPaused: Bool {
+        get { speechRecognizer.playback.isPaused }
+        nonmutating set { speechRecognizer.playback.isPaused = newValue }
+    }
+    private var isUserScrolling: Bool {
+        get { speechRecognizer.playback.isUserScrolling }
+        nonmutating set { speechRecognizer.playback.isUserScrolling = newValue }
+    }
     private let scrollTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     private var listeningMode: ListeningMode {
@@ -1452,20 +1487,23 @@ struct FloatingOverlayView: View {
                 onWordTap: { charOffset in
                     if listeningMode == .wordTracking {
                         speechRecognizer.jumpTo(charOffset: charOffset)
+                        speechRecognizer.playback.seek(to: wordProgressForCharOffset(charOffset))
                     } else {
-                        timerWordProgress = wordProgressForCharOffset(charOffset)
+                        speechRecognizer.playback.seek(to: wordProgressForCharOffset(charOffset))
                     }
                 },
                 onManualScroll: { scrolling, newProgress in
                     isUserScrolling = scrolling
                     if !scrolling {
-                        timerWordProgress = max(0, min(Double(words.count), newProgress))
+                        speechRecognizer.playback.seek(to: max(0, min(Double(words.count), newProgress)))
                     }
                 },
                 smoothScroll: listeningMode != .wordTracking,
                 smoothWordProgress: timerWordProgress,
                 isListening: isEffectivelyListening,
                 readingPosition: NotchSettings.shared.readingPosition,
+                navigationRevision: speechRecognizer.playback.positionRevision,
+                handlesNavigation: { !TextreamService.shared.externalDisplayController.isShowing },
                 paragraphBreakBeforeWordIndices: NotchSettings.shared.showParagraphDividers
                     ? content.paragraphBreakBeforeWordIndices
                     : []
@@ -1502,6 +1540,8 @@ struct FloatingOverlayView: View {
                 } else {
                     Spacer()
                 }
+
+                PrompterNavigationControls()
 
                 if !followingCursor && content.pageCount > 1 {
                     if hasNextPage {
