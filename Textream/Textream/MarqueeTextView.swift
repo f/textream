@@ -115,6 +115,89 @@ struct WordItem: Identifiable {
     }
 }
 
+// MARK: - Smooth scroll follower
+
+/// Moves the displayed scroll offset toward the tracking target once per
+/// frame with a critically damped spring. Speech results arrive in bursts
+/// (nothing, then two or three words at once). Separate animations per result
+/// look like stop-and-go; a spring that keeps its velocity between results
+/// turns the bursts into one continuous glide.
+final class ScrollFollower {
+    /// Seconds for the spring to settle. Longer is smoother; at normal reading
+    /// speed the text trails the target by only a few points.
+    static let response: Double = 1.2
+
+    private(set) var position: CGFloat = 0
+    private var velocity: CGFloat = 0
+    private var lastTime: TimeInterval?
+    private var hasPosition = false
+
+    /// Forget the current motion; the next frame starts at the target.
+    func reset() {
+        hasPosition = false
+        velocity = 0
+        lastTime = nil
+    }
+
+    /// Move the displayed position with the target, e.g. when a manual
+    /// scroll offset is folded into the target, so nothing visibly moves.
+    func shift(by delta: CGFloat) {
+        position += delta
+    }
+
+    func step(toward target: CGFloat, at time: TimeInterval, snapDistance: CGFloat) -> CGFloat {
+        guard hasPosition, abs(target - position) <= snapDistance else {
+            // First frame, or a jump of most of a screen: no glide through
+            // text that isn't laid out yet, just go there.
+            position = target
+            velocity = 0
+            hasPosition = true
+            lastTime = time
+            return position
+        }
+        let elapsed = min(max(time - (lastTime ?? time), 0), 0.1)
+        lastTime = time
+        let omega = 2 * Double.pi / Self.response
+        var remaining = elapsed
+        while remaining > 0 {
+            let h = min(remaining, 1.0 / 240)
+            let acceleration = omega * omega * Double(target - position) - 2 * omega * Double(velocity)
+            velocity += CGFloat(acceleration * h)
+            position += velocity * CGFloat(h)
+            remaining -= h
+        }
+        if abs(target - position) < 0.05 && abs(velocity) < 0.5 {
+            position = target
+            velocity = 0
+        }
+        return position
+    }
+}
+
+/// Applies the tracking offset: per frame through the follower for word
+/// tracking, or with a scoped animation otherwise. The animation is scoped
+/// to the offset so it never animates the culled layout inside.
+private struct ScrollOffsetModifier: ViewModifier {
+    let follower: ScrollFollower
+    let target: CGFloat
+    let useFollower: Bool
+    let animation: Animation?
+    let snapDistance: CGFloat
+
+    func body(content: Content) -> some View {
+        TimelineView(.animation(minimumInterval: nil, paused: !useFollower)) { context in
+            let y = useFollower
+                ? follower.step(
+                    toward: target,
+                    at: context.date.timeIntervalSinceReferenceDate,
+                    snapDistance: snapDistance
+                )
+                : target
+            content.animation(useFollower ? nil : animation) { $0.offset(y: y) }
+        }
+    }
+}
+
 // MARK: - Preference key to report word Y positions
 
 struct WordYPreferenceKey: PreferenceKey {
@@ -152,6 +235,7 @@ struct SpeechScrollView: View {
     /// including jumps backward, which tracking normally ignores.
     var jumpRequestID: Int = 0
     @State private var scrollOffset: CGFloat = 0
+    @State private var follower = ScrollFollower()
     @State private var manualOffset: CGFloat = 0
     @State private var wordYPositions: [Int: CGFloat] = [:]
     @State private var containerHeight: CGFloat = 0
@@ -170,6 +254,12 @@ struct SpeechScrollView: View {
             return nil
         }
         return .smooth(duration: duration, extraBounce: 0)
+    }
+
+    /// Word tracking glides per frame; timer modes and the settings preview
+    /// keep their own animations.
+    private var usesFollower: Bool {
+        !smoothScroll && readingPositionTransitionDuration == nil
     }
 
     private var scrollOffsetAnimation: Animation? {
@@ -236,7 +326,13 @@ struct SpeechScrollView: View {
             // positions drift for the length of the animation and far jumps
             // and fast scrolls land on the wrong line.
             .animation(.easeOut(duration: 0.15)) { $0.offset(y: manualOffset) }
-            .animation(scrollOffsetAnimation) { $0.offset(y: scrollOffset) }
+            .modifier(ScrollOffsetModifier(
+                follower: follower,
+                target: scrollOffset,
+                useFollower: usesFollower,
+                animation: scrollOffsetAnimation,
+                snapDistance: max(400, containerHeight * 0.75)
+            ))
             .onChange(of: geo.size.height) { _, newHeight in
                 containerHeight = newHeight
                 hasAppliedTrackingTarget = false
@@ -270,6 +366,7 @@ struct SpeechScrollView: View {
                 }
             }
             .onChange(of: words) { _, _ in
+                follower.reset()
                 scrollOffset = initialScrollOffset(containerHeight: containerHeight)
                 manualOffset = 0
                 wordYPositions = [:]
@@ -314,6 +411,7 @@ struct SpeechScrollView: View {
             .onAppear {
                 containerHeight = geo.size.height
                 scrollOffset = initialScrollOffset(containerHeight: containerHeight)
+                follower.reset()
             }
             .overlay(
                 ScrollWheelView(
@@ -355,6 +453,7 @@ struct SpeechScrollView: View {
                             settle.disablesAnimations = true
                             withTransaction(settle) {
                                 manualOffset = min(upperBound, max(lowerBound, manualOffset))
+                                follower.shift(by: manualOffset)
                                 scrollOffset += manualOffset
                                 manualOffset = 0
                             }
@@ -668,11 +767,16 @@ struct WordFlowLayout: View {
     }
 
     // Simple layout cache to avoid re-measuring words on every highlight update
-    private static var _cacheKey: String = ""
-    private static var _cachedItems: [WordItem] = []
-    private static var _cachedLines: [[WordItem]] = []
-    private static var _cachedParagraphPrefixCounts: [Int] = []
-    private static var _cachedPositions: [Int: CGFloat] = [:]
+    private struct CachedLayout {
+        let items: [WordItem]
+        let lines: [[WordItem]]
+        let paragraphPrefixCounts: [Int]
+        let positions: [Int: CGFloat]
+    }
+    /// Keyed by layout inputs. The notch and external views lay out the same
+    /// script at different sizes; a single shared slot made each one rebuild
+    /// the whole layout on every highlight update.
+    private static var _cache: [String: CachedLayout] = [:]
 
     private func cachedLayout() -> ([WordItem], [[WordItem]], [Int], [Int: CGFloat]) {
         let paragraphKey = paragraphBreakBeforeWordIndices.sorted()
@@ -680,8 +784,8 @@ struct WordFlowLayout: View {
             .joined(separator: ",")
         let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|"
             + "\(font.fontName)|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
-        if key == Self._cacheKey {
-            return (Self._cachedItems, Self._cachedLines, Self._cachedParagraphPrefixCounts, Self._cachedPositions)
+        if let cached = Self._cache[key] {
+            return (cached.items, cached.lines, cached.paragraphPrefixCounts, cached.positions)
         }
         let items = buildItems()
         let lines = buildLines(items: items)
@@ -694,12 +798,16 @@ struct WordFlowLayout: View {
                 paragraphPrefixCounts[paragraphPrefixCounts.count - 1] + (beginsParagraph ? 1 : 0)
             )
         }
-        Self._cacheKey = key
-        Self._cachedItems = items
-        Self._cachedLines = lines
-        Self._cachedParagraphPrefixCounts = paragraphPrefixCounts
         let positions = layoutPositions(lines: lines, paragraphPrefixCounts: paragraphPrefixCounts)
-        Self._cachedPositions = positions
+        if Self._cache.count >= 8 {
+            Self._cache.removeAll()
+        }
+        Self._cache[key] = CachedLayout(
+            items: items,
+            lines: lines,
+            paragraphPrefixCounts: paragraphPrefixCounts,
+            positions: positions
+        )
         return (items, lines, paragraphPrefixCounts, positions)
     }
 
