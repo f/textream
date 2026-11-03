@@ -176,7 +176,10 @@ struct SpeechScrollView: View {
         if isAnimatingReadingPositionChange {
             return readingPositionTransitionAnimation
         }
-        return smoothScroll ? .linear(duration: 0.06) : .easeOut(duration: 0.5)
+        // Word tracking glides a little per word (see glidingWordY). A smooth
+        // spring keeps its speed when the next word retargets it, so the
+        // small steps blend into one steady motion instead of restarting.
+        return smoothScroll ? .linear(duration: 0.06) : .smooth(duration: 0.6)
     }
 
     var body: some View {
@@ -426,7 +429,7 @@ struct SpeechScrollView: View {
         } else {
             // Word-tracking/voice-activated: active word at vertical center
             let wordIdx = activeWordIndex()
-            if let wordY = wordYPositions[wordIdx] {
+            if let wordY = glidingWordY(for: wordIdx) {
                 let target = center - wordY
                 applyTrackingTarget(target, force: force)
             }
@@ -445,14 +448,37 @@ struct SpeechScrollView: View {
             applyTrackingTarget(target, force: force)
         } else {
             let wordIdx = activeWordIndex()
-            guard let wordY = wordYPositions[wordIdx] else { return }
+            guard let wordY = glidingWordY(for: wordIdx) else { return }
             let target = min(wordY, topReadingAnchor) - wordY
             applyTrackingTarget(target, force: force)
         }
     }
 
+    /// The y to hold at the reading anchor in word tracking. Instead of the
+    /// current word's line (which jumps a whole line at every line break),
+    /// move part of the way toward the next line as this line is read, so
+    /// the text creeps up steadily word by word.
+    private func glidingWordY(for wordIdx: Int) -> CGFloat? {
+        guard let wordY = wordYPositions[wordIdx] else { return nil }
+        let sameLine: (Int) -> Bool = { index in
+            guard let y = wordYPositions[index] else { return false }
+            return abs(y - wordY) < 1
+        }
+        var lineStart = wordIdx
+        while lineStart > 0, sameLine(lineStart - 1) {
+            lineStart -= 1
+        }
+        var lineEnd = wordIdx
+        while lineEnd + 1 < words.count, sameLine(lineEnd + 1) {
+            lineEnd += 1
+        }
+        guard let nextY = wordYPositions[lineEnd + 1], nextY > wordY else { return wordY }
+        let fraction = CGFloat(wordIdx - lineStart) / CGFloat(lineEnd - lineStart + 1)
+        return wordY + (nextY - wordY) * fraction
+    }
+
     private func repositionTracking(toWordIndex wordIndex: Int) {
-        guard let wordY = wordYPositions[wordIndex] else { return }
+        guard let wordY = smoothScroll ? wordYPositions[wordIndex] : glidingWordY(for: wordIndex) else { return }
 
         let target: CGFloat
         switch readingPosition {
