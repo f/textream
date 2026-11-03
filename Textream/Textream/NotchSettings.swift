@@ -10,7 +10,7 @@ import SwiftUI
 // MARK: - Font Size Preset
 
 enum FontSizePreset: String, CaseIterable, Identifiable {
-    case xs, sm, lg, xl
+    case xs, sm, lg, xl, xxl, xxxl
 
     var id: String { rawValue }
 
@@ -20,6 +20,8 @@ enum FontSizePreset: String, CaseIterable, Identifiable {
         case .sm: return "SM"
         case .lg: return "LG"
         case .xl: return "XL"
+        case .xxl: return "2XL"
+        case .xxxl: return "3XL"
         }
     }
 
@@ -29,6 +31,8 @@ enum FontSizePreset: String, CaseIterable, Identifiable {
         case .sm: return 16
         case .lg: return 20
         case .xl: return 24
+        case .xxl: return 32
+        case .xxxl: return 40
         }
     }
 }
@@ -461,6 +465,16 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(Int(fullscreenScreenID), forKey: "fullscreenScreenID") }
     }
 
+    /// Multiplier on the automatic text size in fullscreen and external display modes
+    var fullscreenTextScale: Double {
+        didSet { UserDefaults.standard.set(fullscreenTextScale, forKey: "fullscreenTextScale") }
+    }
+
+    /// Left and right margin in fullscreen and external display modes, as a fraction of screen width per side
+    var fullscreenSideMargin: Double {
+        didSet { UserDefaults.standard.set(fullscreenSideMargin, forKey: "fullscreenSideMargin") }
+    }
+
     var browserServerEnabled: Bool {
         didSet {
             UserDefaults.standard.set(browserServerEnabled, forKey: "browserServerEnabled")
@@ -491,6 +505,11 @@ class NotchSettings {
     static let defaultHeight: CGFloat = 150
     static let defaultLocale: String = SpeechLocaleSupport.closestSupportedLocale(to: Locale.current.identifier)?.identifier
         ?? Locale.current.identifier
+
+    static let defaultFullscreenTextScale: Double = 1.0
+    static let fullscreenTextScaleRange: ClosedRange<Double> = 0.5...1.5
+    static let defaultFullscreenSideMargin: Double = 0.08
+    static let fullscreenSideMarginRange: ClosedRange<Double> = 0.0...0.4
 
     static let minWidth: CGFloat = 310
     static let maxWidth: CGFloat = 500
@@ -543,6 +562,14 @@ class NotchSettings {
             : 3
         let savedFullscreenScreenID = UserDefaults.standard.integer(forKey: "fullscreenScreenID")
         self.fullscreenScreenID = UInt32(savedFullscreenScreenID)
+        let savedTextScale = UserDefaults.standard.double(forKey: "fullscreenTextScale")
+        self.fullscreenTextScale = Self.fullscreenTextScaleRange.contains(savedTextScale)
+            ? savedTextScale
+            : Self.defaultFullscreenTextScale
+        self.fullscreenSideMargin = UserDefaults.standard.object(forKey: "fullscreenSideMargin") != nil
+            && Self.fullscreenSideMarginRange.contains(UserDefaults.standard.double(forKey: "fullscreenSideMargin"))
+            ? UserDefaults.standard.double(forKey: "fullscreenSideMargin")
+            : Self.defaultFullscreenSideMargin
         self.browserServerEnabled = UserDefaults.standard.object(forKey: "browserServerEnabled") as? Bool ?? false
         let savedPort = UserDefaults.standard.integer(forKey: "browserServerPort")
         self.browserServerPort = (1024..<Int(UInt16.max)).contains(savedPort) ? UInt16(savedPort) : 7373
