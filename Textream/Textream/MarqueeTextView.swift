@@ -149,6 +149,8 @@ struct SpeechScrollView: View {
     @State private var hasAppliedTrackingTarget = false
     @State private var anchoredLayoutWidth: CGFloat = 0
     @State private var anchoredParagraphBreakBeforeWordIndices: Set<Int> = []
+    /// The highlight that word tracking last followed.
+    @State private var trackedCharCount = 0
     @State private var isAnimatingReadingPositionChange = false
     @State private var readingPositionAnimationGeneration = 0
 
@@ -185,6 +187,9 @@ struct SpeechScrollView: View {
                     if charOffset < highlightedCharCount {
                         allowsNextBackwardTrackingUpdate = true
                     }
+                    // The tap moves the view below, so the highlight change
+                    // that follows is not a move back to follow again.
+                    trackedCharCount = charOffset
                     onWordTap?(charOffset)
                     // Reposition from the tapped word itself instead of waiting
                     // for the parent progress update. That update can arrive
@@ -382,8 +387,14 @@ struct SpeechScrollView: View {
     }
 
     private func recalculateTracking(containerHeight: CGFloat) {
+        // The highlight moves back only on deliberate events: a confirmed
+        // re-read, a tap in another view, a new session or a text edit. The
+        // view follows such a move, however short it is.
+        let highlightMovedBack = highlightedCharCount < trackedCharCount
+        trackedCharCount = highlightedCharCount
+
         if readingPosition == .nearTop {
-            recalcTopWithPreviousLine()
+            recalcTopWithPreviousLine(highlightMovedBack: highlightMovedBack)
             return
         }
 
@@ -404,12 +415,12 @@ struct SpeechScrollView: View {
             let wordIdx = activeWordIndex()
             if let wordY = wordYPositions[wordIdx] {
                 let target = center - wordY
-                applyTrackingTarget(target)
+                applyTrackingTarget(target, followsBack: highlightMovedBack)
             }
         }
     }
 
-    private func recalcTopWithPreviousLine() {
+    private func recalcTopWithPreviousLine(highlightMovedBack: Bool) {
         if smoothScroll {
             let wordIdx = Int(smoothWordProgress)
             let fraction = smoothWordProgress - Double(wordIdx)
@@ -423,7 +434,7 @@ struct SpeechScrollView: View {
             let wordIdx = activeWordIndex()
             guard let wordY = wordYPositions[wordIdx] else { return }
             let target = min(wordY, topReadingAnchor) - wordY
-            applyTrackingTarget(target)
+            applyTrackingTarget(target, followsBack: highlightMovedBack)
         }
     }
 
@@ -489,10 +500,17 @@ struct SpeechScrollView: View {
 
     /// Normal reading progress may only move the text upward. Brief backward
     /// corrections from speech recognition must not produce a down/up bounce.
-    /// Explicit taps and manual scrolling opt into one backward reposition.
-    private func applyTrackingTarget(_ target: CGFloat, force: Bool = false) {
-        if !hasAppliedTrackingTarget
+    /// Explicit taps and manual scrolling opt into one backward reposition,
+    /// and a highlight that moved back is followed in either direction.
+    private func applyTrackingTarget(_ target: CGFloat, force: Bool = false, followsBack: Bool = false) {
+        // Other backward targets come from measured positions (smooth
+        // scrolling) or from a layout change, such as a smaller font. Follow
+        // only a large one.
+        let regressionThreshold = (stableLineAdvance ?? 40) * 0.9
+        if followsBack
+            || !hasAppliedTrackingTarget
             || target < scrollOffset - 1
+            || target > scrollOffset + regressionThreshold
             || allowsNextBackwardTrackingUpdate
             || force {
             scrollOffset = target
