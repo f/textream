@@ -160,6 +160,9 @@ class SpeechRecognizer {
         recognizedCharCount = advancePastAnnotations(from: recognizedCharCount)
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
+        regressionPending = nil
+        regressionUndo = nil
+        regressionFloor = 0
     }
 
     /// Jump highlight to a specific char offset (e.g. when user taps a word).
@@ -178,6 +181,11 @@ class SpeechRecognizer {
         recognizedCharCount = targetOffset
         matchStartOffset = targetOffset
         recentMatchPositions = []
+        // The reader often finishes the old sentence after a tap. Those words
+        // must not count as a re-read that takes the highlight back.
+        regressionPending = nil
+        regressionUndo = nil
+        regressionFloor = targetOffset
         if isListening && (distance > 500 || !audioEngine.isRunning) {
             // Far jump, or the engine died without a config-change callback —
             // fall back to a full restart (also refreshes contextualStrings).
@@ -202,6 +210,9 @@ class SpeechRecognizer {
         matchStartOffset = recognizedCharCount
         retryCount = 0
         recentMatchPositions = []
+        regressionPending = nil
+        regressionUndo = nil
+        regressionFloor = 0
         error = nil
         sessionGeneration &+= 1
         shouldListen = true
@@ -302,6 +313,8 @@ class SpeechRecognizer {
         annotationRanges = []
         retryCount = maxRetries
         recentMatchPositions = []
+        regressionPending = nil
+        regressionUndo = nil
         cleanupRecognition()
     }
 
@@ -312,6 +325,8 @@ class SpeechRecognizer {
         recognizedCharCount = advancePastAnnotations(from: recognizedCharCount)
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
+        regressionPending = nil
+        regressionUndo = nil
         shouldDismiss = false
         error = nil
         sessionGeneration &+= 1
@@ -391,10 +406,12 @@ class SpeechRecognizer {
         }
         isListening = false
         isStarting = true
+        regressionUndo = regressionUndoForNewTask()
         // New session = fresh transcript (see restartTask for why
         // lastSpokenText must be cleared alongside the anchor)
         spokenAnchorPrefix = ""
         lastSpokenText = ""
+        regressionPending = nil
 
         // Create a fresh engine so it picks up the current hardware format.
         // AVAudioEngine caches the device format internally and reset() alone
@@ -675,6 +692,8 @@ class SpeechRecognizer {
         // Update match offset before restarting
         matchStartOffset = recognizedCharCount
         recentMatchPositions = []
+        regressionPending = nil
+        regressionUndo = regressionUndoForNewTask()
         // New task = fresh transcript. lastSpokenText must be cleared too:
         // a jump taken before the first new result would otherwise anchor on
         // the old task's transcript and trim away everything the new task
@@ -803,18 +822,15 @@ class SpeechRecognizer {
         // don't match pre-jump speech against the text at the new offset.
         guard Date().timeIntervalSince(lastJumpAt) > 0.3 else { return }
 
-        // Ignore transcript from before the most recent jump. Trim by the
-        // common prefix that survived the recognizer's revisions, but never
-        // less than the anchor length minus a small slack — a revision very
-        // early in the transcript would otherwise leak the whole pre-jump
-        // transcript back into matching.
-        var spoken = fullSpoken
-        if !spokenAnchorPrefix.isEmpty {
-            let common = zip(spokenAnchorPrefix, fullSpoken).prefix(while: { $0 == $1 }).count
-            let trimLen = min(fullSpoken.count, max(common, spokenAnchorPrefix.count - 24))
-            spoken = String(fullSpoken.dropFirst(trimLen))
-        }
+        let spoken = spokenSinceJump(fullSpoken)
         guard !spoken.isEmpty else { return }
+
+        // After a re-read jump that the new words show to be wrong, match
+        // again from the state before the jump.
+        if undoWrongRegression(spoken: spoken) {
+            matchCharacters(spoken: fullSpoken)
+            return
+        }
 
         // Strategy 1: character-level fuzzy match from the start offset
         let charResult = charLevelMatch(spoken: spoken)
@@ -829,14 +845,24 @@ class SpeechRecognizer {
 
         let rawCandidate = min(matchStartOffset + best, sourceText.count)
         let candidate = advancePastAnnotations(from: rawCandidate)
-        guard candidate > recognizedCharCount else {
-            // No forward progress: the reader may have gone back to re-read
-            // an earlier line. Look behind the current position for the
-            // last few spoken words.
-            checkForRegression(spoken: spoken, fullSpoken: fullSpoken)
+        // The reader may have gone back to re-read an earlier line. The
+        // re-read words can also look like small forward progress, so check
+        // before any forward move.
+        if checkForRegression(spoken: spoken, fullSpoken: fullSpoken,
+                              current: max(candidate, recognizedCharCount)) {
             return
         }
-        regressionCandidates = []
+        // Do not move forward while a re-read waits for confirmation, so the
+        // highlight does not run ahead before it jumps back.
+        guard candidate > recognizedCharCount, regressionPending == nil else { return }
+        // A move to the end of the page ends the page. Hold it while the
+        // newest words look like the start of a re-read, so that the re-read
+        // can still take the highlight back.
+        if candidate >= sourceText.count,
+           Self.regressionHoldsPageEnd(source: sourceText, floor: regressionFloor,
+                                       spoken: Self.regressionWords(in: spoken), matches: regressionMatch) {
+            return
+        }
 
         // Confidence gating: require 2-of-3 recent results to agree on
         // forward movement to avoid single-result false-positive jumps.
@@ -872,73 +898,329 @@ class SpeechRecognizer {
         }
     }
 
+    /// The transcript from after the most recent jump. Trim by the common
+    /// prefix that survived the recognizer's revisions, but never less than
+    /// the anchor length minus a small slack. A revision very early in the
+    /// transcript would otherwise leak the whole pre-jump transcript back
+    /// into matching.
+    private func spokenSinceJump(_ fullSpoken: String) -> String {
+        guard !spokenAnchorPrefix.isEmpty else { return fullSpoken }
+        let common = zip(spokenAnchorPrefix, fullSpoken).prefix(while: { $0 == $1 }).count
+        let trimLen = min(fullSpoken.count, max(common, spokenAnchorPrefix.count - 24))
+        return String(fullSpoken.dropFirst(trimLen))
+    }
+
     // MARK: - Regression (re-reading an earlier line)
 
-    private var regressionCandidates: [Int] = []
+    /// The re-read run that waits for confirmation: where it ends and how
+    /// many times it has grown.
+    private var regressionPending: (end: Int, growths: Int)?
+    /// A re-read never lands before the last tapped word, until the newest
+    /// words show that the reader reads after that word.
+    private var regressionFloor = 0
+    /// The last re-read jump until the next words check it: where it landed,
+    /// the state from before it, and the words said since it in earlier
+    /// recognition tasks.
+    private var regressionUndo: (target: Int, recognized: Int, matchStart: Int, anchor: String, said: [String])?
     private static let regressionWindowChars = 700
+    private static let regressionLookAheadChars = 300
     private static let regressionMinWords = 4
+    private static let regressionMinGapChars = 30
+    private static let regressionGrowthsToConfirm = 2
+    private static let regressionMaxGrowthChars = 40
 
-    /// If the tail of what was just spoken matches a run of words behind the
-    /// current position, jump back there. Requires two consecutive results to
-    /// agree so a single misheard phrase cannot yank the prompter backwards.
-    private func checkForRegression(spoken: String, fullSpoken: String) {
-        let spokenWords = splitTextIntoWords(spoken.lowercased())
-            .map { $0.filter { $0.isLetter || $0.isNumber } }
-            .filter { !$0.isEmpty }
-        guard spokenWords.count >= Self.regressionMinWords else { return }
+    /// If the tail of what was just spoken matches a run of words behind
+    /// `current`, jump back there. The jump needs the run to grow twice with
+    /// newly spoken words, so a chance match of 4 or 5 earlier words is not
+    /// enough. An aside that matches 6 earlier words in a row, with the
+    /// script words next to it, can still cause a jump. undoWrongRegression
+    /// then puts the highlight back. Returns true when it jumped.
+    private func checkForRegression(spoken: String, fullSpoken: String, current: Int) -> Bool {
+        let spokenWords = Self.regressionWords(in: spoken)
+        guard spokenWords.count >= Self.regressionMinWords else { return false }
         let tail = Array(spokenWords.suffix(Self.regressionMinWords + 2))
 
-        let windowStart = max(0, recognizedCharCount - Self.regressionWindowChars)
-        guard windowStart < recognizedCharCount else { return }
-
-        // Source words with their char offsets, restricted to the window.
-        var offsets: [(word: String, start: Int)] = []
-        var pos = 0
-        for w in sourceText.split(separator: " ", omittingEmptySubsequences: false) {
-            let word = String(w)
-            if pos >= windowStart, pos < recognizedCharCount, !Self.isAnnotationWord(word) {
-                let clean = word.lowercased().filter { $0.isLetter || $0.isNumber }
-                if !clean.isEmpty { offsets.append((clean, pos)) }
-            }
-            pos += word.count + 1
-        }
-        guard offsets.count >= Self.regressionMinWords else { return }
-
-        // Best run: longest consecutive match of the spoken tail inside the window.
-        var bestStart: Int? = nil
-        var bestLen = 0
-        for i in 0..<offsets.count {
-            var len = 0
-            var j = 0
-            while i + len < offsets.count, j < tail.count {
-                let src = offsets[i + len].word, spk = tail[j]
-                if src == spk || isFuzzyMatch(src, spk) { len += 1 }
-                j += 1
-            }
-            if len > bestLen { bestLen = len; bestStart = offsets[i].start }
-        }
-        guard bestLen >= Self.regressionMinWords, let start = bestStart,
-              start < recognizedCharCount - 20 else {
-            regressionCandidates = []
-            return
+        if regressionFloor > 0,
+           Self.regressionFloorReleased(source: sourceText, current: current, floor: regressionFloor,
+                                        tail: tail, matches: regressionMatch) {
+            regressionFloor = 0
         }
 
-        regressionCandidates.append(start)
-        if regressionCandidates.count > 2 { regressionCandidates.removeFirst() }
-        guard regressionCandidates.count == 2,
-              abs(regressionCandidates[0] - regressionCandidates[1]) <= 15 else { return }
-        regressionCandidates = []
+        let end = Self.regressionEnd(
+            source: sourceText, current: current, floor: regressionFloor, tail: tail,
+            matches: regressionMatch
+        )
+        guard Self.regressionConfirmed(pending: &regressionPending, end: end),
+              let end else { return false }
 
-        // Land at the start of the re-read run; matching resumes from there
-        // with only the re-read words left in the transcript.
-        let target = advancePastAnnotations(from: start)
+        // Land just after the re-read words, where the reader is now, and
+        // treat everything spoken so far as consumed so matching continues
+        // forward from there.
+        let target = advancePastAnnotations(from: min(end + 1, sourceText.count))
+        regressionUndo = (target, recognizedCharCount, matchStartOffset, spokenAnchorPrefix, [])
         recognizedCharCount = target
         matchStartOffset = target
         recentMatchPositions = []
-        let keep = max(0, fullSpoken.count - spoken.count)
-        let tailChars = tail.reduce(0) { $0 + $1.count + 1 }
-        spokenAnchorPrefix = String(fullSpoken.prefix(max(keep, fullSpoken.count - tailChars)))
+        spokenAnchorPrefix = fullSpoken
         lastJumpAt = Date()
+        return true
+    }
+
+    /// After a re-read jump, the next words must continue the text at the
+    /// jump target. When they do not, the jump was wrong: put back the state
+    /// from before it. Returns true when it did that.
+    private func undoWrongRegression(spoken: String) -> Bool {
+        guard let undo = regressionUndo,
+              let kept = Self.regressionKept(source: sourceText, target: undo.target,
+                                             spoken: undo.said + Self.regressionWords(in: spoken),
+                                             matches: regressionMatch)
+        else { return false }
+        regressionUndo = nil
+        guard !kept else { return false }
+        recognizedCharCount = undo.recognized
+        matchStartOffset = undo.matchStart
+        spokenAnchorPrefix = undo.anchor
+        recentMatchPositions = []
+        regressionPending = nil
+        return true
+    }
+
+    /// The check of the last re-read jump for a new recognition task, which
+    /// starts a fresh transcript. Call it before the transcript is cleared:
+    /// it keeps the words said since the jump, so that the check goes on
+    /// with the new words after them. An undo matches the new transcript
+    /// from the highlight before the jump.
+    private func regressionUndoForNewTask() -> (target: Int, recognized: Int, matchStart: Int, anchor: String, said: [String])? {
+        regressionUndo.map {
+            ($0.target, $0.recognized, $0.recognized, "",
+             $0.said + Self.regressionWords(in: spokenSinceJump(lastSpokenText)))
+        }
+    }
+
+    private func regressionMatch(_ source: String, _ spoken: String) -> Bool {
+        source == spoken || isFuzzyMatch(source, spoken)
+    }
+
+    /// The words of `text` as lowercased letters and digits.
+    private static func regressionWords(in text: String) -> [String] {
+        splitTextIntoWords(text.lowercased())
+            .map { $0.filter { $0.isLetter || $0.isNumber } }
+            .filter { !$0.isEmpty }
+    }
+
+    /// True when the re-read run in `pending` has grown with newly spoken
+    /// words `regressionGrowthsToConfirm` times. The run grows when a later
+    /// result ends it further on, by at most `regressionMaxGrowthChars`. A
+    /// result with the same end (a partial that only revises words) keeps
+    /// waiting. A nil end, a smaller end or a bigger step starts again.
+    static func regressionConfirmed(pending: inout (end: Int, growths: Int)?, end: Int?) -> Bool {
+        guard let end else {
+            pending = nil
+            return false
+        }
+        guard let previous = pending else {
+            pending = (end, 0)
+            return false
+        }
+        if end == previous.end { return false }
+        guard end > previous.end, end - previous.end <= regressionMaxGrowthChars else {
+            pending = (end, 0)
+            return false
+        }
+        let growths = previous.growths + 1
+        guard growths >= regressionGrowthsToConfirm else {
+            pending = (end, growths)
+            return false
+        }
+        pending = nil
+        return true
+    }
+
+    /// Where the reader is when the spoken tail matches a run of words behind
+    /// `current`: the char offset just after the run's last matched word.
+    /// The search starts at `floor`, at most `regressionWindowChars` back,
+    /// and goes on `regressionLookAheadChars` past `current`, because the
+    /// highlight can be behind the reader. Nil when the best run (see
+    /// regressionRun) has fewer than `regressionMinWords` words, or when it
+    /// is the text just read: it ends after `current` or within
+    /// `regressionMinGapChars` of it, or only stage directions follow it
+    /// before `current`.
+    static func regressionEnd(
+        source: String, current: Int, floor: Int = 0, tail: [String],
+        matches: (String, String) -> Bool
+    ) -> Int? {
+        let start = max(floor, current - regressionWindowChars)
+        guard start < current else { return nil }
+        let words = regressionSourceWords(source, from: start, to: current + regressionLookAheadChars)
+        guard let run = regressionRun(words, tail: tail, matches: matches),
+              run.length >= regressionMinWords else { return nil }
+        let end = words[run.last].start + words[run.last].length
+        guard end < current - regressionMinGapChars,
+              run.last + 1 < words.count, words[run.last + 1].start < current else { return nil }
+        return end
+    }
+
+    /// True when the newest words show that the reader reads after the
+    /// tapped word at `floor`: they match a run of `regressionMinWords` or
+    /// more words after it that ends near `current`, and no text before it
+    /// matches them as well.
+    static func regressionFloorReleased(
+        source: String, current: Int, floor: Int, tail: [String],
+        matches: (String, String) -> Bool
+    ) -> Bool {
+        let after = regressionSourceWords(source, from: floor, to: current + regressionLookAheadChars)
+        guard let run = regressionRun(after, tail: tail, matches: matches),
+              run.length >= regressionMinWords,
+              after[run.last].start + after[run.last].length >= current - regressionMinGapChars
+        else { return false }
+        let before = regressionSourceWords(source, from: current - regressionWindowChars, to: floor)
+        return run.length > (regressionRun(before, tail: tail, matches: matches)?.length ?? 0)
+    }
+
+    /// After a re-read jump to `target`: true when the words said since the
+    /// jump continue the text there, false when they do not, and nil until 2
+    /// words match or 2 words miss. 2 words that match the next words in
+    /// order keep the jump, and 2 other words undo it. Until a word matches,
+    /// a word that matches (or ends) one of the last `regressionMinWords + 2`
+    /// words before `target` is neither a match nor a miss: the reader can say
+    /// the re-read words again, and a revision of the transcript can put them,
+    /// or the end of one, back into the words since the jump. The jump came
+    /// from at most that many spoken words (the tail in checkForRegression),
+    /// so these are the source words it re-read. When such words also match
+    /// the next words, a later word can also match after them. After a match,
+    /// a re-read word that does not continue the text means the reader went
+    /// back: the count starts again from `target`. From then on a word can
+    /// skip 1 source word (the recognizer dropped or misheard a word), and a
+    /// skip needs 3 matching words instead of 2, so a restated aside does not
+    /// keep a wrong jump through a loose match further on.
+    static func regressionKept(
+        source: String, target: Int, spoken: [String],
+        matches: (String, String) -> Bool
+    ) -> Bool? {
+        let next = regressionSourceWords(source, from: target, to: source.count).map(\.word)
+        let reread = regressionSourceWords(source, from: max(0, target - regressionWindowChars), to: target)
+            .suffix(regressionMinWords + 2).map(\.word)
+        var k = 0
+        // Just after the re-read words that also match the next words.
+        var ahead = 0
+        var hits = 0
+        var misses = 0
+        var restarted = false
+        var needed = 2
+        for word in spoken {
+            // A spoken word can skip up to 2 source words (dropped words). After a
+            // restart it can skip 1.
+            func match(from i: Int) -> Int? {
+                next[i..<min(next.count, i + (restarted ? 2 : 3))].firstIndex(where: { matches($0, word) })
+            }
+            let rereadWord = reread.contains(where: { matches($0, word) || $0.hasSuffix(word) })
+            if hits > 0, rereadWord, match(from: k) == nil {
+                // The reader went back to the re-read words: count from the jump again.
+                hits = 0
+                k = 0
+                ahead = 0
+                restarted = true
+                needed = 2
+            }
+            let isRereadWord = hits == 0 && rereadWord
+            if let m = match(from: k), !isRereadWord {
+                hits += 1
+                if restarted, m > k { needed = 3 }
+                k = m + 1
+            } else if !isRereadWord, ahead > k, let m = match(from: ahead) {
+                hits += 1
+                if restarted, m > ahead { needed = 3 }
+                k = m + 1
+            } else if isRereadWord {
+                if let m = match(from: ahead) { ahead = m + 1 }
+            } else {
+                misses += 1
+            }
+            if hits == needed { return true }
+            if misses == 2 { return false }
+        }
+        return nil
+    }
+
+    /// True when a move to the end of the page can be the first words of a
+    /// re-read: the 2 newest words do not both match the last 4 words of the
+    /// page in order, and in the last `regressionWindowChars` (after `floor`)
+    /// the 3 newest words match 3 words in a row, or the 2 newest words match
+    /// 2 words in a row before the last 4 words. The 2-word case also needs
+    /// fewer than 2 of the 3 newest words to match the last 4 words in order,
+    /// so one extra word before the last word does not hold the end.
+    static func regressionHoldsPageEnd(
+        source: String, floor: Int, spoken: [String],
+        matches: (String, String) -> Bool
+    ) -> Bool {
+        let words = regressionSourceWords(source, from: max(floor, source.count - regressionWindowChars), to: source.count)
+        guard spoken.count >= 3, words.count > 4 else { return false }
+        let last = words.suffix(4).map(\.word)
+        func lastWordHits(_ said: ArraySlice<String>) -> Int {
+            var k = 0
+            var hits = 0
+            for word in said {
+                if let m = last[k...].firstIndex(where: { matches($0, word) }) {
+                    hits += 1
+                    k = m + 1
+                }
+            }
+            return hits
+        }
+        guard lastWordHits(spoken.suffix(2)) < 2 else { return false }
+        if regressionRun(words, tail: Array(spoken.suffix(3)), matches: matches)?.length == 3 { return true }
+        return lastWordHits(spoken.suffix(3)) < 2
+            && regressionRun(Array(words.dropLast(4)), tail: Array(spoken.suffix(2)), matches: matches)?.length == 2
+    }
+
+    /// The best run for the spoken `tail` in `words`: the most consecutive
+    /// words that match tail words in order (tail words can be skipped) and
+    /// end on the newest tail word. On a tie the latest run wins. `last` is
+    /// the index of the run's last word.
+    static func regressionRun(
+        _ words: [(word: String, start: Int, length: Int)], tail: [String],
+        matches: (String, String) -> Bool
+    ) -> (length: Int, last: Int)? {
+        var best: (length: Int, last: Int)?
+        for i in words.indices {
+            var length = 0
+            var j = 0
+            var last = -1
+            var lastTail = -1
+            while i + length < words.count, j < tail.count {
+                if matches(words[i + length].word, tail[j]) {
+                    last = i + length
+                    lastTail = j
+                    length += 1
+                }
+                j += 1
+            }
+            if lastTail == tail.count - 1, length >= (best?.length ?? 0) {
+                best = (length, last)
+            }
+        }
+        return best
+    }
+
+    /// The words of `source` that start in `from..<to`, as lowercased
+    /// letters and digits with their char offset and length. Stage
+    /// directions are left out.
+    static func regressionSourceWords(
+        _ source: String, from: Int, to: Int
+    ) -> [(word: String, start: Int, length: Int)] {
+        var out: [(word: String, start: Int, length: Int)] = []
+        var pos = 0
+        let words = source.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+        let inAnnotation = SpeechTextAlignment.annotationFlags(for: words)
+        for (k, word) in words.enumerated() {
+            if pos >= to { break }
+            if pos >= from, !inAnnotation[k] {
+                let clean = word.lowercased().filter { $0.isLetter || $0.isNumber }
+                if !clean.isEmpty { out.append((clean, pos, word.count)) }
+            }
+            pos += word.count + 1
+        }
+        return out
     }
 
     private func advancePastAnnotations(from offset: Int) -> Int {
