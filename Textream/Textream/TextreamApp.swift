@@ -43,9 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         #if !APP_STORE
-        // Direct-download builds check GitHub for updates. App Store builds are
-        // updated exclusively through the App Store.
-        UpdateChecker.shared.checkForUpdates(silent: true)
+        // Direct-download builds check GitHub for updates at launch and daily
+        // while open. App Store builds are updated exclusively through the App Store.
+        UpdateChecker.shared.startPeriodicChecks()
         #endif
 
         // Start browser server if enabled
