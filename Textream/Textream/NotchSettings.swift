@@ -493,7 +493,7 @@ class NotchSettings {
         ?? Locale.current.identifier
 
     static let minWidth: CGFloat = 310
-    static let maxWidth: CGFloat = 500
+    static let maxWidth: CGFloat = 900
     static let minHeight: CGFloat = 100
     static let maxHeight: CGFloat = 400
 
