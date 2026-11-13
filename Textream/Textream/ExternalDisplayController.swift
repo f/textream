@@ -14,10 +14,12 @@ class ExternalDisplayController {
     private var cancellables = Set<AnyCancellable>()
     let overlayContent = OverlayContent()
 
-    /// Find the target external screen based on saved screen ID, or first non-main screen
+    /// Find the target external screen based on saved screen ID, or first non-built-in screen
     func targetScreen() -> NSScreen? {
         let settings = NotchSettings.shared
-        let screens = NSScreen.screens.filter { $0 != NSScreen.main }
+        // NSScreen.main follows the key window, so exclude the built-in display when there is one
+        let builtIn = NSScreen.screens.first { CGDisplayIsBuiltin($0.displayID) != 0 }
+        let screens = NSScreen.screens.filter { $0 != (builtIn ?? NSScreen.main) }
         guard !screens.isEmpty else { return nil }
 
         // Try to find saved screen
