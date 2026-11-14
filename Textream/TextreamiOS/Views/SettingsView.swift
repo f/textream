@@ -64,17 +64,19 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                Section("Text color") {
-                    ColorPresetPicker(selection: $model.textColor)
-                }
+                ScriptPaletteSettings(model: model)
 
-                Section("Stage directions") {
-                    ColorPresetPicker(selection: $model.cueColor)
+                Section {
+                    CuePaletteSettings(model: model)
                     Picker("Brightness", selection: $model.cueBrightness) {
                         ForEach(CueBrightness.allCases) { brightness in
                             Text(brightness.label).tag(brightness)
                         }
                     }
+                } header: {
+                    Text("Stage directions")
+                } footer: {
+                    Text("Tap a color to select it. Touch and hold to edit or delete.")
                 }
 
                 Section("Camera overlay") {
@@ -319,35 +321,5 @@ private struct AboutLink: View {
         }
         .foregroundStyle(.primary)
         .accessibilityHint(accessibilityHint)
-    }
-}
-
-private struct ColorPresetPicker: View {
-    @Binding var selection: PromptColorPreset
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ForEach(PromptColorPreset.allCases) { preset in
-                Button {
-                    selection = preset
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(preset.color)
-                            .frame(width: 28, height: 28)
-                        if selection == preset {
-                            Circle()
-                                .stroke(.white, lineWidth: 2)
-                                .frame(width: 36, height: 36)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(preset.label)
-                .accessibilityAddTraits(selection == preset ? .isSelected : [])
-            }
-        }
-        .padding(.vertical, 4)
     }
 }

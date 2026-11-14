@@ -62,7 +62,7 @@ final class PromptSessionController {
 
     init(configuration: PromptSessionConfiguration) {
         self.configuration = configuration
-        prompt = PromptScript(configuration.script)
+        prompt = PromptScript(configuration.formattedScript)
         showsCamera = configuration.usesCamera
         let initialScrollSpeed = min(
             PromptScrollSpeedAdjustment.maximumSpeed,

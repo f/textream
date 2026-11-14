@@ -82,6 +82,7 @@ struct PromptWord: Identifiable, Equatable {
     let text: String
     let characterRange: Range<Int>
     let isAnnotation: Bool
+    let colorHex: String
 }
 
 struct PromptScript: Equatable {
@@ -92,7 +93,13 @@ struct PromptScript: Equatable {
     let direction: PromptTextDirection
 
     init(_ rawText: String) {
+        self.init(FormattedPage(rawText))
+    }
+
+    init(_ page: FormattedPage) {
+        let rawText = page.text
         let rawWords = splitPromptTextIntoWords(rawText)
+        let colors = page.wordColors(for: rawWords)
         let collapsed = rawWords.joined(separator: " ")
         let flags = SpeechTextAlignment.annotationFlags(for: rawWords)
         var offset = 0
@@ -107,7 +114,8 @@ struct PromptScript: Equatable {
                     id: index,
                     text: word,
                     characterRange: range,
-                    isAnnotation: flags[index] || !containsReadableCharacter
+                    isAnnotation: flags[index] || !containsReadableCharacter,
+                    colorHex: colors[index]
                 )
             )
             offset = range.upperBound + 1

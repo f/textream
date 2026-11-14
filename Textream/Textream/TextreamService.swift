@@ -21,7 +21,34 @@ class TextreamService: NSObject, ObservableObject {
     var launchedExternally = false
     @Published var directorIsReading = false
 
-    @Published var pages: [String] = [""]
+    @Published private var document = EditorDocument()
+    @Published private(set) var documentID = UUID()
+    private(set) var formattedPages: [FormattedPage] {
+        get { document.pages }
+        set { document.pages = newValue }
+    }
+    var pages: [String] { formattedPages.map(\.text) }
+
+    func updatePage(_ page: FormattedPage, at index: Int) {
+        guard formattedPages.indices.contains(index), formattedPages[index] != page else { return }
+        formattedPages[index] = page
+    }
+
+    func updatePageText(_ text: String, at index: Int, insertionColor: String? = nil) {
+        guard formattedPages.indices.contains(index) else { return }
+        updatePage(formattedPages[index].updatingText(text, insertionColor: insertionColor), at: index)
+    }
+
+    func appendPage() { formattedPages.append(FormattedPage()) }
+    func removePage(at index: Int) {
+        formattedPages.remove(at: index)
+        documentID = UUID()
+    }
+    func importPages(_ text: [String]) {
+        documentID = UUID()
+        formattedPages = text.isEmpty ? [FormattedPage()] : text.map { FormattedPage($0) }
+        currentFileURL = nil
+    }
     @Published var currentPageIndex: Int = 0
     @Published var readPages: Set<Int> = []
 
@@ -39,14 +66,14 @@ class TextreamService: NSObject, ObservableObject {
         return pages[currentPageIndex]
     }
 
-    func readText(_ text: String) {
+    func readText(_ text: String, page: FormattedPage? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         launchedExternally = true
         hideMainWindow()
 
-        overlayController.show(text: trimmed, hasNextPage: hasNextPage) { [weak self] in
+        overlayController.show(text: trimmed, wordColors: (page ?? FormattedPage(trimmed)).wordColors(for: splitTextIntoWords(trimmed)), hasNextPage: hasNextPage) { [weak self] in
             self?.externalDisplayController.dismiss()
             self?.browserServer.hideContent()
             self?.onOverlayDismissed?()
@@ -61,6 +88,7 @@ class TextreamService: NSObject, ObservableObject {
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
             totalCharCount: totalCharCount,
+            wordColors: (page ?? FormattedPage(trimmed)).wordColors(for: words),
             paragraphBreakBeforeWordIndices: paragraphBreaks,
             hasNextPage: hasNextPage
         )
@@ -69,6 +97,7 @@ class TextreamService: NSObject, ObservableObject {
             browserServer.showContent(
                 speechRecognizer: overlayController.speechRecognizer,
                 words: words,
+                wordColors: (page ?? FormattedPage(trimmed)).wordColors(for: words),
                 totalCharCount: totalCharCount,
                 hasNextPage: hasNextPage
             )
@@ -79,7 +108,7 @@ class TextreamService: NSObject, ObservableObject {
         let trimmed = currentPageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         readPages.insert(currentPageIndex)
-        readText(trimmed)
+        readText(trimmed, page: formattedPages[currentPageIndex])
     }
 
     func advanceToNextPage() {
@@ -112,12 +141,13 @@ class TextreamService: NSObject, ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         // Update content in-place without recreating the panel
-        overlayController.updateContent(text: trimmed, hasNextPage: hasNextPage)
+        overlayController.updateContent(text: trimmed, wordColors: formattedPages[index].wordColors(for: splitTextIntoWords(trimmed)), hasNextPage: hasNextPage)
         updatePageInfo()
 
         // Also update external display content in-place
         let words = splitTextIntoWords(trimmed)
         externalDisplayController.overlayContent.words = words
+        externalDisplayController.overlayContent.wordColors = formattedPages[index].wordColors(for: words)
         externalDisplayController.overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: trimmed)
         externalDisplayController.overlayContent.totalCharCount = words.joined(separator: " ").count
         externalDisplayController.overlayContent.hasNextPage = hasNextPage
@@ -125,6 +155,7 @@ class TextreamService: NSObject, ObservableObject {
         if browserServer.isRunning {
             browserServer.updateContent(
                 words: words,
+                wordColors: formattedPages[index].wordColors(for: words),
                 totalCharCount: words.joined(separator: " ").count,
                 hasNextPage: hasNextPage
             )
@@ -171,7 +202,6 @@ class TextreamService: NSObject, ObservableObject {
     }
 
     @Published var currentFileURL: URL?
-    @Published var savedPages: [String] = [""]
 
     // MARK: - File Operations
 
@@ -218,24 +248,25 @@ class TextreamService: NSObject, ObservableObject {
         }
     }
 
-    private func saveToURL(_ url: URL) {
+    @discardableResult
+    func saveToURL(_ url: URL) -> Bool {
         do {
-            let data = try JSONEncoder().encode(pages)
-            try data.write(to: url, options: .atomic)
+            try document.save(to: url)
             currentFileURL = url
-            savedPages = pages
             rememberDocumentURL(url)
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            return true
         } catch {
             let alert = NSAlert()
             alert.messageText = "Failed to save file"
             alert.informativeText = error.localizedDescription
             alert.runModal()
+            return false
         }
     }
 
     var hasUnsavedChanges: Bool {
-        pages != savedPages
+        document.hasUnsavedChanges
     }
 
     func openFile() {
@@ -274,8 +305,7 @@ class TextreamService: NSObject, ObservableObject {
             do {
                 let notes = try PresentationNotesExtractor.extractNotes(from: url)
                 DispatchQueue.main.async {
-                    self?.pages = notes
-                    self?.savedPages = notes
+                    self?.importPages(notes)
                     self?.currentPageIndex = 0
                     self?.readPages.removeAll()
                     self?.currentFileURL = nil
@@ -308,8 +338,14 @@ class TextreamService: NSObject, ObservableObject {
         let response = alert.runModal()
         switch response {
         case .alertFirstButtonReturn:
-            saveFile()
-            return true
+            if let url = currentFileURL { return saveToURL(url) }
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.init(filenameExtension: "textream")!]
+            panel.nameFieldStringValue = "Untitled.textream"
+            panel.canCreateDirectories = true
+            panel.directoryURL = lastDocumentDirectoryURL
+            guard panel.runModal() == .OK, let url = panel.url else { return false }
+            return saveToURL(url)
         case .alertSecondButtonReturn:
             return true
         default:
@@ -320,10 +356,10 @@ class TextreamService: NSObject, ObservableObject {
     func openFileAtURL(_ url: URL) {
         do {
             let data = try Data(contentsOf: url)
-            let loadedPages = try JSONDecoder().decode([String].self, from: data)
+            let loadedPages = try FormattedDocument.load(data)
             guard !loadedPages.isEmpty else { return }
-            pages = loadedPages
-            savedPages = loadedPages
+            document = EditorDocument(pages: loadedPages)
+            documentID = UUID()
             currentPageIndex = 0
             readPages.removeAll()
             currentFileURL = url
@@ -370,20 +406,20 @@ class TextreamService: NSObject, ObservableObject {
         directorServer.onSetText = { [weak self] text in
             self?.setTextFromDirector(text)
         }
-        directorServer.onUpdateText = { [weak self] text, readCharCount in
-            self?.updateTextFromDirector(text, readCharCount: readCharCount)
+        directorServer.onUpdateText = { [weak self] text, readCharCount, hasFormatting in
+            self?.updateTextFromDirector(text, readCharCount: readCharCount, hasFormatting: hasFormatting)
         }
         directorServer.onStop = { [weak self] in
             self?.stopDirectorReading()
         }
     }
 
-    func setTextFromDirector(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    func setTextFromDirector(_ page: FormattedPage) {
+        let trimmed = page.text
         guard !trimmed.isEmpty else { return }
 
         // Director mode is single page
-        pages = [trimmed]
+        formattedPages = [page]
         currentPageIndex = 0
         readPages.removeAll()
 
@@ -393,7 +429,7 @@ class TextreamService: NSObject, ObservableObject {
 
         directorIsReading = true
 
-        overlayController.show(text: trimmed, hasNextPage: false) { [weak self] in
+        overlayController.show(text: trimmed, wordColors: page.wordColors(for: splitTextIntoWords(trimmed)), hasNextPage: false) { [weak self] in
             self?.directorIsReading = false
             self?.directorServer.hideContent()
             self?.externalDisplayController.dismiss()
@@ -408,7 +444,8 @@ class TextreamService: NSObject, ObservableObject {
         directorServer.showContent(
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
-            totalCharCount: totalCharCount
+            totalCharCount: totalCharCount,
+            page: page
         )
 
         // Also show on external display & browser if configured
@@ -417,6 +454,7 @@ class TextreamService: NSObject, ObservableObject {
             speechRecognizer: overlayController.speechRecognizer,
             words: words,
             totalCharCount: totalCharCount,
+            wordColors: page.wordColors(for: words),
             paragraphBreakBeforeWordIndices: paragraphBreaks,
             hasNextPage: false
         )
@@ -424,18 +462,37 @@ class TextreamService: NSObject, ObservableObject {
             browserServer.showContent(
                 speechRecognizer: overlayController.speechRecognizer,
                 words: words,
+                wordColors: page.wordColors(for: words),
                 totalCharCount: totalCharCount,
                 hasNextPage: false
             )
         }
     }
 
-    func updateTextFromDirector(_ text: String, readCharCount: Int) {
+    func updateTextFromDirector(_ incomingPage: FormattedPage, readCharCount: Int, hasFormatting: Bool) {
         guard directorIsReading else { return }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = incomingPage.text
         guard !trimmed.isEmpty else { return }
 
-        pages = [trimmed]
+        let oldPage = formattedPages[0]
+        let protectedOffset = oldPage.sourceUTF16Offset(
+            forSpeechOffset: min(overlayController.speechRecognizer.recognizedCharCount, max(0, readCharCount)),
+            words: splitTextIntoWords(oldPage.text)
+        )
+        let oldPrefix = oldPage.prefix(utf16Count: protectedOffset)
+        guard incomingPage.text.utf16.count >= protectedOffset,
+              oldPrefix.text == incomingPage.prefix(utf16Count: protectedOffset).text else { return }
+        let page: FormattedPage
+        if hasFormatting {
+            guard oldPrefix == incomingPage.prefix(utf16Count: protectedOffset) else { return }
+            page = incomingPage
+        } else {
+            // Legacy clients have no color metadata; keep the locked prefix intact.
+            let unreadRange = NSRange(location: protectedOffset, length: incomingPage.text.utf16.count - protectedOffset)
+            let unread = FormattedPage(attributedString: incomingPage.attributedString.attributedSubstring(from: unreadRange))
+            page = FormattedPage(runs: oldPrefix.runs + unread.runs)
+        }
+        formattedPages = [page]
 
         let words = splitTextIntoWords(trimmed)
         let totalCharCount = words.joined(separator: " ").count
@@ -452,6 +509,7 @@ class TextreamService: NSObject, ObservableObject {
 
         // Update overlay content without resetting speech progress
         overlayController.overlayContent.words = words
+        overlayController.overlayContent.wordColors = page.wordColors(for: words)
         overlayController.overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: trimmed)
         overlayController.overlayContent.totalCharCount = totalCharCount
         overlayController.overlayContent.hasNextPage = false
@@ -460,15 +518,17 @@ class TextreamService: NSObject, ObservableObject {
         overlayController.speechRecognizer.updateText(trimmed, preservingCharCount: preservedCharCount)
 
         // Update director server
-        directorServer.updateContent(words: words, totalCharCount: totalCharCount)
+        directorServer.updateContent(words: words, totalCharCount: totalCharCount, page: page)
 
         // Update external display & browser
         externalDisplayController.overlayContent.words = words
+        externalDisplayController.overlayContent.wordColors = page.wordColors(for: words)
         externalDisplayController.overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: trimmed)
         externalDisplayController.overlayContent.totalCharCount = totalCharCount
         if browserServer.isRunning {
             browserServer.updateContent(
                 words: words,
+                wordColors: page.wordColors(for: words),
                 totalCharCount: totalCharCount,
                 hasNextPage: false
             )

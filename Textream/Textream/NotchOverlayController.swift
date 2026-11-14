@@ -40,6 +40,7 @@ class NotchFrameTracker {
 @Observable
 class OverlayContent {
     var words: [String] = []
+    var wordColors: [String] = []
     var paragraphBreakBeforeWordIndices: Set<Int> = []
     var totalCharCount: Int = 0
     var hasNextPage: Bool = false
@@ -70,7 +71,7 @@ class NotchOverlayController: NSObject {
     private var escMonitor: Any?
     private var keepAwakeActivity: NSObjectProtocol?
 
-    func show(text: String, hasNextPage: Bool = false, onComplete: (() -> Void)? = nil) {
+    func show(text: String, wordColors: [String] = [], hasNextPage: Bool = false, onComplete: (() -> Void)? = nil) {
         self.onComplete = onComplete
         self.onNextPage = {
             TextreamService.shared.advanceToNextPage()
@@ -82,6 +83,7 @@ class NotchOverlayController: NSObject {
         // Populate overlay content
         let normalized = splitTextIntoWords(text)
         overlayContent.words = normalized
+        overlayContent.wordColors = wordColors
         overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: text)
         overlayContent.totalCharCount = normalized.joined(separator: " ").count
         overlayContent.hasNextPage = hasNextPage
@@ -133,7 +135,7 @@ class NotchOverlayController: NSObject {
         }
     }
 
-    func updateContent(text: String, hasNextPage: Bool) {
+    func updateContent(text: String, wordColors: [String] = [], hasNextPage: Bool) {
         let normalized = splitTextIntoWords(text)
 
         // Fully reset speech state for new page
@@ -143,6 +145,7 @@ class NotchOverlayController: NSObject {
         speechRecognizer.lastSpokenText = ""
 
         overlayContent.words = normalized
+        overlayContent.wordColors = wordColors
         overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakWordIndices(in: text)
         overlayContent.totalCharCount = normalized.joined(separator: " ").count
         overlayContent.hasNextPage = hasNextPage
@@ -921,11 +924,12 @@ struct NotchOverlayView: View {
     private var prompterView: some View {
         VStack(spacing: 0) {
             SpeechScrollView(
+                wordColors: content.wordColors,
                 words: words,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
-                highlightColor: NotchSettings.shared.fontColorPreset.color,
-                cueColor: NotchSettings.shared.cueColorPreset.color,
+                highlightColor: .white,
+                cueColor: NotchSettings.shared.cueColor,
                 cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
                 cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
                 onWordTap: { charOffset in
@@ -1442,11 +1446,12 @@ struct FloatingOverlayView: View {
     private var floatingPrompterView: some View {
         VStack(spacing: 0) {
             SpeechScrollView(
+                wordColors: content.wordColors,
                 words: words,
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
-                highlightColor: NotchSettings.shared.fontColorPreset.color,
-                cueColor: NotchSettings.shared.cueColorPreset.color,
+                highlightColor: .white,
+                cueColor: NotchSettings.shared.cueColor,
                 cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
                 cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
                 onWordTap: { charOffset in

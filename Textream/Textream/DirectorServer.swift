@@ -8,29 +8,6 @@
 import Foundation
 import Network
 
-// MARK: - Director State (App → Web)
-
-struct DirectorState: Codable {
-    let words: [String]
-    let highlightedCharCount: Int
-    let totalCharCount: Int
-    let isActive: Bool
-    let isDone: Bool
-    let isListening: Bool
-    let fontColor: String
-    let cueColor: String
-    let lastSpokenText: String
-    let audioLevels: [Double]
-}
-
-// MARK: - Director Command (Web → App)
-
-struct DirectorCommand: Codable {
-    let type: String          // "setText", "updateText", "stop"
-    let text: String?
-    let readCharCount: Int?
-}
-
 // MARK: - Director Server
 
 class DirectorServer {
@@ -50,14 +27,15 @@ class DirectorServer {
 
     // Content state
     private var words: [String] = []
+    private var formattedPage = FormattedPage()
     private var totalCharCount: Int = 0
     private weak var speechRecognizer: SpeechRecognizer?
     private var contentActive: Bool = false
     private var lastBroadcastState: Data?
 
     // Callbacks
-    var onSetText: ((String) -> Void)?
-    var onUpdateText: ((String, Int) -> Void)?
+    var onSetText: ((FormattedPage) -> Void)?
+    var onUpdateText: ((FormattedPage, Int, Bool) -> Void)?
     var onStop: (() -> Void)?
 
     var httpPort: UInt16 { NotchSettings.shared.directorServerPort }
@@ -91,16 +69,18 @@ class DirectorServer {
 
     // MARK: - Content Management
 
-    func showContent(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int) {
+    func showContent(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int, page: FormattedPage) {
         self.speechRecognizer = speechRecognizer
         self.words = words
+        self.formattedPage = page
         self.totalCharCount = totalCharCount
         self.contentActive = true
         startBroadcasting()
     }
 
-    func updateContent(words: [String], totalCharCount: Int) {
+    func updateContent(words: [String], totalCharCount: Int, page: FormattedPage) {
         self.words = words
+        self.formattedPage = page
         self.totalCharCount = totalCharCount
     }
 
@@ -218,6 +198,8 @@ class DirectorServer {
             if !self.authenticatedConnections.contains(connId) {
                 if command.type == "auth", command.text == self.authToken {
                     self.authenticatedConnections.insert(connId)
+                    self.lastBroadcastState = nil
+                    if self.contentActive { self.broadcastCurrentState() } else { self.broadcastInactive() }
                 } else {
                     conn.cancel()
                 }
@@ -226,12 +208,12 @@ class DirectorServer {
 
             switch command.type {
             case "setText":
-                if let text = command.text {
-                    self.onSetText?(text)
+                if let page = command.formattedPage {
+                    self.onSetText?(page)
                 }
             case "updateText":
-                if let text = command.text, let readCharCount = command.readCharCount {
-                    self.onUpdateText?(text, readCharCount)
+                if let page = command.formattedPage, let readCharCount = command.readCharCount {
+                    self.onUpdateText?(page, readCharCount, command.formattedRuns != nil)
                 }
             case "stop":
                 self.onStop?()
@@ -258,6 +240,11 @@ class DirectorServer {
         }
     }
 
+    func publishPaletteState() {
+        guard isRunning else { return }
+        if contentActive { broadcastCurrentState() } else { broadcastInactive() }
+    }
+
     private func broadcastCurrentState() {
         guard contentActive, !wsConnections.isEmpty else { return }
 
@@ -266,14 +253,17 @@ class DirectorServer {
         let isDone = totalCharCount > 0 && effective >= totalCharCount
 
         let state = DirectorState(
+            formattedRuns: formattedPage.runs,
+            editorPalette: NotchSettings.shared.editorColorPaletteHex,
+            readUTF16Count: formattedPage.sourceUTF16Offset(forSpeechOffset: effective, words: words),
             words: words,
             highlightedCharCount: effective,
             totalCharCount: totalCharCount,
             isActive: true,
             isDone: isDone,
             isListening: speechRecognizer?.isListening ?? false,
-            fontColor: NotchSettings.shared.fontColorPreset.cssColor,
-            cueColor: NotchSettings.shared.cueColorPreset.cssColor,
+            fontColor: "#ffffff",
+            cueColor: NotchSettings.shared.cueColorHex,
             lastSpokenText: speechRecognizer?.lastSpokenText ?? "",
             audioLevels: (speechRecognizer?.audioLevels ?? []).map { Double($0) }
         )
@@ -282,6 +272,7 @@ class DirectorServer {
 
     private func broadcastInactive() {
         let state = DirectorState(
+            formattedRuns: [], editorPalette: NotchSettings.shared.editorColorPaletteHex, readUTF16Count: 0,
             words: [], highlightedCharCount: 0, totalCharCount: 0,
             isActive: false, isDone: false, isListening: false,
             fontColor: "#ffffff", cueColor: "#ffffff", lastSpokenText: "",
@@ -312,7 +303,10 @@ class DirectorServer {
     // MARK: - HTML Template
 
     static func generateHTML(wsPort: UInt16, authToken: String) -> String {
-        """
+        let scriptURL = Bundle.main.url(forResource: "DirectorFormatting", withExtension: "js")
+        let formattingScript = scriptURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        let initialPalette = String(data: try! JSONEncoder().encode(NotchSettings.shared.editorColorPaletteHex), encoding: .utf8)!
+        return """
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -332,9 +326,16 @@ class DirectorServer {
         #status-dot.connected{background:#22c55e}
         #status-dot.active{background:#facc15;animation:pulse-dot 1.5s ease-in-out infinite}
         @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.4}}
-        #status-text{font-size:13px;color:rgba(255,255,255,0.5);flex:1}
+        #status-text{font-size:13px;color:rgba(255,255,255,0.5);flex:1;min-width:0;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         #progress-text{font-size:13px;font-weight:600;color:rgba(255,255,255,0.4);
           font-variant-numeric:tabular-nums}
+
+        #color-palette{display:flex;gap:clamp(4px,1vw,9px);margin-left:auto;flex-shrink:0}
+        #color-palette[hidden]{display:none}
+        .color-dot{width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.2);cursor:pointer}
+        .color-dot.selected{outline:3px solid #0a84ff;outline-offset:2px}
+        #read-text{opacity:.4}
 
         /* Editor area */
         #editor-wrap{flex:1;overflow:hidden;position:relative}
@@ -353,6 +354,7 @@ class DirectorServer {
           white-space:pre-wrap;word-wrap:break-word;outline:none;
           min-height:60vh;caret-color:#facc15}
         #edit-text:empty::before{content:attr(data-placeholder);color:rgba(255,255,255,0.2)}
+        #editor-container .default-text-color{color:#fff!important}
 
         /* Divider between read and edit */
         #read-divider{height:2px;background:linear-gradient(to right,#facc15,transparent);
@@ -415,6 +417,7 @@ class DirectorServer {
           <div id="status-dot"></div>
           <div id="status-text">Connecting…</div>
           <div id="progress-text"></div>
+          <div id="color-palette" role="group" aria-label="Text colors" hidden></div>
         </div>
 
         <div id="editor-wrap">
@@ -463,6 +466,7 @@ class DirectorServer {
         /* ---- state handler ---- */
         function handleState(s){
           const doneEl=document.getElementById('done-overlay');
+          syncPalette(s.editorPalette);
 
           if(!s.isActive){
             isActive=false;
@@ -493,7 +497,8 @@ class DirectorServer {
 
           // Update read boundary
           lastReadCount=s.highlightedCharCount;
-          updateReadBoundary(s.highlightedCharCount);
+          if(!lockedRuns.length && !editor.textContent.length && (s.formattedRuns||[]).length) renderRuns(editor,s.formattedRuns);
+          updateFormattedBoundary(s.readUTF16Count ?? s.highlightedCharCount);
 
           // Waveform
           const wf=document.getElementById('waveform'),
@@ -510,42 +515,7 @@ class DirectorServer {
           document.getElementById('mic-indicator').className=s.isListening?'on':'';
         }
 
-        /* ---- read boundary ---- */
-        function normalizeDirectorText(text){
-          return text.replace(/\\r\\n?/g,'\\n')
-            .replace(/[^\\S\\n]+/g,' ')
-            .replace(/ *\\n(?:[^\\S\\n]*\\n)* */g,'\\n')
-            .trim();
-        }
-        function getText(el){
-          return el.innerText||el.textContent||'';
-        }
-        function getFullText(){
-          const editEl=document.getElementById('edit-text');
-          return normalizeDirectorText(lockedReadText+getText(editEl));
-        }
-
-        function updateReadBoundary(charCount){
-          if(charCount<=0)return;
-          const fullText=getFullText();
-          if(charCount>fullText.length)charCount=fullText.length;
-
-          const readPart=fullText.substring(0,charCount);
-          const editPart=fullText.substring(charCount);
-
-          const readEl=document.getElementById('read-text');
-          const editEl=document.getElementById('edit-text');
-          const divider=document.getElementById('read-divider');
-
-          lockedReadText=readPart;
-          readEl.textContent=readPart;
-          divider.classList.toggle('visible',readPart.length>0);
-
-          // Only update edit if content actually changed (preserve cursor)
-          if(editEl.textContent!==editPart){
-            editEl.textContent=editPart;
-          }
-        }
+        function getFullText(){return plain(fullRuns());}
 
         /* ---- go/stop ---- */
         function toggleGo(){
@@ -556,7 +526,7 @@ class DirectorServer {
           } else {
             const fullText=getFullText();
             if(!fullText.trim())return;
-            send({type:'setText',text:fullText});
+            sendFormatted('setText');
             isRunning=true;
             updateGoButton();
           }
@@ -575,14 +545,6 @@ class DirectorServer {
 
         /* ---- live edit ---- */
         let editDebounce=null;
-        document.getElementById('edit-text').addEventListener('input',function(){
-          if(!isRunning)return;
-          clearTimeout(editDebounce);
-          editDebounce=setTimeout(()=>{
-            const fullText=getFullText();
-            send({type:'updateText',text:fullText,readCharCount:lastReadCount});
-          },300);
-        });
 
         /* ---- reset ---- */
         function resetAll(){
@@ -595,6 +557,7 @@ class DirectorServer {
           isActive=false;
           lastReadCount=0;
           lockedReadText='';
+          lockedRuns=[]; typingColor=null; savedEditorRange=null;
           updateGoButton();
         }
 
@@ -603,6 +566,8 @@ class DirectorServer {
         for(let i=0;i<20;i++){const b=document.createElement('div');
           b.className='wf';b.style.height='2px';wfInit.appendChild(b)}
 
+        \(formattingScript)
+        syncPalette(\(initialPalette));
         connect();
         </script>
         </body>

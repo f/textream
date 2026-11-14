@@ -1,16 +1,16 @@
 import SwiftUI
 import UIKit
 
-/// A plain-text script editor that presents balanced bracket cues with the
-/// same visual treatment as the macOS editor. Styling lives only in the text
-/// view; the bound value remains an ordinary `String`.
+/// Native rich-text editing; only text and foreground colors are persisted.
 struct BracketHighlightingTextEditor: UIViewRepresentable {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    @Binding var text: String
+    @Binding var page: FormattedPage
     @Binding var isFocused: Bool
     let accessibilityLabel: String
     let accessibilityIdentifier: String
+    var formatting: ScriptFormattingController? = nil
+    var palette: [ScriptPaletteEntry] = []
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -24,6 +24,7 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
         textView.backgroundColor = .clear
         textView.isEditable = true
         textView.isSelectable = true
+        textView.allowsEditingTextAttributes = true
         textView.isScrollEnabled = true
         textView.alwaysBounceVertical = true
         textView.showsVerticalScrollIndicator = true
@@ -46,6 +47,11 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
 
     static func dismantleUIView(_ textView: UITextView, coordinator: Coordinator) {
         textView.resignFirstResponder()
+        textView.delegate = nil
+        textView.undoManager?.removeAllActions(withTarget: coordinator)
+        if coordinator.parent.formatting?.coordinator === coordinator {
+            coordinator.parent.formatting?.coordinator = nil
+        }
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
@@ -53,12 +59,21 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
 
         private var isApplyingHighlighting = false
         private var lastStyleSignature = ""
+        private var displayedPage: FormattedPage
+        weak var textView: UITextView?
+        private var selectionReportPending = false
+        private var keyboardAccessory: UIHostingController<ScriptKeyboardAccessory>?
+        private var accessoryPaletteSignature = ""
 
         init(parent: BracketHighlightingTextEditor) {
             self.parent = parent
+            displayedPage = parent.page
         }
 
         func update(_ textView: UITextView, force: Bool) {
+            self.textView = textView
+            parent.formatting?.coordinator = self
+            updateKeyboardAccessory(textView)
             let font = UIFont.preferredFont(
                 forTextStyle: .body,
                 compatibleWith: textView.traitCollection
@@ -74,26 +89,60 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
             // Never replace or restyle the storage while an input method owns
             // marked text. Doing so can discard an unfinished composition.
             if textView.markedTextRange == nil {
-                if force || textView.text != parent.text {
+                if force || displayedPage != parent.page {
                     replaceText(
                         in: textView,
-                        with: parent.text,
+                        with: parent.page,
                         font: font
                     )
                 } else if lastStyleSignature != styleSignature {
                     applyHighlighting(to: textView, font: font)
                 }
                 lastStyleSignature = styleSignature
+                reportSelection()
             }
 
             updateFocus(of: textView)
         }
 
+        private func updateKeyboardAccessory(_ textView: UITextView) {
+            guard let formatting = parent.formatting, parent.palette.count > 1 else {
+                if textView.inputAccessoryView != nil {
+                    textView.inputAccessoryView = nil
+                    keyboardAccessory = nil
+                    accessoryPaletteSignature = ""
+                }
+                return
+            }
+            let signature = parent.palette.map { "\($0.id):\($0.hex)" }.joined(separator: "|")
+            guard keyboardAccessory == nil || accessoryPaletteSignature != signature else { return }
+            let content = ScriptKeyboardAccessory(entries: parent.palette, formatting: formatting) { [weak textView] in
+                textView?.resignFirstResponder()
+            }
+            if let keyboardAccessory {
+                keyboardAccessory.rootView = content
+            } else {
+                // SwiftUI keyboard toolbar placement doesn't attach reliably to a
+                // bridged UITextView; UIKit owns its input accessory directly.
+                let hosting = UIHostingController(rootView: content)
+                let accessory = UIInputView(frame: CGRect(x: 0, y: 0, width: 0, height: 48), inputViewStyle: .keyboard)
+                hosting.view.backgroundColor = .clear
+                hosting.view.frame = accessory.bounds
+                hosting.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                accessory.addSubview(hosting.view)
+                textView.inputAccessoryView = accessory
+                keyboardAccessory = hosting
+            }
+            keyboardAccessory?.overrideUserInterfaceStyle = textView.traitCollection.userInterfaceStyle
+            accessoryPaletteSignature = signature
+        }
+
         func textViewDidChange(_ textView: UITextView) {
             guard !isApplyingHighlighting else { return }
-            let newText = textView.text ?? ""
-            if parent.text != newText {
-                parent.text = newText
+            let page = FormattedPage(attributedString: textView.attributedText)
+            displayedPage = page
+            if parent.page != page {
+                parent.page = page
             }
 
             // Attribute mutations during a marked-text composition can break
@@ -107,6 +156,55 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
                     compatibleWith: textView.traitCollection
                 )
             )
+            reportSelection()
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) { reportSelection() }
+
+        func reportSelection() {
+            guard !selectionReportPending, parent.formatting != nil else { return }
+            selectionReportPending = true
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                selectionReportPending = false
+                guard let textView, textView.markedTextRange == nil,
+                      let formatting = parent.formatting, formatting.coordinator === self else { return }
+                let range = textView.selectedRange
+                let color: String?
+                if range.length == 0 {
+                    color = (textView.typingAttributes[.foregroundColor] as? UIColor)?.rgbHex ?? "#ffffff"
+                } else {
+                    var colors = Set<String>()
+                    textView.textStorage.enumerateAttribute(.foregroundColor, in: range) { value, _, _ in
+                        colors.insert((value as? UIColor)?.rgbHex ?? "#ffffff")
+                    }
+                    color = colors.count == 1 ? colors.first : nil
+                }
+                if formatting.selectedColor != color { formatting.selectedColor = color }
+            }
+        }
+
+        func applyColor(_ hex: String) {
+            guard let textView, textView.markedTextRange == nil else { return }
+            let range = textView.selectedRange
+            let color = UIColor(rgbHex: hex).editorTextColor
+            if range.length > 0 {
+                let before = FormattedPage(attributedString: textView.attributedText)
+                textView.undoManager?.registerUndo(withTarget: self) { target in target.restorePage(before, selection: range) }
+                textView.textStorage.addAttribute(.foregroundColor, value: color, range: range)
+                textViewDidChange(textView)
+            }
+            textView.typingAttributes[.foregroundColor] = color
+            reportSelection()
+        }
+
+        private func restorePage(_ page: FormattedPage, selection: NSRange) {
+            guard let textView else { return }
+            let current = FormattedPage(attributedString: textView.attributedText)
+            textView.undoManager?.registerUndo(withTarget: self) { target in target.restorePage(current, selection: selection) }
+            textView.textStorage.setAttributedString(page.editorAttributedString)
+            textView.selectedRange = selection
+            textViewDidChange(textView)
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -146,14 +244,15 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
 
         private func replaceText(
             in textView: UITextView,
-            with text: String,
+            with page: FormattedPage,
             font: UIFont
         ) {
             let previousSelection = textView.selectedRange
             let previousOffset = textView.contentOffset
 
             isApplyingHighlighting = true
-            textView.attributedText = NSAttributedString(string: text)
+            textView.attributedText = page.editorAttributedString
+            displayedPage = page
             isApplyingHighlighting = false
             applyHighlighting(to: textView, font: font)
 
@@ -174,14 +273,13 @@ struct BracketHighlightingTextEditor: UIViewRepresentable {
             let selectedRange = textView.selectedRange
             let contentOffset = textView.contentOffset
 
-            let defaultAttributes: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: UIColor.label
-            ]
+            var typingAttributes = textView.typingAttributes
+            typingAttributes[.font] = font
+            typingAttributes[.foregroundColor] = ((typingAttributes[.foregroundColor] as? UIColor) ?? UIColor.white).editorTextColor
 
             isApplyingHighlighting = true
             BracketCueTextStyling.apply(to: textStorage, font: font)
-            textView.typingAttributes = defaultAttributes
+            textView.typingAttributes = typingAttributes
             textView.selectedRange = selectedRange
             textView.setContentOffset(contentOffset, animated: false)
             isApplyingHighlighting = false
@@ -208,22 +306,21 @@ enum BracketCueTextStyling {
     static func apply(to text: NSMutableAttributedString, font: UIFont) {
         let defaultAttributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: UIColor.label
+            .foregroundColor: UIColor.defaultWhiteText
         ]
         let italicFont = font.fontDescriptor.withSymbolicTraits(.traitItalic)
             .map { UIFont(descriptor: $0, size: font.pointSize) }
             ?? font
         let cueAttributes: [NSAttributedString.Key: Any] = [
             .font: italicFont,
-            .foregroundColor: UIColor.secondaryLabel,
             .backgroundColor: UIColor.secondaryLabel.withAlphaComponent(0.08)
         ]
 
         text.beginEditing()
-        text.setAttributes(
-            defaultAttributes,
-            range: NSRange(location: 0, length: text.length)
-        )
+        let normalized = FormattedPage(attributedString: text).editorAttributedString
+        normalized.enumerateAttributes(in: NSRange(location: 0, length: normalized.length)) { attributes, range, _ in
+            text.setAttributes(defaultAttributes.merging(attributes) { _, color in color }, range: range)
+        }
         for range in ranges(in: text.string) {
             text.addAttributes(cueAttributes, range: range)
         }

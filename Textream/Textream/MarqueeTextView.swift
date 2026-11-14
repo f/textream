@@ -12,96 +12,13 @@ private let paragraphDividerDotSize: CGFloat = 3
 private let paragraphDividerDotSpacing: CGFloat = 5
 private let paragraphDividerDotOpacity: Double = 0.16
 
-// MARK: - CJK-aware word splitting
-
-extension Unicode.Scalar {
-    var isCJK: Bool {
-        let v = value
-        return (v >= 0x4E00 && v <= 0x9FFF)    // CJK Unified Ideographs
-            || (v >= 0x3400 && v <= 0x4DBF)    // CJK Extension A
-            || (v >= 0x20000 && v <= 0x2A6DF)  // CJK Extension B
-            || (v >= 0xF900 && v <= 0xFAFF)    // CJK Compatibility Ideographs
-            || (v >= 0x3040 && v <= 0x309F)    // Hiragana
-            || (v >= 0x30A0 && v <= 0x30FF)    // Katakana
-            || (v >= 0xAC00 && v <= 0xD7AF)    // Hangul Syllables
-    }
-}
-
-/// Splits text into display-ready words. CJK characters (Chinese, Japanese, Korean)
-/// are split into individual characters so the flow layout can wrap them properly.
-func splitTextIntoWords(_ text: String) -> [String] {
-    let tokens = text.replacingOccurrences(of: "\n", with: " ")
-        .split(omittingEmptySubsequences: true, whereSeparator: { $0.isWhitespace })
-        .map { String($0) }
-
-    var result: [String] = []
-    for token in tokens {
-        guard token.unicodeScalars.contains(where: { $0.isCJK }) else {
-            result.append(token)
-            continue
-        }
-        // Token contains CJK characters — split each CJK char individually;
-        // consecutive non-CJK chars (e.g. Latin letters, digits) stay grouped.
-        var buffer = ""
-        for char in token {
-            if char.unicodeScalars.first.map({ $0.isCJK }) == true {
-                if !buffer.isEmpty {
-                    result.append(buffer)
-                    buffer = ""
-                }
-                result.append(String(char))
-            } else {
-                buffer.append(char)
-            }
-        }
-        if !buffer.isEmpty {
-            result.append(buffer)
-        }
-    }
-    return result
-}
-
-/// Returns the word indices that begin a new paragraph. Consecutive and
-/// whitespace-only lines collapse into a single visual separator.
-func paragraphBreakWordIndices(in text: String) -> Set<Int> {
-    let normalizedLineEndings = text
-        .replacingOccurrences(of: "\r\n", with: "\n")
-        .replacingOccurrences(of: "\r", with: "\n")
-    let lines = normalizedLineEndings.split(
-        separator: "\n",
-        omittingEmptySubsequences: false
-    )
-
-    var result = Set<Int>()
-    var wordCount = 0
-    var hasContent = false
-    var hasPendingBreak = false
-
-    for (index, line) in lines.enumerated() {
-        let lineWords = splitTextIntoWords(String(line))
-        if !lineWords.isEmpty {
-            if hasContent && hasPendingBreak {
-                result.insert(wordCount)
-            }
-            wordCount += lineWords.count
-            hasContent = true
-            hasPendingBreak = false
-        }
-
-        if index < lines.count - 1, hasContent {
-            hasPendingBreak = true
-        }
-    }
-
-    return result
-}
-
 // MARK: - Data
 
 struct WordItem: Identifiable {
     let id: Int
     let word: String
     let charOffset: Int // char offset of this word in the full text (counting spaces)
+    let colorHex: String?
     let isAnnotation: Bool // true for [bracket] words and emoji-only words
 }
 
@@ -117,6 +34,7 @@ struct WordYPreferenceKey: PreferenceKey {
 // MARK: - Teleprompter
 
 struct SpeechScrollView: View {
+    var wordColors: [String] = []
     let words: [String]
     let highlightedCharCount: Int
     var font: NSFont = .systemFont(ofSize: 18, weight: .semibold)
@@ -169,6 +87,7 @@ struct SpeechScrollView: View {
     var body: some View {
         GeometryReader { geo in
             WordFlowLayout(
+                wordColors: wordColors,
                 words: words,
                 highlightedCharCount: highlightedCharCount,
                 font: font,
@@ -574,6 +493,7 @@ struct SpeechScrollView: View {
 // MARK: - Word Flow Layout
 
 struct WordFlowLayout: View {
+    var wordColors: [String] = []
     let words: [String]
     let highlightedCharCount: Int
     let font: NSFont
@@ -607,7 +527,7 @@ struct WordFlowLayout: View {
         let paragraphKey = paragraphBreakBeforeWordIndices.sorted()
             .map(String.init)
             .joined(separator: ",")
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|"
+        let key = "\(words.joined(separator: "\u{1f}"))|\(wordColors.joined())|"
             + "\(font.fontName)|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
         if key == Self._cacheKey {
             return (Self._cachedItems, Self._cachedLines, Self._cachedParagraphPrefixCounts)
@@ -764,6 +684,7 @@ struct WordFlowLayout: View {
     }
 
     private func wordView(for item: WordItem, isNextWord: Bool) -> some View {
+        let baseColor = item.colorHex.map { Color(nsColor: NSColor(rgbHex: $0)) } ?? highlightColor
         let wordLen = item.word.count
         let charsIntoWord = highlightedCharCount - item.charOffset
         let litCount = max(0, min(wordLen, charsIntoWord))
@@ -775,7 +696,7 @@ struct WordFlowLayout: View {
         if !highlightWords {
             let uniformColor: Color = item.isAnnotation
                 ? cueColor.opacity(cueUnreadOpacity)
-                : highlightColor
+                : baseColor
 
             return Text(item.word + " ")
                 .font(item.isAnnotation ? Font(font).italic() : Font(font))
@@ -819,11 +740,11 @@ struct WordFlowLayout: View {
 
         // Dim color: highlight color variant for current word, full for unread
         let dimColor: Color = isCurrentWord
-            ? highlightColor.opacity(0.6)
-            : highlightColor
+            ? baseColor.opacity(0.6)
+            : baseColor
 
         // Base color for the whole word
-        let wordColor: Color = isFullyLit ? highlightColor.opacity(0.3) : dimColor
+        let wordColor: Color = isFullyLit ? baseColor.opacity(0.3) : dimColor
 
         return Text(item.word + " ")
             .font(Font(font))
@@ -849,7 +770,7 @@ struct WordFlowLayout: View {
         let annotationFlags = SpeechTextAlignment.annotationFlags(for: words)
         for (i, word) in words.enumerated() {
             let isAnnotation = annotationFlags[i] || Self.isAnnotationWord(word)
-            items.append(WordItem(id: i, word: word, charOffset: offset, isAnnotation: isAnnotation))
+            items.append(WordItem(id: i, word: word, charOffset: offset, colorHex: wordColors.indices.contains(i) ? wordColors[i] : nil, isAnnotation: isAnnotation))
             offset += word.count + 1 // +1 for space
         }
         return items

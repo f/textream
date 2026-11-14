@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var dictationHighlightRange: NSRange? = nil
     @State private var dictationCaretPosition: Int? = nil
     @State private var editorCaretPosition: Int = 0
+    @State private var formatting = EditorFormattingController()
     @State private var isDroppingPresentation = false
     @State private var dropError: String?
     @State private var dropAlertTitle: String = "Import Error"
@@ -44,15 +45,16 @@ Happy presenting! [wave]
             ?? locale
     }
 
-    private var currentText: Binding<String> {
-        Binding(
+    private var currentPage: Binding<FormattedPage> {
+        let pageIndex = service.currentPageIndex
+        return Binding(
             get: {
-                guard service.currentPageIndex < service.pages.count else { return "" }
-                return service.pages[service.currentPageIndex]
+                guard pageIndex < service.pages.count else { return FormattedPage() }
+                return service.formattedPages[pageIndex]
             },
             set: { newValue in
-                guard service.currentPageIndex < service.pages.count else { return }
-                service.pages[service.currentPageIndex] = newValue
+                guard pageIndex < service.pages.count else { return }
+                service.updatePage(newValue, at: pageIndex)
             }
         )
     }
@@ -220,29 +222,32 @@ Happy presenting! [wave]
 
             let pageIndex = service.currentPageIndex
             guard pageIndex < service.pages.count else { return }
-            var text = service.pages[pageIndex]
+            let sourceText = service.pages[pageIndex]
 
             // Remove the old segment text
-            let safeStart = min(segmentStart, text.count)
-            let removeStart = text.index(text.startIndex, offsetBy: safeStart)
-            let safeLen = min(segmentLength, text.count - safeStart)
-            let removeEnd = text.index(removeStart, offsetBy: safeLen)
-            text.removeSubrange(removeStart..<removeEnd)
+            let safeStart = min(segmentStart, sourceText.count)
+            let removeStart = sourceText.index(sourceText.startIndex, offsetBy: safeStart)
+            let safeLen = min(segmentLength, sourceText.count - safeStart)
+            let removeEnd = sourceText.index(removeStart, offsetBy: safeLen)
+            let replacementRange = NSRange(removeStart..<removeEnd, in: sourceText)
 
             // Build the new segment content
             let sep = segmentNeedsSeparator ? " " : ""
             let newSegment = sep + effectiveText
-            text.insert(contentsOf: newSegment, at: text.index(text.startIndex, offsetBy: min(segmentStart, text.count)))
+            let page = service.formattedPages[pageIndex].replacingCharacters(
+                in: replacementRange, with: newSegment, insertionColor: formatting.selectedColor
+            )
+            let text = page.text
 
             let prevLen = segmentLength
             segmentLength = newSegment.count
-            service.pages[pageIndex] = text
+            service.updatePage(page, at: pageIndex)
 
             // Highlight only the newly added characters
             let newChars = segmentLength - prevLen
             if newChars > 0 {
                 let highlightStart = segmentStart + prevLen
-                dictationHighlightRange = NSRange(location: highlightStart, length: newChars)
+                dictationHighlightRange = NSRange(location: String(text.prefix(highlightStart)).utf16.count, length: String(text.dropFirst(highlightStart).prefix(newChars)).utf16.count)
             }
 
             // Move caret to end of segment
@@ -277,12 +282,14 @@ Happy presenting! [wave]
 
             ZStack {
                 HighlightingTextEditor(
-                    text: currentText,
+                    page: currentPage,
+                    formatting: formatting,
                     font: .systemFont(ofSize: 16, weight: .regular).rounded,
                     highlightRange: dictationHighlightRange,
                     caretPosition: $dictationCaretPosition,
                     editorCaretPosition: $editorCaretPosition
                 )
+                .id("\(service.documentID):\(service.currentPageIndex)")
                 .onChange(of: editorCaretPosition) { _, newPos in
                     guard isRecording else { return }
                     // If caret moved away from end of current segment, user clicked elsewhere
@@ -538,7 +545,7 @@ Happy presenting! [wave]
                         service.openFile()
                     } label: {
                         HStack(spacing: 4) {
-                            if service.currentFileURL != nil && service.pages != service.savedPages {
+                            if service.currentFileURL != nil && service.hasUnsavedChanges {
                                 Circle()
                                     .fill(.orange)
                                     .frame(width: 6, height: 6)
@@ -557,7 +564,7 @@ Happy presenting! [wave]
                             stopRecording()
                         }
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            service.pages.append("")
+                            service.appendPage()
                             service.currentPageIndex = service.pages.count - 1
                         }
                     } label: {
@@ -588,6 +595,11 @@ Happy presenting! [wave]
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 8)
+            }
+            if NotchSettings.shared.editorPalette.count > 1 && !NotchSettings.shared.directorModeEnabled {
+                ToolbarItem(id: "editor-colors", placement: .primaryAction) {
+                    QuickColorPalette(entries: NotchSettings.shared.editorPalette, formatting: formatting)
+                }
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -639,7 +651,7 @@ Happy presenting! [wave]
         .onAppear {
             // Set default text for the first page if empty
             if service.pages.count == 1 && service.pages[0].isEmpty {
-                service.pages[0] = defaultText
+                service.updatePageText(defaultText, at: 0)
             }
             // Sync button state with overlay
             if service.overlayController.isShowing {
@@ -718,7 +730,7 @@ Happy presenting! [wave]
                     stopRecording()
                 }
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    service.pages.append("")
+                    service.appendPage()
                     service.currentPageIndex = service.pages.count - 1
                 }
             } label: {
@@ -741,7 +753,7 @@ Happy presenting! [wave]
             stopRecording()
         }
         withAnimation(.easeInOut(duration: 0.2)) {
-            service.pages.remove(at: index)
+            service.removePage(at: index)
             if service.currentPageIndex >= service.pages.count {
                 service.currentPageIndex = service.pages.count - 1
             } else if service.currentPageIndex > index {
@@ -785,8 +797,7 @@ Happy presenting! [wave]
             do {
                 let notes = try PresentationNotesExtractor.extractNotes(from: url)
                 DispatchQueue.main.async {
-                    service.pages = notes
-                    service.savedPages = notes
+                    service.importPages(notes)
                     service.currentPageIndex = 0
                     service.readPages.removeAll()
                     service.currentFileURL = nil

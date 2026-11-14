@@ -23,6 +23,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+        F01000000000000000000001 /* Shared */ = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = Shared;
+            sourceTree = "<group>";
+        };
 		446966B62F37E47300AF141F /* Textream */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Textream;
@@ -68,6 +73,7 @@
 		446966AB2F37E47300AF141F = {
 			isa = PBXGroup;
 			children = (
+				F01000000000000000000001 /* Shared */,
 				446966B62F37E47300AF141F /* Textream */,
 				A10000000000000000000003 /* TextreamiOS */,
 				A10000000000000000000004 /* TextreamiOSTests */,
@@ -101,6 +107,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				F01000000000000000000001 /* Shared */,
 				446966B62F37E47300AF141F /* Textream */,
 			);
 			name = Textream;
@@ -123,6 +130,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				F01000000000000000000001 /* Shared */,
 				A10000000000000000000003 /* TextreamiOS */,
 			);
 			name = TextreamiOS;

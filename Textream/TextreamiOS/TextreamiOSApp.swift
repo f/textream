@@ -134,13 +134,13 @@ struct TextreamiOSApp: App {
 
     private static func promptPreviewConfiguration() -> PromptSessionConfiguration {
         PromptSessionConfiguration(
-            script: """
+            formattedScript: FormattedPage("""
             Stay on script. Keep eye contact. [smile]
 
             Textream follows every word you say and keeps the last spoken line close to the camera.
 
             Read naturally, speak confidently, and never lose your place.
-            """,
+            """),
             sessionMode: .read,
             cameraEnabled: false,
             followMode: .classic,
@@ -150,8 +150,7 @@ struct TextreamiOSApp: App {
             scrollSpeed: 0.5,
             fontFamily: .sans,
             fontSize: .lg,
-            textColor: .white,
-            cueColor: .blue,
+            cueColorHex: "#4f8cff",
             cueBrightness: .medium,
             overlayOpacity: 0.52,
             speechLocaleIdentifier: "en-US"

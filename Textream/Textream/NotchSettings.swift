@@ -334,6 +334,35 @@ enum ReadingPosition: String, CaseIterable, Identifiable {
 class NotchSettings {
     static let shared = NotchSettings()
 
+    static let maximumPaletteColors = 8
+    static let defaultEditorPalette = TextColorRun.defaultPalette
+    var editorPalette: [PaletteEntry] {
+        didSet { UserDefaults.standard.set(editorPalette.map(\.hex), forKey: "editorColorPaletteHex") }
+    }
+    var editorColorPaletteHex: [String] { editorPalette.map(\.hex) }
+
+    var cuePalette: [PaletteEntry] {
+        didSet {
+            if !cuePalette.contains(where: { $0.id == selectedCueID }), !cuePalette.isEmpty {
+                let previousIndex = oldValue.firstIndex(where: { $0.id == selectedCueID }) ?? 0
+                selectedCueID = cuePalette[min(previousIndex, cuePalette.count - 1)].id
+            }
+            UserDefaults.standard.set(cuePalette.map(\.hex), forKey: "cueColorPaletteHex")
+            persistCueSelection()
+        }
+    }
+    var selectedCueID: UUID {
+        didSet { persistCueSelection() }
+    }
+    var cueColorHex: String { cuePalette.first(where: { $0.id == selectedCueID })?.hex ?? "#ffffff" }
+    var cueColor: Color { Color(nsColor: NSColor(rgbHex: cueColorHex)) }
+
+    private func persistCueSelection() {
+        guard let index = cuePalette.firstIndex(where: { $0.id == selectedCueID }) else { return }
+        UserDefaults.standard.set(index, forKey: "selectedCuePaletteIndex")
+        UserDefaults.standard.set(cuePalette[index].hex, forKey: "cueColorHex")
+    }
+
     var notchWidth: CGFloat {
         didSet { UserDefaults.standard.set(Double(notchWidth), forKey: "notchWidth") }
     }
@@ -353,12 +382,9 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(fontFamilyPreset.rawValue, forKey: "fontFamilyPreset") }
     }
 
+    // Retained preference key for older versions; projection now uses page colors.
     var fontColorPreset: FontColorPreset {
         didSet { UserDefaults.standard.set(fontColorPreset.rawValue, forKey: "fontColorPreset") }
-    }
-
-    var cueColorPreset: FontColorPreset {
-        didSet { UserDefaults.standard.set(cueColorPreset.rawValue, forKey: "cueColorPreset") }
     }
 
     var cueBrightness: CueBrightness {
@@ -498,6 +524,26 @@ class NotchSettings {
     static let maxHeight: CGFloat = 400
 
     init() {
+        let savedPalette = UserDefaults.standard.stringArray(forKey: "editorColorPaletteHex")
+        let colors = Array((savedPalette ?? Self.defaultEditorPalette).compactMap(TextColorRun.canonicalHex).prefix(Self.maximumPaletteColors))
+        self.editorPalette = (colors.isEmpty ? ["#ffffff"] : colors).map { PaletteEntry(hex: $0) }
+        let cueColors = Array((UserDefaults.standard.stringArray(forKey: "cueColorPaletteHex") ?? Self.defaultEditorPalette).compactMap(TextColorRun.canonicalHex).prefix(Self.maximumPaletteColors))
+        var restoredCues = cueColors.isEmpty ? ["#ffffff"] : cueColors
+        let legacyCue = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "cueColorPreset") ?? "") ?? .white
+        let selectedCue = UserDefaults.standard.string(forKey: "cueColorHex").flatMap(TextColorRun.canonicalHex) ?? NSColor(legacyCue.color).rgbHex
+        let savedCueIndex = UserDefaults.standard.object(forKey: "selectedCuePaletteIndex") as? Int
+        let cueIndex: Int
+        if let savedCueIndex, restoredCues.indices.contains(savedCueIndex) {
+            cueIndex = savedCueIndex
+        } else if let matchingIndex = restoredCues.firstIndex(of: selectedCue) {
+            cueIndex = matchingIndex
+        } else {
+            restoredCues[0] = selectedCue
+            cueIndex = 0
+        }
+        let restoredEntries = restoredCues.map { PaletteEntry(hex: $0) }
+        self.cuePalette = restoredEntries
+        self.selectedCueID = restoredEntries[cueIndex].id
         let savedWidth = UserDefaults.standard.double(forKey: "notchWidth")
         let savedHeight = UserDefaults.standard.double(forKey: "textAreaHeight")
         self.notchWidth = savedWidth > 0 ? CGFloat(savedWidth) : Self.defaultWidth
@@ -508,7 +554,6 @@ class NotchSettings {
         self.fontSizePreset = FontSizePreset(rawValue: UserDefaults.standard.string(forKey: "fontSizePreset") ?? "") ?? .lg
         self.fontFamilyPreset = FontFamilyPreset(rawValue: UserDefaults.standard.string(forKey: "fontFamilyPreset") ?? "") ?? .sans
         self.fontColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "fontColorPreset") ?? "") ?? .white
-        self.cueColorPreset = FontColorPreset(rawValue: UserDefaults.standard.string(forKey: "cueColorPreset") ?? "") ?? .white
         self.cueBrightness = CueBrightness(rawValue: UserDefaults.standard.string(forKey: "cueBrightness") ?? "") ?? .dim
         self.overlayMode = OverlayMode(rawValue: UserDefaults.standard.string(forKey: "overlayMode") ?? "") ?? .pinned
         self.notchDisplayMode = NotchDisplayMode(rawValue: UserDefaults.standard.string(forKey: "notchDisplayMode") ?? "") ?? .followMouse

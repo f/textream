@@ -12,6 +12,7 @@ import Network
 
 struct BrowserState: Codable {
     let words: [String]
+    let wordColors: [String]
     let highlightedCharCount: Int
     let totalCharCount: Int
     let audioLevels: [Double]
@@ -35,6 +36,7 @@ class BrowserServer {
 
     // Content state
     private var words: [String] = []
+    private var wordColors: [String] = []
     private var totalCharCount: Int = 0
     private var hasNextPage: Bool = false
     private weak var speechRecognizer: SpeechRecognizer?
@@ -70,9 +72,10 @@ class BrowserServer {
 
     // MARK: - Content Management
 
-    func showContent(speechRecognizer: SpeechRecognizer, words: [String], totalCharCount: Int, hasNextPage: Bool) {
+    func showContent(speechRecognizer: SpeechRecognizer, words: [String], wordColors: [String], totalCharCount: Int, hasNextPage: Bool) {
         self.speechRecognizer = speechRecognizer
         self.words = words
+        self.wordColors = wordColors
         self.totalCharCount = totalCharCount
         self.hasNextPage = hasNextPage
         self.timerWordProgress = 0
@@ -80,8 +83,9 @@ class BrowserServer {
         startBroadcasting()
     }
 
-    func updateContent(words: [String], totalCharCount: Int, hasNextPage: Bool) {
+    func updateContent(words: [String], wordColors: [String], totalCharCount: Int, hasNextPage: Bool) {
         self.words = words
+        self.wordColors = wordColors
         self.totalCharCount = totalCharCount
         self.hasNextPage = hasNextPage
         self.timerWordProgress = 0
@@ -214,13 +218,14 @@ class BrowserServer {
 
         let state = BrowserState(
             words: words,
+            wordColors: wordColors,
             highlightedCharCount: effective,
             totalCharCount: totalCharCount,
             audioLevels: (speechRecognizer?.audioLevels ?? []).map { Double($0) },
             isListening: speechRecognizer?.isListening ?? false,
             isDone: isDone,
-            fontColor: NotchSettings.shared.fontColorPreset.cssColor,
-            cueColor: NotchSettings.shared.cueColorPreset.cssColor,
+            fontColor: "#ffffff",
+            cueColor: NotchSettings.shared.cueColorHex,
             hasNextPage: hasNextPage,
             isActive: true,
             highlightWords: highlightWords,
@@ -231,7 +236,7 @@ class BrowserServer {
 
     private func broadcastInactive() {
         let state = BrowserState(
-            words: [], highlightedCharCount: 0, totalCharCount: 0,
+            words: [], wordColors: [], highlightedCharCount: 0, totalCharCount: 0,
             audioLevels: [], isListening: false, isDone: false,
             fontColor: "#ffffff", cueColor: "#ffffff", hasNextPage: false, isActive: false,
             highlightWords: true, lastSpokenText: ""
@@ -526,13 +531,12 @@ class BrowserServer {
                 words=s.words||[],
                 fc=s.fontColor||'#ffffff',
                 cc=s.cueColor||fc,
-                rgb=parseColor(fc),
                 crgb=parseColor(cc),
                 hlWords=s.highlightWords!==false,
                 hcc=s.highlightedCharCount||0;
 
           // Rebuild spans only when words change
-          const wordKey=words.length+'|'+(words[0]||'')+'|'+(words[words.length-1]||'');
+          const wordKey=JSON.stringify(words);
           if(wordKey!==prevWordKey){
             c.innerHTML='';
             let cp=0;
@@ -571,6 +575,9 @@ class BrowserServer {
             const sp=spans[i],d=sp.dataset;
             const charOff=parseInt(d.s),wLen=parseInt(d.l),lc=parseInt(d.lc);
             const ann=d.a==='1';
+            const sourceColor=(s.wordColors||[])[i]||fc;
+            const wordColor=sourceColor.toLowerCase()==='#000000'?'#ffffff':sourceColor;
+            const rgb=parseColor(wordColor);
             const litCount=Math.max(0,Math.min(wLen,hcc-charOff));
             const isFullyLit=litCount>=lc;
             const charsInto=hcc-charOff;
@@ -580,7 +587,7 @@ class BrowserServer {
 
             if(!hlWords){
               // Classic / silence-paused: uniform color, no per-word highlight
-              color=ann?rgba(crgb,0.4):fc;
+              color=ann?rgba(crgb,0.4):wordColor;
             } else if(ann){
               // Annotation: cue color with varying opacity
               color=isFullyLit?rgba(crgb,0.5):rgba(crgb,0.2);
@@ -593,7 +600,7 @@ class BrowserServer {
               underline=true;
             } else {
               // Unread: full brightness
-              color=fc;
+              color=wordColor;
             }
 
             sp.style.color=color;

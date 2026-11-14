@@ -270,8 +270,8 @@ struct NotchPreviewContent: View {
                             ? Self.highlightedCount
                             : Self.previewWords.count * 5,
                         font: settings.font,
-                        highlightColor: settings.fontColorPreset.color,
-                        cueColor: settings.cueColorPreset.color,
+                        highlightColor: .white,
+                        cueColor: settings.cueColor,
                         cueUnreadOpacity: settings.cueBrightness.unreadOpacity,
                         cueReadOpacity: settings.cueBrightness.readOpacity,
                         smoothScroll: settings.listeningMode != .wordTracking,
@@ -461,6 +461,7 @@ struct SettingsView: View {
                     Spacer()
 
                     Button("Done") {
+                        PaletteRow.closeActivePicker()
                         dismiss()
                     }
                     .keyboardShortcut(.defaultAction)
@@ -495,7 +496,11 @@ struct SettingsView: View {
             }
         }
         .onDisappear {
+            PaletteRow.closeActivePicker()
             previewController.dismiss()
+        }
+        .onChange(of: settings.editorColorPaletteHex) { _, _ in
+            TextreamService.shared.directorServer.publishPaletteState()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             previewController.hide()
@@ -606,95 +611,23 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Highlight Color
-                Text("Highlight Color")
+                Text("Editor Color Palette")
                     .font(.system(size: 13, weight: .medium))
-
-                HStack(spacing: 8) {
-                    ForEach(FontColorPreset.allCases) { preset in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.fontColorPreset = preset
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Circle()
-                                    .fill(preset.color)
-                                    .frame(width: 22, height: 22)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                    )
-                                    .overlay(
-                                        settings.fontColorPreset == preset
-                                            ? Image(systemName: "checkmark")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundStyle(preset == .white ? .black : .white)
-                                            : nil
-                                    )
-                                Text(preset.label)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(settings.fontColorPreset == preset ? .primary : .secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.fontColorPreset == preset ? preset.color.opacity(0.1) : Color.primary.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.fontColorPreset == preset ? preset.color.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                PaletteSettingsRow(settings: settings, entries: settings.editorPalette)
+                    .frame(height: 34)
+                Text("Click to edit; right-click to delete; drag to reorder or remove.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
                 // Cue Color
                 Text("Cue Color")
                     .font(.system(size: 13, weight: .medium))
 
-                HStack(spacing: 8) {
-                    ForEach(FontColorPreset.allCases) { preset in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.cueColorPreset = preset
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Circle()
-                                    .fill(preset.color)
-                                    .frame(width: 22, height: 22)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                    )
-                                    .overlay(
-                                        settings.cueColorPreset == preset
-                                            ? Image(systemName: "checkmark")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundStyle(preset == .white ? .black : .white)
-                                            : nil
-                                    )
-                                Text(preset.label)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(settings.cueColorPreset == preset ? .primary : .secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.cueColorPreset == preset ? preset.color.opacity(0.1) : Color.primary.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.cueColorPreset == preset ? preset.color.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                PaletteSettingsRow(settings: settings, entries: settings.cuePalette, isCue: true)
+                    .frame(height: 34)
+                Text("Click to select; double-click to edit; right-click to delete; drag to reorder or remove.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
                 // Cue Brightness
                 Text("Cue Brightness")
@@ -1517,7 +1450,9 @@ struct SettingsView: View {
         settings.fontSizePreset = .lg
         settings.fontFamilyPreset = .sans
         settings.fontColorPreset = .white
-        settings.cueColorPreset = .white
+        settings.editorPalette = NotchSettings.defaultEditorPalette.map { PaletteEntry(hex: $0) }
+        settings.cuePalette = NotchSettings.defaultEditorPalette.map { PaletteEntry(hex: $0) }
+        settings.selectedCueID = settings.cuePalette[0].id
         settings.cueBrightness = .dim
         settings.overlayMode = .pinned
         settings.notchDisplayMode = .followMouse

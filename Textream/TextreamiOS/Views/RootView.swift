@@ -215,7 +215,7 @@ struct RootView: View {
             }
 
             BracketHighlightingTextEditor(
-                text: $model.script,
+                page: $model.formattedScript,
                 isFocused: $isInlineScriptEditorFocused,
                 accessibilityLabel: "Script",
                 accessibilityIdentifier: "scriptEditor"
@@ -438,13 +438,14 @@ private struct ExpandedScriptEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: AppModel
     let languageSuggestions: SpeechLanguageSuggestionCoordinator
-    @State private var draft: String
+    @State private var draft: FormattedPage
+    @State private var formatting = ScriptFormattingController()
     @State private var isEditorFocused = false
 
     init(model: AppModel, languageSuggestions: SpeechLanguageSuggestionCoordinator) {
         self.model = model
         self.languageSuggestions = languageSuggestions
-        _draft = State(initialValue: model.script)
+        _draft = State(initialValue: model.formattedScript)
     }
 
     var body: some View {
@@ -462,10 +463,12 @@ private struct ExpandedScriptEditor: View {
                 }
 
                 BracketHighlightingTextEditor(
-                    text: $draft,
+                    page: $draft,
                     isFocused: $isEditorFocused,
                     accessibilityLabel: "Script",
-                    accessibilityIdentifier: "expandedScriptEditor"
+                    accessibilityIdentifier: "expandedScriptEditor",
+                    formatting: formatting,
+                    palette: model.editorPalette
                 )
                 .scrollDismissesKeyboard(.interactively)
                 .padding(.horizontal, 12)
@@ -484,10 +487,6 @@ private struct ExpandedScriptEditor: View {
                             .buttonStyle(.glassProminent)
                     }
 
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("Done") { isEditorFocused = false }
-                    }
                 }
         }
         .preferredColorScheme(.dark)
@@ -495,7 +494,7 @@ private struct ExpandedScriptEditor: View {
             await Task.yield()
             isEditorFocused = true
         }
-        .onChange(of: draft, initial: true) { _, text in
+        .onChange(of: draft.text, initial: true) { _, text in
             languageSuggestions.schedule(
                 text: text,
                 currentLocaleIdentifier: model.speechLocaleIdentifier
@@ -503,7 +502,7 @@ private struct ExpandedScriptEditor: View {
         }
         .onChange(of: model.speechLocaleIdentifier) { _, localeIdentifier in
             languageSuggestions.reset(
-                text: draft,
+                text: draft.text,
                 currentLocaleIdentifier: localeIdentifier
             )
         }
@@ -511,8 +510,8 @@ private struct ExpandedScriptEditor: View {
     }
 
     private func commitDraft() {
-        guard model.script != draft else { return }
-        model.script = draft
+        guard model.formattedScript != draft else { return }
+        model.formattedScript = draft
     }
 
     private func useSuggestedLanguage() {

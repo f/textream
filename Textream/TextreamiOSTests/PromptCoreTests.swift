@@ -19,19 +19,23 @@ private final class IdleTimerControllerSpy: IdleTimerControlling {
 
 @MainActor
 private final class EditorBindingHarness {
-    var text: String
+    var page: FormattedPage
+    var text: String {
+        get { page.text }
+        set { page = FormattedPage(newValue) }
+    }
     var isFocused: Bool
 
     init(text: String, isFocused: Bool) {
-        self.text = text
+        page = FormattedPage(text)
         self.isFocused = isFocused
     }
 
     var editor: BracketHighlightingTextEditor {
         BracketHighlightingTextEditor(
-            text: Binding(
-                get: { [unowned self] in self.text },
-                set: { [unowned self] in self.text = $0 }
+            page: Binding(
+                get: { [unowned self] in self.page },
+                set: { [unowned self] in self.page = $0 }
             ),
             isFocused: Binding(
                 get: { [unowned self] in self.isFocused },
@@ -834,7 +838,7 @@ struct PromptCoreTests {
 
             #expect(cueFont.fontDescriptor.symbolicTraits.contains(.traitItalic))
             #expect(abs(cueFont.pointSize - font.pointSize) < 0.001)
-            #expect(colorsMatch(foreground, .secondaryLabel))
+            #expect(colorsMatch(foreground, UIColor.defaultWhiteText))
             #expect(colorsMatch(background, .secondaryLabel.withAlphaComponent(0.08)))
         }
 
@@ -845,7 +849,7 @@ struct PromptCoreTests {
             attributedText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
         )
         #expect(normalFont == font)
-        #expect(colorsMatch(normalForeground, .label))
+        #expect(colorsMatch(normalForeground, UIColor.defaultWhiteText))
         #expect(attributedText.attribute(.backgroundColor, at: 0, effectiveRange: nil) == nil)
     }
 
@@ -1859,7 +1863,7 @@ struct PromptCoreTests {
 
         let configuration = model.configuration()
 
-        #expect(configuration.script == editedScript)
+        #expect(configuration.formattedScript.text == editedScript)
         #expect(configuration.fontFamily == .dyslexia)
         #expect(configuration.fontSize == .xl)
         #expect(configuration.mirrorEnabled)
@@ -1956,7 +1960,7 @@ struct PromptCoreTests {
         fontSize: PromptFontSize = .lg
     ) -> PromptSessionConfiguration {
         PromptSessionConfiguration(
-            script: "One two three",
+            formattedScript: FormattedPage("One two three"),
             sessionMode: sessionMode,
             cameraEnabled: cameraEnabled,
             followMode: followMode,
@@ -1966,8 +1970,7 @@ struct PromptCoreTests {
             scrollSpeed: 3,
             fontFamily: .sans,
             fontSize: fontSize,
-            textColor: .white,
-            cueColor: .white,
+            cueColorHex: "#ffffff",
             cueBrightness: .dim,
             overlayOpacity: 0.52,
             speechLocaleIdentifier: "en-US"

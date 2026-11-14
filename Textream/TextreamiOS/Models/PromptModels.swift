@@ -275,7 +275,7 @@ enum CueBrightness: String, CaseIterable, Identifiable, Codable {
 }
 
 struct PromptSessionConfiguration: Equatable {
-    let script: String
+    let formattedScript: FormattedPage
     let sessionMode: SessionMode
     let cameraEnabled: Bool
     let followMode: FollowMode
@@ -285,8 +285,7 @@ struct PromptSessionConfiguration: Equatable {
     let scrollSpeed: Double
     let fontFamily: PromptFontFamily
     let fontSize: PromptFontSize
-    let textColor: PromptColorPreset
-    let cueColor: PromptColorPreset
+    let cueColorHex: String
     let cueBrightness: CueBrightness
     let overlayOpacity: Double
     let speechLocaleIdentifier: String

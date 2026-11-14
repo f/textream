@@ -196,6 +196,7 @@ struct PromptTextView: UIViewRepresentable {
                 parent.font.fontName,
                 String(describing: parent.font.pointSize),
                 parent.textColor.description,
+                parent.prompt.words.map(\.colorHex).joined(),
                 parent.cueColor.description,
                 String(parent.cueUnreadOpacity),
                 String(parent.cueReadOpacity),
@@ -411,19 +412,24 @@ struct PromptTextView: UIViewRepresentable {
             result.removeAttribute(.underlineStyle, range: fullRange)
             result.removeAttribute(.underlineColor, range: fullRange)
 
+            let readRange = parent.prompt.nsRange(upToCharacterOffset: parent.highlightedCharacterCount)
+            for word in parent.prompt.words {
+                let color = UIColor(rgbHex: word.colorHex)
+                let range = parent.prompt.nsRange(forCharacterRange: word.characterRange)
+                result.addAttribute(.foregroundColor, value: color.withAlphaComponent(parent.wordTracking ? 1 : 0.94), range: range)
+                let readPart = NSIntersectionRange(range, readRange)
+                if parent.wordTracking, readPart.length > 0 {
+                    result.addAttribute(.foregroundColor, value: color.withAlphaComponent(0.3), range: readPart)
+                }
+            }
             if parent.wordTracking, parent.highlightedCharacterCount > 0 {
-                result.addAttribute(
-                    .foregroundColor,
-                    value: parent.textColor.withAlphaComponent(0.3),
-                    range: parent.prompt.nsRange(upToCharacterOffset: parent.highlightedCharacterCount)
-                )
                 if let activeWord = parent.prompt.activeWord(atCharacterOffset: parent.highlightedCharacterCount),
                    !activeWord.isAnnotation {
                     result.addAttributes(
                         [
-                            .foregroundColor: parent.textColor.withAlphaComponent(0.7),
+                            .foregroundColor: UIColor(rgbHex: activeWord.colorHex).withAlphaComponent(0.7),
                             .underlineStyle: NSUnderlineStyle.single.rawValue,
-                            .underlineColor: parent.textColor.withAlphaComponent(0.6)
+                            .underlineColor: UIColor(rgbHex: activeWord.colorHex).withAlphaComponent(0.6)
                         ],
                         range: parent.prompt.nsRange(forCharacterRange: activeWord.characterRange)
                     )

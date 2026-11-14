@@ -57,8 +57,8 @@ struct PromptSessionView: View {
                         size: responsiveFontSize(isLandscape: isLandscape),
                         weight: .semibold
                     ),
-                    textColor: controller.configuration.textColor.uiColor,
-                    cueColor: controller.configuration.cueColor.uiColor,
+                    textColor: .white,
+                    cueColor: UIColor(rgbHex: controller.configuration.cueColorHex),
                     cueUnreadOpacity: controller.configuration.cueBrightness.unreadOpacity,
                     cueReadOpacity: controller.configuration.cueBrightness.readOpacity,
                     wordTracking: controller.configuration.followMode == .wordTracking,
@@ -376,7 +376,7 @@ struct PromptSessionView: View {
                 }
 
                 ProgressView(value: controller.progress)
-                    .tint(controller.configuration.textColor.color)
+                    .tint(.white)
 
                 Text("\(Int(controller.progress * 100))%")
                     .font(.caption2.monospacedDigit().weight(.semibold))
