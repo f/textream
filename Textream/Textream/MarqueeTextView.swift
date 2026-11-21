@@ -27,6 +27,9 @@ extension Unicode.Scalar {
     }
 }
 
+private let cjkOpeningMarks: Set<Character> = Set("「『（［｛〈《【〔〖〘〚“‘")
+private let cjkClosingMarks: Set<Character> = Set("」』）］｝〉》】〕〗〙〛”’、。，．：；！？…")
+
 /// Splits text into display-ready words. CJK characters (Chinese, Japanese, Korean)
 /// are split into individual characters so the flow layout can wrap them properly.
 func splitTextIntoWords(_ text: String) -> [String] {
@@ -36,26 +39,24 @@ func splitTextIntoWords(_ text: String) -> [String] {
 
     var result: [String] = []
     for token in tokens {
-        guard token.unicodeScalars.contains(where: { $0.isCJK }) else {
-            result.append(token)
-            continue
-        }
-        // Token contains CJK characters — split each CJK char individually;
-        // consecutive non-CJK chars (e.g. Latin letters, digits) stay grouped.
-        var buffer = ""
-        for char in token {
-            if char.unicodeScalars.first.map({ $0.isCJK }) == true {
-                if !buffer.isEmpty {
-                    result.append(buffer)
-                    buffer = ""
-                }
-                result.append(String(char))
-            } else {
-                buffer.append(char)
+        var remaining = token[...]
+        while let character = remaining.firstIndex(where: { $0.unicodeScalars.first?.isCJK == true }) {
+            // Keep opening marks with the character they introduce and closing
+            // marks with the character they follow, including nested quotes.
+            let before = remaining[..<character]
+            let start = before.lastIndex(where: { !cjkOpeningMarks.contains($0) })
+                .map { before.index(after: $0) } ?? before.startIndex
+            if start != remaining.startIndex {
+                result.append(String(remaining[..<start]))
             }
+
+            let after = remaining[remaining.index(after: character)...]
+            let end = after.firstIndex(where: { !cjkClosingMarks.contains($0) }) ?? after.endIndex
+            result.append(String(remaining[start..<end]))
+            remaining = remaining[end...]
         }
-        if !buffer.isEmpty {
-            result.append(buffer)
+        if !remaining.isEmpty {
+            result.append(String(remaining))
         }
     }
     return result
