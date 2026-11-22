@@ -824,6 +824,28 @@ struct PromptCoreTests {
     }
 
     @Test
+    func matcherDoesNotReadHangulAttachedToACueUntilItIsSpoken() {
+        let text = "먼저 [웃음]안녕하세요"
+        let prompt = PromptScript(text)
+        var matcher = PromptMatcher(source: prompt)
+
+        #expect(prompt.text == text)
+        #expect(prompt.words.filter(\.isAnnotation).map(\.text) == ["[웃음]"])
+        let nextWordStart = "먼저 [웃음]".count
+        #expect(matcher.match(transcript: "먼저") == nextWordStart)
+        #expect(prompt.activeWord(atCharacterOffset: nextWordStart)?.text == "안녕하세요")
+        #expect(matcher.match(transcript: "먼저 안녕하세요") == text.count)
+    }
+
+    @Test
+    func matcherKeepsUnspokenProseAfterAnEmbeddedCueUnread() {
+        let text = "안녕하세요[웃음 크게][박수]반갑습니다."
+        var matcher = PromptMatcher(source: PromptScript(text))
+        #expect(matcher.match(transcript: "안녕하세요") == "안녕하세요[웃음 크게][박수]".count)
+        #expect(matcher.match(transcript: "안녕하세요 반갑습니다") == text.count)
+    }
+
+    @Test
     func annotationRangesConvertToUTF16SafelyAfterEmoji() throws {
         let prompt = PromptScript("hello🙂 [gülümse] now")
         let range = try #require(prompt.annotationRanges.first)

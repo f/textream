@@ -93,34 +93,51 @@ struct PromptScript: Equatable {
     init(_ rawText: String) {
         let rawWords = splitPromptTextIntoWords(rawText)
         let collapsed = rawWords.joined(separator: " ")
-        let flags = SpeechTextAlignment.annotationFlags(for: rawWords)
+        let balancedAnnotationRanges = SpeechTextAlignment.annotationRanges(in: collapsed)
+        // Split the word ranges at cue boundaries without adding spaces to the displayed text.
+        let cueBoundaries = balancedAnnotationRanges.flatMap { [$0.lowerBound, $0.upperBound] }
+        var styleRanges = balancedAnnotationRanges
+        var boundaryIndex = 0
         var offset = 0
         var builtWords: [PromptWord] = []
         builtWords.reserveCapacity(rawWords.count)
 
-        for (index, word) in rawWords.enumerated() {
-            let range = offset..<(offset + word.count)
-            let containsReadableCharacter = word.contains { $0.isLetter || $0.isNumber }
-            builtWords.append(
-                PromptWord(
-                    id: index,
-                    text: word,
-                    characterRange: range,
-                    isAnnotation: flags[index] || !containsReadableCharacter
+        for word in rawWords {
+            let wordEnd = offset + word.count
+            var start = word.startIndex
+            while offset < wordEnd {
+                while boundaryIndex < cueBoundaries.count, cueBoundaries[boundaryIndex] <= offset {
+                    boundaryIndex += 1
+                }
+                let nextBoundary = boundaryIndex < cueBoundaries.count
+                    ? cueBoundaries[boundaryIndex] : wordEnd
+                let endOffset = min(nextBoundary, wordEnd)
+                let end = word.index(start, offsetBy: endOffset - offset)
+                let part = String(word[start..<end])
+                let isInsideCue = !boundaryIndex.isMultiple(of: 2)
+                let hasNoReadableCharacters = !part.contains { $0.isLetter || $0.isNumber }
+                let range = offset..<endOffset
+                if !isInsideCue, hasNoReadableCharacters {
+                    styleRanges.append(range)
+                }
+                builtWords.append(
+                    PromptWord(
+                        id: builtWords.count,
+                        text: part,
+                        characterRange: range,
+                        isAnnotation: isInsideCue || hasNoReadableCharacters
+                    )
                 )
-            )
-            offset = range.upperBound + 1
+                offset = endOffset
+                start = end
+            }
+            offset = wordEnd + 1
         }
 
-        let balancedAnnotationRanges = SpeechTextAlignment.annotationRanges(in: collapsed)
         text = collapsed
         words = builtWords
         annotationRanges = balancedAnnotationRanges
-        annotationStyleRanges = Self.makeAnnotationStyleRanges(
-            text: collapsed,
-            words: builtWords,
-            balancedRanges: balancedAnnotationRanges
-        )
+        annotationStyleRanges = styleRanges.sorted { $0.lowerBound < $1.lowerBound }
         direction = PromptTextDirection.inferred(from: collapsed)
     }
 
@@ -148,7 +165,13 @@ struct PromptScript: Equatable {
     }
 
     func activeWord(atCharacterOffset offset: Int) -> PromptWord? {
-        words.first(where: { offset <= $0.characterRange.upperBound }) ?? words.last
+        guard let index = words.firstIndex(where: { offset <= $0.characterRange.upperBound }) else {
+            return words.last
+        }
+        if index + 1 < words.count, words[index + 1].characterRange.lowerBound == offset {
+            return words[index + 1]
+        }
+        return words[index]
     }
 
     func nsRange(forCharacterRange range: Range<Int>) -> NSRange {
@@ -159,52 +182,5 @@ struct PromptScript: Equatable {
 
     func nsRange(upToCharacterOffset offset: Int) -> NSRange {
         nsRange(forCharacterRange: 0..<max(0, min(offset, text.count)))
-    }
-
-    /// Exact character spans that use cue styling in the prompter.
-    ///
-    /// Balanced bracket cues stay whole so their brackets and internal spaces
-    /// share one style. Standalone emoji/punctuation retain the macOS prompt's
-    /// annotation treatment, without accidentally coloring prose attached to
-    /// an embedded cue (for example, `[pause]continue`).
-    private static func makeAnnotationStyleRanges(
-        text: String,
-        words: [PromptWord],
-        balancedRanges: [Range<Int>]
-    ) -> [Range<Int>] {
-        let characters = Array(text)
-        var result = balancedRanges
-
-        for word in words {
-            var remainingSegments = [word.characterRange]
-            for balancedRange in balancedRanges {
-                remainingSegments = remainingSegments.flatMap { segment in
-                    guard segment.lowerBound < balancedRange.upperBound,
-                          balancedRange.lowerBound < segment.upperBound else {
-                        return [segment]
-                    }
-
-                    var pieces: [Range<Int>] = []
-                    if segment.lowerBound < balancedRange.lowerBound {
-                        pieces.append(segment.lowerBound..<balancedRange.lowerBound)
-                    }
-                    if balancedRange.upperBound < segment.upperBound {
-                        pieces.append(balancedRange.upperBound..<segment.upperBound)
-                    }
-                    return pieces
-                }
-            }
-
-            for segment in remainingSegments where !segment.isEmpty {
-                let containsReadableCharacter = characters[segment].contains {
-                    $0.isLetter || $0.isNumber
-                }
-                if !containsReadableCharacter {
-                    result.append(segment)
-                }
-            }
-        }
-
-        return result.sorted { lhs, rhs in lhs.lowerBound < rhs.lowerBound }
     }
 }
