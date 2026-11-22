@@ -9,7 +9,6 @@ extension Unicode.Scalar {
             || (value >= 0xF900 && value <= 0xFAFF)
             || (value >= 0x3040 && value <= 0x309F)
             || (value >= 0x30A0 && value <= 0x30FF)
-            || (value >= 0xAC00 && value <= 0xD7AF)
     }
 }
 
