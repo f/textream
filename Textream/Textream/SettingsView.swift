@@ -471,7 +471,7 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(width: 500)
+        .frame(width: 580)
         .frame(minHeight: 280, maxHeight: 500)
         .background(.ultraThinMaterial)
         .alert("Reset All Settings?", isPresented: $showResetConfirmation) {
@@ -757,6 +757,7 @@ struct SettingsView: View {
     // MARK: - Guidance Tab
 
     private var guidanceTab: some View {
+        ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 14) {
             Picker("", selection: $settings.listeningMode) {
                 ForEach(ListeningMode.allCases) { mode in
@@ -831,9 +832,9 @@ struct SettingsView: View {
                 }
             }
 
-            Spacer()
         }
         .padding(16)
+        }
         .onAppear { availableMics = AudioInputDevice.allInputDevices() }
     }
 
@@ -1047,6 +1048,8 @@ struct SettingsView: View {
                         onRefresh: { refreshOverlayScreens() }
                     )
 
+                    fullscreenTextControls
+
                     HStack(spacing: 6) {
                         Image(systemName: "escape")
                             .font(.system(size: 11, weight: .semibold))
@@ -1129,7 +1132,58 @@ struct SettingsView: View {
 
     @State private var availableScreens: [NSScreen] = []
 
+    private var fullscreenTextControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Fullscreen Text")
+                .font(.system(size: 13, weight: .medium))
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Text Size")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int((settings.fullscreenTextScale * 100).rounded()))%")
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+                Slider(
+                    value: $settings.fullscreenTextScale,
+                    in: NotchSettings.fullscreenTextScaleRange,
+                    step: 0.05
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Side Margins")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int((settings.fullscreenSideMargin * 100).rounded()))% each side")
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+                Slider(
+                    value: $settings.fullscreenSideMargin,
+                    in: NotchSettings.fullscreenSideMarginRange,
+                    step: 0.01
+                )
+            }
+
+            Text("Wider margins make shorter lines, so your eyes move less on camera.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            Text("While the prompter runs: \u{2318}+ / \u{2318}\u{2212} text size, \u{2318}[ / \u{2318}] margins, \u{2191} \u{2193} sentence, \u{2190} \u{2192} word. Scroll over the prompter to move the reading position.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var externalTab: some View {
+        ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 14) {
             Text("Show the teleprompter on an external display or Sidecar iPad.")
                 .font(.system(size: 11))
@@ -1178,10 +1232,14 @@ struct SettingsView: View {
                     onRefresh: { refreshScreens() },
                     emptyMessage: "No external displays detected. Connect a display or enable Sidecar."
                 )
+
+                Divider()
+
+                fullscreenTextControls
             }
-            Spacer()
         }
         .padding(16)
+        }
         .onAppear { refreshScreens() }
     }
 
@@ -1528,6 +1586,8 @@ struct SettingsView: View {
         settings.overlayTransparencyOpacity = 0.85
         settings.followCursorWhenUndocked = false
         settings.fullscreenScreenID = 0
+        settings.fullscreenTextScale = NotchSettings.defaultFullscreenTextScale
+        settings.fullscreenSideMargin = NotchSettings.defaultFullscreenSideMargin
         settings.externalDisplayMode = .off
         settings.externalScreenID = 0
         settings.mirrorAxis = .horizontal
