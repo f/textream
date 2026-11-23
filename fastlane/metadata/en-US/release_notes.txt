@@ -1,0 +1,1 @@
+Textream now supports iPhone Duo. In tabletop, your script and camera stay on the top half with the controls below, or side by side when you hold it like a book. While recording, the script can appear on the outer display so the person on camera can read it. Controls now sit correctly next to the outer display's status bar.
