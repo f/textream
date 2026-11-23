@@ -1,7 +1,29 @@
 @preconcurrency import AVFoundation
+import AVKit
 import QuartzCore
 import SwiftUI
 import UIKit
+
+/// Which cameras face the person looking at the preview.
+///
+/// On iPhone Duo a camera's position no longer says which way it points: a
+/// rear camera faces the viewer when the device is folded around, and the
+/// front camera can be the inner or the outer one. The direction coordinator
+/// reports the cameras on each side; until it does, and on devices where it
+/// reports nothing, the front camera is the one facing the viewer.
+struct CameraFacing: Equatable {
+    var forwardDeviceIDs: Set<String> = []
+    var backwardDeviceIDs: Set<String> = []
+
+    /// A preview reads as a mirror only when its camera faces the viewer.
+    func previewIsMirrored(deviceID: String?, position: AVCaptureDevice.Position) -> Bool {
+        if let deviceID {
+            if forwardDeviceIDs.contains(deviceID) { return true }
+            if backwardDeviceIDs.contains(deviceID) { return false }
+        }
+        return position == .front
+    }
+}
 
 struct CameraRotationState {
     private(set) var previewAngle: CGFloat?
@@ -56,11 +78,17 @@ final class CameraPreviewView: UIView {
     private var captureAngleObservation: NSKeyValueObservation?
     private var rotationObservationGeneration = 0
     private var rotationState = CameraRotationState()
-    private var lastMirroredPosition: AVCaptureDevice.Position?
+    private var lastMirrored: Bool?
+    /// An `AVCaptureDeviceDirectionCoordinator` on iOS 27.1 and later.
+    private var directionCoordinator: AnyObject?
+    private var cameraFacing = CameraFacing()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .black
+        // Aspect fill draws past the layer's bounds. Clip it so a preview that
+        // holds only one half of a folded display stays out of the other half.
+        clipsToBounds = true
         previewLayer.videoGravity = .resizeAspectFill
     }
 
@@ -77,8 +105,11 @@ final class CameraPreviewView: UIView {
         super.didMoveToWindow()
         guard window != nil else {
             invalidateRotationCoordinator()
+            directionCoordinator = nil
+            cameraFacing = CameraFacing()
             return
         }
+        installDirectionCoordinatorIfPossible()
         installRotationCoordinatorIfPossible()
         refreshRotation()
     }
@@ -163,12 +194,48 @@ final class CameraPreviewView: UIView {
         captureAngleObservation = nil
         rotationCoordinator = nil
         rotationState.reset()
-        lastMirroredPosition = nil
+        lastMirrored = nil
+    }
+
+    private func installDirectionCoordinatorIfPossible() {
+        guard #available(iOS 27.1, *), window != nil, directionCoordinator == nil else { return }
+        // The handler runs on the main queue: once with the first map, then
+        // whenever a fold or unfold changes which cameras face the viewer.
+        directionCoordinator = AVCaptureDeviceDirectionCoordinator(
+            view: self,
+            deviceTypes: CaptureController.preferredCameraDeviceTypes
+        ) { [weak self] directions in
+            let facing = CameraFacing(
+                forwardDeviceIDs: Set(directions.forwardFacingDeviceDescriptors.map(\.uniqueID)),
+                backwardDeviceIDs: Set(directions.backwardFacingDeviceDescriptors.map(\.uniqueID))
+            )
+            MainActor.assumeIsolated { [weak self] in
+                guard let self, self.cameraFacing != facing else { return }
+                self.cameraFacing = facing
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                self.applyMirroring()
+                CATransaction.commit()
+            }
+        }
+    }
+
+    private func applyMirroring() {
+        guard let controller,
+              let connection = previewLayer.connection,
+              connection.isVideoMirroringSupported else { return }
+        let mirrored = cameraFacing.previewIsMirrored(
+            deviceID: controller.activeVideoDevice?.uniqueID,
+            position: controller.cameraPosition
+        )
+        guard lastMirrored != mirrored else { return }
+        connection.automaticallyAdjustsVideoMirroring = false
+        connection.isVideoMirrored = mirrored
+        lastMirrored = mirrored
     }
 
     private func applyPreviewAngle(_ angle: CGFloat, generation: Int) {
         guard generation == rotationObservationGeneration,
-              let controller,
               let connection = previewLayer.connection else { return }
 
         CATransaction.begin()
@@ -180,12 +247,7 @@ final class CameraPreviewView: UIView {
             connection.videoRotationAngle = angle
         }
 
-        if connection.isVideoMirroringSupported,
-           lastMirroredPosition != controller.cameraPosition {
-            connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = controller.cameraPosition == .front
-            lastMirroredPosition = controller.cameraPosition
-        }
+        applyMirroring()
     }
 
     private func applyCaptureAngle(_ angle: CGFloat, generation: Int) {

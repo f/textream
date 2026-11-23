@@ -796,8 +796,23 @@ final class CaptureController: NSObject, AVCaptureAudioDataOutputSampleBufferDel
         }
     }
 
+    /// Camera types in order of preference. A discovery session returns its
+    /// devices in this order, so a wide angle camera wins wherever one exists.
+    nonisolated static let preferredCameraDeviceTypes: [AVCaptureDevice.DeviceType] = [
+        .builtInWideAngleCamera,
+        .builtInUltraWideCamera
+    ]
+
     nonisolated private static func cameraDevice(position: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
+        // iPhone Duo's front camera is a virtual device that follows whichever
+        // of the inner and outer cameras faces the person. Only a discovery
+        // session finds it, because `AVCaptureDevice.default(_:for:position:)`
+        // never returns an ultra wide camera.
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: preferredCameraDeviceTypes,
+            mediaType: .video,
+            position: position
+        ).devices.first
     }
 
     nonisolated private static func makePendingRecordingURL() throws -> URL {
