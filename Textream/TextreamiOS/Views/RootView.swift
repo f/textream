@@ -7,6 +7,7 @@ struct RootView: View {
     @State private var isShowingExpandedScriptEditor = false
     @State private var isInlineScriptEditorFocused = false
     @State private var languageSuggestions = SpeechLanguageSuggestionCoordinator()
+    @State private var foldLayout: PromptFoldLayout?
 
     var body: some View {
         GeometryReader { geometry in
@@ -14,7 +15,9 @@ struct RootView: View {
                 AppBackground()
                     .ignoresSafeArea()
 
-                if geometry.size.width > 700 || geometry.size.width > geometry.size.height * 1.35 {
+                if let foldLayout {
+                    foldedLayout(foldLayout)
+                } else if geometry.size.width > 700 || geometry.size.width > geometry.size.height * 1.35 {
                     VStack(spacing: 18) {
                         header
 
@@ -56,6 +59,20 @@ struct RootView: View {
                     }
                 }
             }
+        }
+        .background {
+            // Measure the fold with the keyboard ignored. On a tabletop the
+            // keyboard rises over the half on the table; measuring the space
+            // above it would lose the split, and the script editor with its
+            // focus, in the middle of typing.
+            GeometryReader { proxy in
+                let fold = PromptFoldLayout.current(in: proxy)
+                Color.clear
+                    .onChange(of: fold, initial: true) { _, fold in
+                        foldLayout = fold
+                    }
+            }
+            .ignoresSafeArea(.keyboard)
         }
         .sheet(isPresented: $model.isShowingSettings) {
             SettingsView(model: model)
@@ -332,6 +349,30 @@ struct RootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.black.opacity(0.17), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .glassEffect(.regular.tint(.black.opacity(0.1)), in: .rect(cornerRadius: 28))
+    }
+
+    /// On a partially folded display the script takes the upright half of a
+    /// tabletop, or the leading half of a book, and the setup controls with
+    /// the start button take the other half, so nothing straddles the hinge.
+    private func foldedLayout(_ fold: PromptFoldLayout) -> some View {
+        ZStack {
+            VStack(spacing: 18) {
+                header
+                editorPanel
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .frame(width: fold.stage.width, height: fold.stage.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            landscapeSetupColumn
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .frame(width: fold.controls.width, height: fold.controls.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        // The panes keep their halves while the keyboard covers the lower one.
+        .ignoresSafeArea(.keyboard)
     }
 
     private var landscapeSetupColumn: some View {
