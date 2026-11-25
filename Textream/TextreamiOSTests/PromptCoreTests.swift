@@ -770,6 +770,29 @@ struct PromptCoreTests {
     }
 
     @Test
+    func tokenizerKeepsWhitespaceDelimitedHangulReadingUnitsWhole() {
+        let precomposed = PromptScript("안녕하세요 [웃으며 말하기] 안녕")
+        let decomposed = PromptScript("안녕")
+        let mixed = PromptScript("안녕世界")
+        let mixedWithJapanese = PromptScript("안녕こんにちは世界")
+
+        #expect(precomposed.words.map(\.text) == ["안녕하세요", "[웃으며", "말하기]", "안녕"])
+        #expect(precomposed.text == "안녕하세요 [웃으며 말하기] 안녕")
+        #expect(
+            precomposed.annotationRanges.map { String(Array(precomposed.text)[$0]) }
+                == ["[웃으며 말하기]"]
+        )
+        #expect(decomposed.words.map(\.text) == ["안녕"])
+        #expect(mixed.words.map(\.text) == ["안녕", "世", "界"])
+        #expect(
+            mixedWithJapanese.words.map(\.text)
+                == ["안녕", "こ", "ん", "に", "ち", "は", "世", "界"]
+        )
+        #expect(precomposed.characterOffset(forWordProgress: 1) == "안녕하세요".count + 1)
+        #expect(precomposed.wordProgress(forCharacterOffset: "안녕하세요".count + 1) == 1)
+    }
+
+    @Test
     func balancedCuesAreAnnotationsButUnmatchedOpeningBracketIsReadable() {
         let balanced = PromptScript("Hello [look at camera] world")
         #expect(balanced.words.filter(\.isAnnotation).map(\.text) == ["[look", "at", "camera]"])
@@ -798,6 +821,28 @@ struct PromptCoreTests {
                 == ["[pause]", "[one]", "[two]"]
         )
         #expect(prompt.annotationRanges.first == 5..<12)
+    }
+
+    @Test
+    func matcherDoesNotReadHangulAttachedToACueUntilItIsSpoken() {
+        let text = "먼저 [웃음]안녕하세요"
+        let prompt = PromptScript(text)
+        var matcher = PromptMatcher(source: prompt)
+
+        #expect(prompt.text == text)
+        #expect(prompt.words.filter(\.isAnnotation).map(\.text) == ["[웃음]"])
+        let nextWordStart = "먼저 [웃음]".count
+        #expect(matcher.match(transcript: "먼저") == nextWordStart)
+        #expect(prompt.activeWord(atCharacterOffset: nextWordStart)?.text == "안녕하세요")
+        #expect(matcher.match(transcript: "먼저 안녕하세요") == text.count)
+    }
+
+    @Test
+    func matcherKeepsUnspokenProseAfterAnEmbeddedCueUnread() {
+        let text = "안녕하세요[웃음 크게][박수]반갑습니다."
+        var matcher = PromptMatcher(source: PromptScript(text))
+        #expect(matcher.match(transcript: "안녕하세요") == "안녕하세요[웃음 크게][박수]".count)
+        #expect(matcher.match(transcript: "안녕하세요 반갑습니다") == text.count)
     }
 
     @Test

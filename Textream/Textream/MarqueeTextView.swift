@@ -14,8 +14,8 @@ private let paragraphDividerDotOpacity: Double = 0.16
 
 // MARK: - CJK-aware word splitting
 
-extension Unicode.Scalar {
-    var isCJK: Bool {
+private extension Unicode.Scalar {
+    var wrapsIndividually: Bool {
         let v = value
         return (v >= 0x4E00 && v <= 0x9FFF)    // CJK Unified Ideographs
             || (v >= 0x3400 && v <= 0x4DBF)    // CJK Extension A
@@ -23,28 +23,52 @@ extension Unicode.Scalar {
             || (v >= 0xF900 && v <= 0xFAFF)    // CJK Compatibility Ideographs
             || (v >= 0x3040 && v <= 0x309F)    // Hiragana
             || (v >= 0x30A0 && v <= 0x30FF)    // Katakana
-            || (v >= 0xAC00 && v <= 0xD7AF)    // Hangul Syllables
     }
 }
 
-/// Splits text into display-ready words. CJK characters (Chinese, Japanese, Korean)
-/// are split into individual characters so the flow layout can wrap them properly.
+/// Splits text into display-ready words. Chinese and Japanese characters can
+/// wrap individually. Korean text follows the whitespace boundaries in the script.
 func splitTextIntoWords(_ text: String) -> [String] {
-    let tokens = text.replacingOccurrences(of: "\n", with: " ")
+    wordsInPromptText(separatingBracketCues(in: text))
+}
+
+private func separatingBracketCues(in text: String) -> String {
+    guard text.contains("[") else { return text }
+    let ranges = SpeechTextAlignment.annotationRanges(in: text)
+    guard !ranges.isEmpty else { return text }
+
+    var result = ""
+    var cursor = text.startIndex
+    var offset = 0
+    for range in ranges {
+        let start = text.index(cursor, offsetBy: range.lowerBound - offset)
+        let end = text.index(start, offsetBy: range.count)
+        result += text[cursor..<start]
+        result += " "
+        result += text[start..<end]
+        result += " "
+        cursor = end
+        offset = range.upperBound
+    }
+    result += text[cursor...]
+    return result
+}
+
+private func wordsInPromptText(_ text: String) -> [String] {
+    let tokens = text
         .split(omittingEmptySubsequences: true, whereSeparator: { $0.isWhitespace })
         .map { String($0) }
 
     var result: [String] = []
     for token in tokens {
-        guard token.unicodeScalars.contains(where: { $0.isCJK }) else {
+        guard token.unicodeScalars.contains(where: \.wrapsIndividually) else {
             result.append(token)
             continue
         }
-        // Token contains CJK characters — split each CJK char individually;
-        // consecutive non-CJK chars (e.g. Latin letters, digits) stay grouped.
+        // Keep consecutive characters that don't wrap individually together.
         var buffer = ""
         for char in token {
-            if char.unicodeScalars.first.map({ $0.isCJK }) == true {
+            if char.unicodeScalars.first?.wrapsIndividually == true {
                 if !buffer.isEmpty {
                     result.append(buffer)
                     buffer = ""
@@ -64,7 +88,7 @@ func splitTextIntoWords(_ text: String) -> [String] {
 /// Returns the word indices that begin a new paragraph. Consecutive and
 /// whitespace-only lines collapse into a single visual separator.
 func paragraphBreakWordIndices(in text: String) -> Set<Int> {
-    let normalizedLineEndings = text
+    let normalizedLineEndings = separatingBracketCues(in: text)
         .replacingOccurrences(of: "\r\n", with: "\n")
         .replacingOccurrences(of: "\r", with: "\n")
     let lines = normalizedLineEndings.split(
@@ -78,7 +102,7 @@ func paragraphBreakWordIndices(in text: String) -> Set<Int> {
     var hasPendingBreak = false
 
     for (index, line) in lines.enumerated() {
-        let lineWords = splitTextIntoWords(String(line))
+        let lineWords = wordsInPromptText(String(line))
         if !lineWords.isEmpty {
             if hasContent && hasPendingBreak {
                 result.insert(wordCount)
@@ -599,6 +623,7 @@ struct WordFlowLayout: View {
 
     // Simple layout cache to avoid re-measuring words on every highlight update
     private static var _cacheKey: String = ""
+    private static var _cachedWords: [String] = []
     private static var _cachedItems: [WordItem] = []
     private static var _cachedLines: [[WordItem]] = []
     private static var _cachedParagraphPrefixCounts: [Int] = []
@@ -607,9 +632,8 @@ struct WordFlowLayout: View {
         let paragraphKey = paragraphBreakBeforeWordIndices.sorted()
             .map(String.init)
             .joined(separator: ",")
-        let key = "\(words.count)|\(words.first ?? "")|\(words.last ?? "")|"
-            + "\(font.fontName)|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
-        if key == Self._cacheKey {
+        let key = "\(font.fontName)|\(font.pointSize)|\(Int(containerWidth))|\(paragraphKey)"
+        if key == Self._cacheKey, words == Self._cachedWords {
             return (Self._cachedItems, Self._cachedLines, Self._cachedParagraphPrefixCounts)
         }
         let items = buildItems()
@@ -624,6 +648,7 @@ struct WordFlowLayout: View {
             )
         }
         Self._cacheKey = key
+        Self._cachedWords = words
         Self._cachedItems = items
         Self._cachedLines = lines
         Self._cachedParagraphPrefixCounts = paragraphPrefixCounts

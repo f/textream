@@ -150,34 +150,25 @@ struct PromptMatcher {
     }
 
     private func wordLevelMatch(spoken: String) -> Int {
-        let remainingSource = String(source.text.dropFirst(matchStartOffset))
-        let sourceWords = remainingSource.split(separator: " ").map(String.init)
+        let sourceWords = source.words.drop(while: { $0.characterRange.upperBound <= matchStartOffset })
         let spokenWords = splitPromptTextIntoWords(spoken.lowercased())
-        var sourceIndex = 0
+        var sourceIndex = sourceWords.startIndex
         var spokenIndex = 0
-        var matchedCharacterCount = 0
-        var isInsideAnnotation = false
 
-        while sourceIndex < sourceWords.count && spokenIndex < spokenWords.count {
-            let beginsAnnotation = sourceWords[sourceIndex].hasPrefix("[")
-                && sourceWords[sourceIndex...].contains(where: { $0.contains("]") })
-            let skipsAnnotation = isInsideAnnotation || beginsAnnotation || Self.isAnnotationWord(sourceWords[sourceIndex])
-            if skipsAnnotation {
-                if beginsAnnotation { isInsideAnnotation = true }
-                if sourceWords[sourceIndex].contains("]") { isInsideAnnotation = false }
-                matchedCharacterCount += sourceWords[sourceIndex].count
-                if sourceIndex < sourceWords.count - 1 { matchedCharacterCount += 1 }
+        while sourceIndex < sourceWords.endIndex && spokenIndex < spokenWords.count {
+            let current = sourceWords[sourceIndex]
+            if current.isAnnotation {
                 sourceIndex += 1
                 continue
             }
 
-            let sourceWord = sourceWords[sourceIndex].lowercased().filter { $0.isLetter || $0.isNumber }
+            let precedingCharacters = max(0, matchStartOffset - current.characterRange.lowerBound)
+            let sourceWord = current.text.dropFirst(precedingCharacters).lowercased()
+                .filter { $0.isLetter || $0.isNumber }
             let spokenWord = spokenWords[spokenIndex].filter { $0.isLetter || $0.isNumber }
             if sourceWord == spokenWord || Self.isFuzzyMatch(sourceWord, spokenWord) {
-                matchedCharacterCount += sourceWords[sourceIndex].count
                 sourceIndex += 1
                 spokenIndex += 1
-                if sourceIndex < sourceWords.count { matchedCharacterCount += 1 }
                 continue
             }
 
@@ -196,14 +187,13 @@ struct PromptMatcher {
             if foundSpoken { continue }
 
             var foundSource = false
-            let maximumSourceSkip = min(5, sourceWords.count - sourceIndex - 1)
+            let maximumSourceSkip = min(5, sourceWords.endIndex - sourceIndex - 1)
             if maximumSourceSkip >= 1 {
                 for skip in 1...maximumSourceSkip {
-                    let next = sourceWords[sourceIndex + skip].lowercased().filter { $0.isLetter || $0.isNumber }
-                    if next == spokenWord || Self.isFuzzyMatch(next, spokenWord) {
-                        for skippedIndex in 0..<skip {
-                            matchedCharacterCount += sourceWords[sourceIndex + skippedIndex].count + 1
-                        }
+                    let next = sourceWords[sourceIndex + skip]
+                    guard !next.isAnnotation else { continue }
+                    let readableText = next.text.lowercased().filter { $0.isLetter || $0.isNumber }
+                    if readableText == spokenWord || Self.isFuzzyMatch(readableText, spokenWord) {
                         sourceIndex += skip
                         foundSource = true
                         break
@@ -213,26 +203,20 @@ struct PromptMatcher {
             if foundSource { continue }
 
             if sourceWord.isEmpty {
-                matchedCharacterCount += sourceWords[sourceIndex].count
-                if sourceIndex < sourceWords.count - 1 { matchedCharacterCount += 1 }
                 sourceIndex += 1
             } else {
                 spokenIndex += 1
             }
         }
 
-        while sourceIndex < sourceWords.count {
-            let beginsAnnotation = sourceWords[sourceIndex].hasPrefix("[")
-                && sourceWords[sourceIndex...].contains(where: { $0.contains("]") })
-            let skipsAnnotation = isInsideAnnotation || beginsAnnotation || Self.isAnnotationWord(sourceWords[sourceIndex])
-            guard skipsAnnotation else { break }
-            if beginsAnnotation { isInsideAnnotation = true }
-            if sourceWords[sourceIndex].contains("]") { isInsideAnnotation = false }
-            matchedCharacterCount += sourceWords[sourceIndex].count
-            if sourceIndex < sourceWords.count - 1 { matchedCharacterCount += 1 }
+        while sourceIndex < sourceWords.endIndex, sourceWords[sourceIndex].isAnnotation {
             sourceIndex += 1
         }
-        return matchedCharacterCount
+        guard sourceIndex > sourceWords.startIndex else { return 0 }
+
+        let end = sourceIndex < sourceWords.endIndex
+            ? sourceWords[sourceIndex].characterRange.lowerBound : source.characterCount
+        return end - matchStartOffset
     }
 
     static func isFuzzyMatch(_ first: String, _ second: String) -> Bool {
@@ -267,11 +251,6 @@ struct PromptMatcher {
             }
         }
         return row[secondCharacters.count]
-    }
-
-    private static func isAnnotationWord(_ word: String) -> Bool {
-        (word.hasPrefix("[") && word.hasSuffix("]"))
-            || word.allSatisfy { !$0.isLetter && !$0.isNumber }
     }
 
     private static func normalize(_ text: String) -> String {
