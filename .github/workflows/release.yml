@@ -52,7 +52,7 @@ jobs:
       matrix:
         include:
           - runner: macos-15
-            xcode: /Applications/Xcode_16.2.app/Contents/Developer
+            xcode: /Applications/Xcode_16.4.app/Contents/Developer
             suffix: "-macos15"
           - runner: macos-26
             xcode: /Applications/Xcode_26.0.app/Contents/Developer

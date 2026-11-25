@@ -29,6 +29,7 @@ fastlane/Preview.html
 
 # SwiftPM
 .build/
+.swiftpm/
 Package.resolved
 
 # CocoaPods
@@ -39,3 +40,6 @@ Pods/
 *~
 *.orig
 *.log
+
+# Agent screenshots
+docs/ss/

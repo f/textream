@@ -395,6 +395,7 @@ struct SettingsView: View {
     @State private var previewController = NotchPreviewController()
     @State private var selectedTab: SettingsTab = .appearance
     @State private var showResetConfirmation = false
+    @State private var guidanceTestEngine: SpeechEngine?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -477,11 +478,13 @@ struct SettingsView: View {
                 }
                 .padding(12)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: Self.sheetWidth)
-        .frame(minHeight: 280, maxHeight: 500)
+        .frame(width: Self.sheetWidth, height: 500)
         .background(.ultraThinMaterial)
+        .sheet(item: $guidanceTestEngine) { engine in
+            GuidanceTestSheet(engine: engine)
+        }
         .alert("Reset All Settings?", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) {
@@ -765,87 +768,137 @@ struct SettingsView: View {
     // MARK: - Guidance Tab
 
     private var guidanceTab: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Picker("", selection: $settings.listeningMode) {
-                ForEach(ListeningMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            Text(settings.listeningMode.description)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            if settings.listeningMode == .wordTracking {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Speech Language")
-                        .font(.system(size: 13, weight: .medium))
-                    Picker("", selection: $settings.speechLocale) {
-                        ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
-                            Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
-                                .tag(locale.identifier)
-                        }
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("", selection: $settings.listeningMode) {
+                    ForEach(ListeningMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
                     }
-                    .labelsHidden()
                 }
-            }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-            if settings.listeningMode != .classic {
-                Divider()
+                Text(settings.listeningMode.description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Microphone")
-                        .font(.system(size: 13, weight: .medium))
-                    Picker("", selection: $settings.selectedMicUID) {
-                        Text("System Default").tag("")
-                        ForEach(availableMics) { mic in
-                            Text(mic.name).tag(mic.uid)
-                        }
-                    }
-                    .labelsHidden()
-                }
-            }
+                if settings.listeningMode == .wordTracking {
+                    Divider()
 
-            if settings.listeningMode != .wordTracking {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Scroll Speed")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Engine")
                             .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text(String(format: "%.1f words/s", settings.scrollSpeed))
-                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                        Picker("", selection: $settings.speechEngine) {
+                            ForEach(SpeechEngine.allCases) { engine in
+                                Text(engine.label).tag(engine)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        Text(settings.speechEngine.description)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
-                    Slider(
-                        value: $settings.scrollSpeed,
-                        in: 0.5...8,
-                        step: 0.5
-                    )
+
+                    Divider()
+
+                    if settings.speechEngine == .local {
+                        LocalModelSettingsSection(settings: settings)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Speech Language")
+                            .font(.system(size: 13, weight: .medium))
+                        Picker("", selection: $settings.speechLocale) {
+                            ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
+                                Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+                                    .tag(locale.identifier)
+                            }
+                        }
+                        .labelsHidden()
+                        if settings.speechEngine == .local {
+                            Text("Guidance uses the selected language when supported. Some models detect the spoken language in Test Guidance.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     HStack {
-                        Text("Slower")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
                         Spacer()
-                        Text("Faster")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
+                        Button {
+                            guidanceTestEngine = settings.speechEngine
+                        } label: {
+                            Label("Test Guidance", systemImage: "waveform")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isPrompterActive)
+                        .help(isPrompterActive
+                              ? "Stop the active teleprompter before testing guidance."
+                              : "Listen with the selected engine and show its transcription.")
+                    }
+                }
+
+                if settings.listeningMode != .classic {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Microphone")
+                            .font(.system(size: 13, weight: .medium))
+                        Picker("", selection: $settings.selectedMicUID) {
+                            Text("System Default").tag("")
+                            ForEach(availableMics) { mic in
+                                Text(mic.name).tag(mic.uid)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                }
+
+                if settings.listeningMode != .wordTracking {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Scroll Speed")
+                                .font(.system(size: 13, weight: .medium))
+                            Spacer()
+                            Text(String(format: "%.1f words/s", settings.scrollSpeed))
+                                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(
+                            value: $settings.scrollSpeed,
+                            in: 0.5...8,
+                            step: 0.5
+                        )
+                        HStack {
+                            Text("Slower")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                            Text("Faster")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
             }
-
-            Spacer()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
         .onAppear { availableMics = AudioInputDevice.allInputDevices() }
     }
 
     @State private var availableMics: [AudioInputDevice] = []
+
+    private var isPrompterActive: Bool {
+        let service = TextreamService.shared
+        let recognizer = service.overlayController.speechRecognizer
+        return service.overlayController.isShowing
+            || service.directorIsReading
+            || recognizer.isListening
+            || recognizer.isStarting
+    }
 
     // MARK: - Reading Tab
 

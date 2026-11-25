@@ -53,6 +53,12 @@ X86_APP="$ARCHIVE_X86/Products/Applications/$APP_NAME"
 echo "🧬 Creating universal binary…"
 cp -R "$ARM_APP" "$OUTPUT_APP"
 
+has_both_architectures() {
+  local architectures
+  architectures=" $(lipo -archs "$1") "
+  [[ "$architectures" == *" arm64 "* && "$architectures" == *" x86_64 "* ]]
+}
+
 # Find all Mach-O binaries and lipo them together
 find "$ARM_APP" -type f | while read -r arm_file; do
   rel="${arm_file#$ARM_APP}"
@@ -60,13 +66,24 @@ find "$ARM_APP" -type f | while read -r arm_file; do
   out_file="$OUTPUT_APP$rel"
 
   if [ -f "$x86_file" ] && file "$arm_file" | grep -q "Mach-O"; then
+    # Swift packages can embed prebuilt frameworks that are already universal.
+    if has_both_architectures "$arm_file"; then
+      continue
+    fi
     lipo -create "$arm_file" "$x86_file" -output "$out_file"
-    lipo "$out_file" -verify_arch arm64 x86_64
+    has_both_architectures "$out_file"
   fi
 done
 
 if [ -n "${SIGNING_IDENTITY:-}" ]; then
   echo "🖋️  Signing universal app with Developer ID…"
+  # Sign embedded code first so the app seals its final signatures.
+  if [ -d "$OUTPUT_APP/Contents/Frameworks" ]; then
+    while IFS= read -r -d '' code; do
+      codesign --force --sign "$SIGNING_IDENTITY" --options runtime --timestamp "$code"
+    done < <(find "$OUTPUT_APP/Contents/Frameworks" -depth \
+      \( -type d -name '*.framework' -o -type f -name '*.dylib' \) -print0)
+  fi
   codesign \
     --force \
     --sign "$SIGNING_IDENTITY" \
