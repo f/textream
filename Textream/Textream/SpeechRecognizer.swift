@@ -136,6 +136,7 @@ class SpeechRecognizer {
     // Local (custom model) engine state
     private var localEngineInfo: LocalSpeechEngineInfo?
     private var currentLocalEngineIsActive = false
+    private var localEngineSessionID: Int?
     private var localAudioConverter: AVAudioConverter?
     private var localConverterInputFormat: AVAudioFormat?
     private var localConverterOutputFormat: AVAudioFormat?
@@ -412,10 +413,10 @@ class SpeechRecognizer {
     private func stopLocalEngineSession() {
         guard currentLocalEngineIsActive else { return }
         currentLocalEngineIsActive = false
-        LocalSpeechEngine.shared.onText = nil
-        LocalSpeechEngine.shared.onError = nil
-        LocalSpeechEngine.shared.onFinished = nil
-        LocalSpeechEngine.shared.stop()
+        if let localEngineSessionID {
+            LocalSpeechEngine.shared.cancel(sessionID: localEngineSessionID)
+        }
+        localEngineSessionID = nil
         localAudioConverter = nil
         localConverterInputFormat = nil
         localConverterOutputFormat = nil
@@ -763,35 +764,41 @@ class SpeechRecognizer {
         )
         let prompt = localInitialPrompt()
 
-        engine.onText = { [weak self] text, isNewWindow in
-            guard let self,
-                  self.shouldListen,
-                  self.sessionGeneration == generation,
-                  !self.sourceText.isEmpty else { return }
-            if isNewWindow {
-                // Rolling window rolled over: re-anchor matching at the current
-                // progress so old transcripts can't be re-matched.
-                self.matchStartOffset = self.recognizedCharCount
-                self.recentMatchPositions = []
+        localEngineSessionID = engine.start(
+            language: language,
+            initialPrompt: prompt,
+            wordTimestamps: false,
+            onText: { [weak self] text, _, _, isNewWindow, engineSessionID in
+                guard let self,
+                      self.shouldListen,
+                      self.sessionGeneration == generation,
+                      self.localEngineSessionID == engineSessionID,
+                      !self.sourceText.isEmpty else { return }
+                if isNewWindow {
+                    // Rolling window rolled over: re-anchor matching at the current
+                    // progress so old transcripts can't be re-matched.
+                    self.matchStartOffset = self.recognizedCharCount
+                    self.recentMatchPositions = []
+                }
+                self.retryCount = 0
+                self.lastSpokenText = text
+                self.matchCharacters(spoken: text)
+            },
+            onError: { [weak self] message, engineSessionID in
+                guard let self,
+                      self.shouldListen,
+                      self.sessionGeneration == generation,
+                      self.localEngineSessionID == engineSessionID else { return }
+                self.failListening(message)
+            },
+            onFinished: { [weak self] engineSessionID in
+                guard let self,
+                      self.shouldListen,
+                      self.sessionGeneration == generation,
+                      self.localEngineSessionID == engineSessionID else { return }
+                self.retryCount = 0
             }
-            self.retryCount = 0
-            self.lastSpokenText = text
-            self.matchCharacters(spoken: text)
-        }
-        engine.onError = { [weak self] message in
-            guard let self,
-                  self.shouldListen,
-                  self.sessionGeneration == generation else { return }
-            self.failListening(message)
-        }
-        engine.onFinished = { [weak self] in
-            guard let self,
-                  self.shouldListen,
-                  self.sessionGeneration == generation else { return }
-            self.retryCount = 0
-        }
-
-        engine.start(language: language, initialPrompt: prompt)
+        )
     }
 
     /// Converts the hardware-rate tap buffers to the 16 kHz mono float32 the
@@ -837,7 +844,11 @@ class SpeechRecognizer {
         guard conversionError == nil,
               output.frameLength > 0,
               let channel = output.floatChannelData?[0] else { return }
-        engine.feed(Array(UnsafeBufferPointer(start: channel, count: Int(output.frameLength))))
+        guard let localEngineSessionID else { return }
+        engine.feed(
+            Array(UnsafeBufferPointer(start: channel, count: Int(output.frameLength))),
+            sessionID: localEngineSessionID
+        )
     }
 
     private func localInitialPrompt() -> String? {

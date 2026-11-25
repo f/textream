@@ -123,6 +123,7 @@ struct ModelManagerSheet: View {
     @State private var isImporting = false
     @State private var errorMessage: String?
     @State private var showInstalledOnly = false
+    @State private var showAddRepository = false
     @State private var repoInput = ""
     @State private var isResolvingRepo = false
 
@@ -130,91 +131,90 @@ struct ModelManagerSheet: View {
         VStack(spacing: 0) {
             header
             Divider()
+            modelList
 
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(visibleModels.enumerated()), id: \.element.id) { index, model in
-                        if index > 0 { Divider() }
-                        CatalogModelRow(
-                            model: model,
-                            quant: quant(for: model),
-                            selectedFilename: settings.localModelFilename,
-                            onQuantChange: { quantSelection[model.id] = $0 },
-                            onDownload: { download(model) },
-                            onCancel: { downloads.cancel(selectedFile(for: model).filename) },
-                            onDelete: { deleteInstalled(selectedFile(for: model).filename) },
-                            onSelect: { settings.localModelFilename = selectedFile(for: model).filename },
-                            onRemoveRepository: model.isUserAdded ? { removeRepository(model) } : nil
-                        )
-                        .padding(.horizontal, 16)
-                    }
-
-                    if !customModels.isEmpty {
-                        Divider()
-                        importedSection
-                            .padding(.horizontal, 16)
-                    }
-                }
-                .padding(.vertical, 4)
+            if let errorMessage {
+                Divider()
+                errorBanner(errorMessage)
             }
 
             Divider()
             footer
         }
-        .frame(width: 560, height: 520)
-        .background(.ultraThinMaterial)
+        .frame(width: 660, height: 560)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .alert("Add Model Repository", isPresented: $showAddRepository) {
+            TextField("owner/name", text: $repoInput)
+            Button("Cancel", role: .cancel) { repoInput = "" }
+            Button("Add") { addRepository() }
+                .disabled(repoInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .keyboardShortcut(.defaultAction)
+        } message: {
+            Text("Enter the name of a public Hugging Face repository that contains compatible model files.")
+        }
     }
 
     // MARK: - Chrome
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(alignment: .center, spacing: 20) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Speech Models")
-                    .font(.system(size: 15, weight: .semibold))
-                Spacer()
-                Picker("", selection: $showInstalledOnly) {
-                    Text("All").tag(false)
-                    Text("Installed").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 150)
+                    .font(.title2.weight(.semibold))
+                Text("Download speech models that run entirely on this Mac.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
 
-            Text("Models download from Hugging Face and run entirely on this Mac. Each download is checksum verified before it is installed.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 12)
 
-            Text("Weights belong to their original authors, listed on each model. GGUF conversions are published by handy-computer and run through transcribe.cpp.")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            addRepositoryField
+            Picker("Models", selection: $showInstalledOnly) {
+                Text("All").tag(false)
+                Text("Installed").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 160)
         }
-        .padding(16)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 
-    /// Adds any public Hugging Face repo that holds GGUF speech models. The
-    /// bundled list is a starting set, not the limit: other people publish
-    /// conversions too.
-    private var addRepositoryField: some View {
-        HStack(spacing: 6) {
-            TextField("Add a Hugging Face repo — owner/name", text: $repoInput)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .disabled(isResolvingRepo)
-                .onSubmit { addRepository() }
-
-            if isResolvingRepo {
-                ProgressView().controlSize(.small)
-            } else {
-                Button("Add") { addRepository() }
-                    .controlSize(.small)
-                    .disabled(repoInput.trimmingCharacters(in: .whitespaces).isEmpty)
+    @ViewBuilder
+    private var modelList: some View {
+        if visibleModels.isEmpty && customModels.isEmpty {
+            ContentUnavailableView {
+                Label(showInstalledOnly ? "No Installed Models" : "No Models Available", systemImage: "waveform")
+            } description: {
+                Text(showInstalledOnly
+                    ? "Download a model from the All tab or import one from your Mac."
+                    : "The model catalog could not be loaded.")
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(visibleModels) { model in
+                    CatalogModelRow(
+                        model: model,
+                        quant: quant(for: model),
+                        selectedFilename: settings.localModelFilename,
+                        onQuantChange: { quantSelection[model.id] = $0 },
+                        onDownload: { download(model) },
+                        onCancel: { downloads.cancel(selectedFile(for: model).filename) },
+                        onDelete: { deleteInstalled(selectedFile(for: model).filename) },
+                        onSelect: { settings.localModelFilename = selectedFile(for: model).filename },
+                        onRemoveRepository: model.isUserAdded ? { removeRepository(model) } : nil
+                    )
+                    .listRowInsets(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
+                }
+
+                if !customModels.isEmpty {
+                    Section("Imported Models") {
+                        importedSection
+                    }
+                }
+            }
+            .listStyle(.inset)
         }
     }
 
@@ -236,58 +236,87 @@ struct ModelManagerSheet: View {
 
 
     private var footer: some View {
-        HStack(spacing: 8) {
-            Button("Import…") { importModel() }
-                .controlSize(.regular)
-                .disabled(isImporting)
-            Button("Show Folder") { store.revealInFinder() }
-                .controlSize(.regular)
-
-            if isImporting {
-                ProgressView().controlSize(.small)
+        HStack(spacing: 12) {
+            Menu {
+                Button {
+                    showAddRepository = true
+                } label: {
+                    Label("Hugging Face Repository…", systemImage: "link.badge.plus")
+                }
+                Button {
+                    importModel()
+                } label: {
+                    Label("Model File…", systemImage: "doc.badge.plus")
+                }
+            } label: {
+                Label("Add Model", systemImage: "plus")
+                    .labelStyle(.iconOnly)
             }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .disabled(isImporting || isResolvingRepo)
+            .help("Add Model")
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
+            Button {
+                store.revealInFinder()
+            } label: {
+                Label("Reveal Models in Finder", systemImage: "folder")
+                    .labelStyle(.iconOnly)
             }
+            .buttonStyle(.borderless)
+            .help("Reveal Models in Finder")
 
             Spacer()
+
+            if isImporting || isResolvingRepo {
+                ProgressView()
+                    .controlSize(.small)
+                Text(isImporting ? "Importing…" : "Adding repository…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Button("Done") { dismiss() }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
         }
-        .padding(12)
+        .controlSize(.regular)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var importedSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Imported")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            ForEach(customModels) { model in
-                HStack {
-                    Text("\(model.displayName) — \(model.sizeMB) MB")
-                        .font(.system(size: 11))
-                    Spacer()
-                    if settings.localModelFilename == model.filename {
-                        Text("Active")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.tint)
-                    } else {
-                        Button("Use") { settings.localModelFilename = model.filename }
-                            .controlSize(.small)
-                    }
-                    Button("Delete", role: .destructive) { deleteInstalled(model.filename) }
-                        .controlSize(.small)
-                }
-            }
+        ForEach(customModels) { model in
+            ImportedModelRow(
+                model: model,
+                isActive: settings.localModelFilename == model.filename,
+                onSelect: { settings.localModelFilename = model.filename },
+                onDelete: { deleteInstalled(model.filename) }
+            )
+            .listRowInsets(EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14))
         }
-        .padding(.vertical, 8)
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(message)
+                .font(.callout)
+                .lineLimit(2)
+            Spacer()
+            Button {
+                errorMessage = nil
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .help("Dismiss")
+        }
+        .foregroundStyle(.red)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.red.opacity(0.06))
     }
 
     // MARK: - Model resolution
@@ -400,70 +429,98 @@ private struct CatalogModelRow: View {
     private var state: ModelDownloadState? { downloads.state(for: file.filename) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(model.name)
-                    .font(.system(size: 12, weight: .medium))
-                if model.capabilities.streaming {
-                    Text("STREAMING")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tint)
-                }
-                if model.recommended {
-                    Text("RECOMMENDED")
-                        .font(.system(size: 9, weight: .semibold))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 10) {
+                        Text(model.name)
+                            .font(.headline)
+                        modelBadges
+                            .font(.caption)
+                    }
+
+                    Text(model.description)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                if model.isUserAdded {
-                    Text("ADDED")
+
+                Spacer(minLength: 12)
+
+                HStack(spacing: 6) {
+                    primaryAction
+                    moreActions
                 }
-                Spacer()
-                actionButtons
             }
 
-            Text(model.languageSummary.isEmpty ? model.description : "\(model.description) — \(model.languageSummary)")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            metadataLine
 
-            attributionLine
-
-            HStack(spacing: 10) {
-                Picker("", selection: Binding(get: { quant }, set: onQuantChange)) {
-                    ForEach(model.files) { candidate in
-                        Text("\(candidate.quant) · \(candidate.sizeMB) MB").tag(candidate.quant)
+            HStack(spacing: 12) {
+                if model.files.count > 1 {
+                    Picker("Variant", selection: Binding(get: { quant }, set: onQuantChange)) {
+                        ForEach(model.files) { candidate in
+                            Text("\(candidate.quant) · \(candidate.sizeMB) MB").tag(candidate.quant)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 220)
+                    .disabled(state?.isActive == true)
+                } else {
+                    Label("\(file.quant) · \(file.sizeMB) MB", systemImage: "shippingbox")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(width: 150)
-                .disabled(state?.isActive == true)
 
-                ScoreBar(label: "Speed", value: model.normalizedSpeed)
-                ScoreBar(label: "Accuracy", value: model.normalizedAccuracy)
                 Spacer()
             }
 
             progressArea
         }
-        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var modelBadges: some View {
+        if model.capabilities.streaming {
+            Label("Live", systemImage: "waveform")
+                .foregroundStyle(.tint)
+        }
+        if model.recommended {
+            Label("Recommended", systemImage: "star.fill")
+                .foregroundStyle(.secondary)
+        }
+        if model.isUserAdded {
+            Label("Added", systemImage: "person.badge.plus")
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// Credits the repo the weights come from, the upstream model, and the
     /// license. Several of these models are CC-BY-4.0, where attribution is a
     /// condition of use rather than a courtesy.
+    private var metadataLine: some View {
+        HStack(spacing: 12) {
+            if !model.languageSummary.isEmpty {
+                Label(model.languageSummary, systemImage: "globe")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+            }
+            attributionLine
+        }
+    }
+
     private var attributionLine: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "link")
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-            Link(model.attribution, destination: model.repoURL)
-                .font(.system(size: 9))
+        Link(destination: model.repoURL) {
+            Label(model.attribution, systemImage: "link")
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .help("Open \(model.repoID) on Hugging Face")
         }
+        .buttonStyle(.plain)
+        .help("Open \(model.repoID) on Hugging Face")
     }
 
     @ViewBuilder
@@ -471,81 +528,133 @@ private struct CatalogModelRow: View {
         if let state {
             switch state {
             case .queued:
-                ProgressView().progressViewStyle(.linear)
-            case .downloading(let received, let total, let speed):
-                VStack(alignment: .leading, spacing: 2) {
-                    ProgressView(value: Double(received), total: Double(max(total, 1)))
-                        .progressViewStyle(.linear)
-                    Text("\(received / 1_048_576) / \(total / 1_048_576) MB" + (speed > 0 ? " — \(ModelDownloadManager.byteRate(speed))" : ""))
-                        .font(.system(size: 10))
+                HStack(spacing: 7) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Waiting to download…")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            case .verifying:
-                Text("Verifying checksum…")
-                    .font(.system(size: 10))
+            case .downloading(let received, let total, let speed):
+                VStack(alignment: .leading, spacing: 4) {
+                    ProgressView(value: Double(received), total: Double(max(total, 1)))
+                        .progressViewStyle(.linear)
+                    HStack {
+                        Text("\(received / 1_048_576) of \(total / 1_048_576) MB")
+                        Spacer()
+                        if speed > 0 {
+                            Text(ModelDownloadManager.byteRate(speed))
+                        }
+                    }
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+            case .verifying:
+                HStack(spacing: 7) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Verifying download…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             case .failed(let message):
-                Text(message)
-                    .font(.system(size: 10))
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } else if !isInstalled {
             let partial = ModelDownloadManager.partialSize(for: file.filename)
             if partial > 0 {
-                Text("Paused at \(partial / 1_048_576) MB. Download resumes from here.")
-                    .font(.system(size: 10))
+                Label("Paused at \(partial / 1_048_576) MB. Retry to resume.", systemImage: "pause.circle")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
     @ViewBuilder
-    private var actionButtons: some View {
+    private var primaryAction: some View {
         if state?.isActive == true {
             Button("Cancel") { onCancel() }
                 .controlSize(.small)
         } else if isInstalled {
             if isActive {
-                Text("Active")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.tint)
+                Label("In Use", systemImage: "checkmark.circle.fill")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.green)
             } else {
                 Button("Use") { onSelect() }
                     .controlSize(.small)
             }
-            Button("Delete", role: .destructive) { onDelete() }
-                .controlSize(.small)
         } else {
             Button(state == nil ? "Download" : "Retry") { onDownload() }
                 .controlSize(.small)
         }
-        if let onRemoveRepository, state?.isActive != true {
-            Button {
-                onRemoveRepository()
+    }
+
+    @ViewBuilder
+    private var moreActions: some View {
+        if state?.isActive != true && (isInstalled || onRemoveRepository != nil) {
+            Menu {
+                if isInstalled {
+                    Button("Delete Model", role: .destructive) { onDelete() }
+                }
+                if let onRemoveRepository {
+                    Button("Remove Repository") { onRemoveRepository() }
+                }
             } label: {
-                Image(systemName: "xmark")
+                Image(systemName: "ellipsis.circle")
             }
-            .controlSize(.small)
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("Remove \(model.repoID) from the list")
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More actions")
         }
     }
 }
 
-private struct ScoreBar: View {
-    let label: String
-    let value: Double
+private struct ImportedModelRow: View {
+    let model: LocalSpeechModel
+    let isActive: Bool
+    let onSelect: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-            ProgressView(value: min(max(value, 0), 1))
-                .progressViewStyle(.linear)
-                .frame(width: 60)
+        HStack(spacing: 12) {
+            Image(systemName: "waveform")
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.displayName)
+                    .font(.headline)
+                Text("Imported file · \(model.sizeMB) MB")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isActive {
+                Label("In Use", systemImage: "checkmark.circle.fill")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.green)
+            } else {
+                Button("Use") { onSelect() }
+                    .controlSize(.small)
+            }
+
+            Menu {
+                Button("Delete Model", role: .destructive) { onDelete() }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More actions")
         }
     }
 }

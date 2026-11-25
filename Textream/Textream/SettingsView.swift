@@ -387,6 +387,7 @@ struct SettingsView: View {
     @State private var previewController = NotchPreviewController()
     @State private var selectedTab: SettingsTab = .appearance
     @State private var showResetConfirmation = false
+    @State private var guidanceTestEngine: SpeechEngine?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -469,11 +470,13 @@ struct SettingsView: View {
                 }
                 .padding(12)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 500)
-        .frame(minHeight: 280, maxHeight: 500)
+        .frame(width: 560, height: 500)
         .background(.ultraThinMaterial)
+        .sheet(item: $guidanceTestEngine) { engine in
+            GuidanceTestSheet(engine: engine)
+        }
         .alert("Reset All Settings?", isPresented: $showResetConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) {
@@ -757,7 +760,7 @@ struct SettingsView: View {
     // MARK: - Guidance Tab
 
     private var guidanceTab: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 14) {
                 Picker("", selection: $settings.listeningMode) {
                     ForEach(ListeningMode.allCases) { mode in
@@ -805,6 +808,20 @@ struct SettingsView: View {
                             }
                             .labelsHidden()
                         }
+                    }
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            guidanceTestEngine = settings.speechEngine
+                        } label: {
+                            Label("Test Guidance", systemImage: "waveform")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isPrompterActive)
+                        .help(isPrompterActive
+                              ? "Stop the active teleprompter before testing guidance."
+                              : "Listen with the selected engine and show its transcription.")
                     }
                 }
 
@@ -854,11 +871,21 @@ struct SettingsView: View {
                 }
             }
             .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear { availableMics = AudioInputDevice.allInputDevices() }
     }
 
     @State private var availableMics: [AudioInputDevice] = []
+
+    private var isPrompterActive: Bool {
+        let service = TextreamService.shared
+        let recognizer = service.overlayController.speechRecognizer
+        return service.overlayController.isShowing
+            || service.directorIsReading
+            || recognizer.isListening
+            || recognizer.isStarting
+    }
 
     // MARK: - Reading Tab
 

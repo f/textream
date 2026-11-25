@@ -332,7 +332,7 @@ enum SpeechEngine: String, CaseIterable, Identifiable {
         case .apple:
             return "Uses macOS speech recognition. Audio may be processed by Apple."
         case .local:
-            return "Runs a custom Whisper-family model on this Mac. Audio never leaves the device."
+            return "Runs a custom speech model on this Mac. Audio never leaves the device."
         }
     }
 }
