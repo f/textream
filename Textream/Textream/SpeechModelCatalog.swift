@@ -2,7 +2,7 @@
 //  SpeechModelCatalog.swift
 //  Textream
 //
-//  The bundled catalog of downloadable Whisper-family speech models. The JSON
+//  The bundled catalog of downloadable local speech models. The JSON
 //  is compiled into the app, so the model list is complete without network
 //  access. Every entry is a file inside a Hugging Face repo pinned to an
 //  immutable revision, which is the only download source: there is no mirror

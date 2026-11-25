@@ -804,17 +804,22 @@ struct SettingsView: View {
 
                     if settings.speechEngine == .local {
                         LocalModelSettingsSection(settings: settings)
-                    } else {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Speech Language")
-                                .font(.system(size: 13, weight: .medium))
-                            Picker("", selection: $settings.speechLocale) {
-                                ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
-                                    Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
-                                        .tag(locale.identifier)
-                                }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Speech Language")
+                            .font(.system(size: 13, weight: .medium))
+                        Picker("", selection: $settings.speechLocale) {
+                            ForEach(SFSpeechRecognizer.supportedLocales().sorted(by: { $0.identifier < $1.identifier }), id: \.identifier) { locale in
+                                Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+                                    .tag(locale.identifier)
                             }
-                            .labelsHidden()
+                        }
+                        .labelsHidden()
+                        if settings.speechEngine == .local {
+                            Text("Guidance uses the selected language when supported. Some models detect the spoken language in Test Guidance.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
                         }
                     }
 

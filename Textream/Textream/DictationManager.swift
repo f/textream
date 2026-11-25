@@ -596,10 +596,9 @@ class DictationManager {
     ) -> String? {
         guard !info.languages.isEmpty else { return nil }
 
-        // A free-speech test should preserve whatever language the user is
-        // actually speaking. Unlike script tracking, it has no known source
-        // language to pin, so let multilingual models detect it.
-        if info.supportsLanguageDetection { return nil }
+        // Free speech usually has no known source language. Nemotron's short
+        // streaming chunks can misdetect it, so use the selected locale.
+        if info.supportsLanguageDetection && !info.isNemotron35Streaming { return nil }
 
         let preferred = baseLanguageCode(preferredLocale)
         if !preferred.isEmpty {

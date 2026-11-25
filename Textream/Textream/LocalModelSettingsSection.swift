@@ -2,7 +2,7 @@
 //  LocalModelSettingsSection.swift
 //  Textream
 //
-//  Settings controls for the local (Whisper-family) speech engine. The section
+//  Settings controls for the local speech engine. The section
 //  itself stays compact — status, installed-model picker, and a button that
 //  opens the model manager sheet where downloading happens.
 //
@@ -55,7 +55,7 @@ struct LocalModelSettingsSection: View {
                 .labelsHidden()
             }
 
-            Text("Runs entirely on this Mac. Whisper models transcribe in ~1.5 s chunks; streaming models (Parakeet, Moonshine Streaming) track words live.")
+            Text("Models marked Live stream words as you speak. Other models update the transcript in batches.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
@@ -321,9 +321,11 @@ struct ModelManagerSheet: View {
 
     // MARK: - Model resolution
 
-    /// The bundled catalog followed by the repos the user added.
+    /// Show newly bundled repos once if the user had already added them.
     private var allModels: [CatalogModel] {
-        SpeechModelCatalog.models + repositories.models
+        let bundled = SpeechModelCatalog.models
+        let bundledRepoIDs = Set(bundled.map { $0.repoID.lowercased() })
+        return bundled + repositories.models.filter { !bundledRepoIDs.contains($0.repoID.lowercased()) }
     }
 
     private var visibleModels: [CatalogModel] {

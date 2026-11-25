@@ -2,7 +2,7 @@
 //  LocalSpeechEngine.swift
 //  Textream
 //
-//  Runs custom Whisper-family GGML/GGUF models entirely on-device through
+//  Runs custom speech models entirely on-device through
 //  transcribe.cpp (the engine Handy uses). Two transcription paths:
 //
 //  * Streaming models (Parakeet, Nemotron, Moonshine Streaming, …) use the
@@ -24,9 +24,11 @@ struct LocalSpeechEngineInfo: Equatable {
     var backend: String
     var supportsStreaming: Bool
     var supportsLanguageDetection: Bool
+    var supportsWordTimestamps: Bool
     var languages: [String]
 
     var usesRollingWindow: Bool { !supportsStreaming }
+    var isNemotron35Streaming: Bool { variant == "nemotron-3.5-asr-streaming-0.6b" }
 }
 
 nonisolated final class LocalSpeechEngine: @unchecked Sendable {
@@ -119,6 +121,8 @@ nonisolated final class LocalSpeechEngine: @unchecked Sendable {
                     backend: model.backend,
                     supportsStreaming: capabilities.supportsStreaming,
                     supportsLanguageDetection: capabilities.supportsLanguageDetect,
+                    supportsWordTimestamps: capabilities.maxTimestampKind == .word
+                        || capabilities.maxTimestampKind == .token,
                     languages: capabilities.languages
                 )
                 self.model = model
@@ -221,14 +225,21 @@ nonisolated final class LocalSpeechEngine: @unchecked Sendable {
             windowNeedsReanchor = false
             self.language = language
             self.initialPrompt = initialPrompt
-            requestWordTimestamps = wordTimestamps
+            // An explicit timestamp kind above the model's limit fails the run.
+            requestWordTimestamps = wordTimestamps && info.supportsWordTimestamps
             windowHasAudioOverlap = false
 
             if info.supportsStreaming {
                 do {
+                    var streamOptions = StreamOptions()
+                    if info.isNemotron35Streaming {
+                        // Use the trained 560 ms streaming setting. The default
+                        // 1.12 s setting can return empty or truncated speech.
+                        streamOptions.family = .parakeetStream(.init(attContextRight: 6))
+                    }
                     stream = try session.stream(
                         RunOptions(task: .transcribe, language: language),
-                        StreamOptions()
+                        streamOptions
                     )
                 } catch {
                     fail("Could not start streaming: \(error.localizedDescription)")
