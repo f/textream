@@ -17,6 +17,8 @@ struct PromptSessionView: View {
     @State private var isPromptSessionVisible = false
     @State private var isShowingMirrorSettings = false
     @State private var showsSessionControls = true
+    @State private var isOuterDisplayAvailable = false
+    @AppStorage("ios.showsScriptOnOuterDisplay") private var showsScriptOnOuterDisplay = true
     private let onScrollSpeedChanged: (Double) -> Void
     private let onDisplaySettingsChanged: (PromptDisplaySettings) -> Void
 
@@ -36,87 +38,100 @@ struct PromptSessionView: View {
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
+            // On a partially folded display the stage and the controls each
+            // take one side of the hinge, so nothing is drawn across the fold.
+            let foldLayout = PromptFoldLayout.current(in: geometry)
+            let stageSize = foldLayout?.stage.size ?? geometry.size
+            let controlsSize = foldLayout?.controls.size ?? geometry.size
             let isMirrorActive = PromptMirrorPresentation.isActive(
                 enabled: displaySettings.mirrorEnabled,
                 sessionMode: controller.configuration.sessionMode,
                 viewportSize: geometry.size
             )
             ZStack {
-                stageBackground
-                    .accessibilityHidden(isShowingMirrorSettings)
+                ZStack {
+                    stageBackground
+                        .accessibilityHidden(isShowingMirrorSettings)
 
-                if controller.showsCamera {
-                    Color.black.opacity(controller.configuration.overlayOpacity)
-                        .ignoresSafeArea()
-                }
+                    if controller.showsCamera {
+                        Color.black.opacity(controller.configuration.overlayOpacity)
+                            .ignoresSafeArea()
+                    }
 
-                PromptTextView(
-                    prompt: controller.prompt,
-                    highlightedCharacterCount: controller.effectiveCharacterCount,
-                    font: controller.configuration.fontFamily.uiFont(
-                        size: responsiveFontSize(isLandscape: isLandscape),
-                        weight: .semibold
-                    ),
-                    textColor: controller.configuration.textColor.uiColor,
-                    cueColor: controller.configuration.cueColor.uiColor,
-                    cueUnreadOpacity: controller.configuration.cueBrightness.unreadOpacity,
-                    cueReadOpacity: controller.configuration.cueBrightness.readOpacity,
-                    wordTracking: controller.configuration.followMode == .wordTracking,
-                    continuousWordProgress: controller.continuousWordProgress,
-                    allowsHorizontalSpeedAdjustment: controller.canAdjustScrollSpeed,
-                    readingPosition: displaySettings.readingPosition,
-                    topOverlayClearance: max(
-                        geometry.safeAreaInsets.top,
-                        closeControlMaxY
-                    ),
-                    bottomOverlayClearance: bottomControlOverlayHeight,
-                    horizontalTextInsets: UIEdgeInsets(
-                        top: 0,
-                        left: max(16, geometry.safeAreaInsets.leading + 12),
-                        bottom: 0,
-                        right: max(16, geometry.safeAreaInsets.trailing + 12)
-                    ),
-                    onWordTap: controller.jump,
-                    onManualScrollBegan: controller.beginManualScroll,
-                    onManualScrollEnded: controller.finishManualScroll,
-                    onSpeedAdjustmentBegan: controller.beginScrollSpeedAdjustment,
-                    onSpeedAdjustmentChanged: { translation, width in
-                        controller.updateScrollSpeedAdjustment(
-                            horizontalTranslation: PromptMirrorPresentation.deviceHorizontalTranslation(
-                                from: translation,
-                                isActive: isMirrorActive,
-                                axis: displaySettings.mirrorAxis
+                    PromptTextView(
+                        prompt: controller.prompt,
+                        highlightedCharacterCount: controller.effectiveCharacterCount,
+                        font: controller.configuration.fontFamily.uiFont(
+                            size: responsiveFontSize(
+                                isLandscape: stageSize.width > stageSize.height
                             ),
-                            viewWidth: width
-                        )
-                    },
-                    onSpeedAdjustmentEnded: finishScrollSpeedAdjustment
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea()
-                .scaleEffect(
-                    x: isMirrorActive ? displaySettings.mirrorAxis.scaleX : 1,
-                    y: isMirrorActive ? displaySettings.mirrorAxis.scaleY : 1
-                )
-                .mask(verticalFade)
-                .accessibilityHidden(isShowingMirrorSettings)
-                .accessibilityIdentifier("promptText")
-                .zIndex(0)
+                            weight: .semibold
+                        ),
+                        textColor: controller.configuration.textColor.uiColor,
+                        cueColor: controller.configuration.cueColor.uiColor,
+                        cueUnreadOpacity: controller.configuration.cueBrightness.unreadOpacity,
+                        cueReadOpacity: controller.configuration.cueBrightness.readOpacity,
+                        wordTracking: controller.configuration.followMode == .wordTracking,
+                        continuousWordProgress: controller.continuousWordProgress,
+                        allowsHorizontalSpeedAdjustment: controller.canAdjustScrollSpeed,
+                        readingPosition: displaySettings.readingPosition,
+                        topOverlayClearance: max(
+                            geometry.safeAreaInsets.top,
+                            closeControlMaxY
+                        ),
+                        // Controls on the far side of a fold never cover the text.
+                        bottomOverlayClearance: foldLayout == nil ? bottomControlOverlayHeight : 0,
+                        horizontalTextInsets: UIEdgeInsets(
+                            top: 0,
+                            left: max(16, geometry.safeAreaInsets.leading + 12),
+                            bottom: 0,
+                            right: max(16, geometry.safeAreaInsets.trailing + 12)
+                        ),
+                        onWordTap: controller.jump,
+                        onManualScrollBegan: controller.beginManualScroll,
+                        onManualScrollEnded: controller.finishManualScroll,
+                        onSpeedAdjustmentBegan: controller.beginScrollSpeedAdjustment,
+                        onSpeedAdjustmentChanged: { translation, width in
+                            controller.updateScrollSpeedAdjustment(
+                                horizontalTranslation: PromptMirrorPresentation.deviceHorizontalTranslation(
+                                    from: translation,
+                                    isActive: isMirrorActive,
+                                    axis: displaySettings.mirrorAxis
+                                ),
+                                viewWidth: width
+                            )
+                        },
+                        onSpeedAdjustmentEnded: finishScrollSpeedAdjustment
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+                    .scaleEffect(
+                        x: isMirrorActive ? displaySettings.mirrorAxis.scaleX : 1,
+                        y: isMirrorActive ? displaySettings.mirrorAxis.scaleY : 1
+                    )
+                    .mask(verticalFade)
+                    .accessibilityHidden(isShowingMirrorSettings)
+                    .accessibilityIdentifier("promptText")
+                    .zIndex(0)
 
-                if controller.isAdjustingScrollSpeed {
-                    scrollSpeedIndicator
-                        .allowsHitTesting(false)
-                        .zIndex(2)
+                    if controller.isAdjustingScrollSpeed {
+                        scrollSpeedIndicator
+                            .allowsHitTesting(false)
+                            .zIndex(2)
+                    }
                 }
+                .frame(width: foldLayout?.stage.width, height: foldLayout?.stage.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                 if showsSessionControls {
                     VStack(spacing: 0) {
-                        Spacer()
+                        Spacer(minLength: 0)
 
-                        bottomControls(isLandscape: isLandscape)
-                            .padding(.leading, max(18, geometry.safeAreaInsets.leading + 18))
-                            .padding(.trailing, max(18, geometry.safeAreaInsets.trailing + 18))
-                            .padding(.bottom, geometry.safeAreaInsets.bottom + 10)
+                        bottomControls(
+                            isLandscape: controlsSize.width > controlsSize.height
+                        )
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 10)
                             .background {
                                 GeometryReader { controlsGeometry in
                                     Color.clear.preference(
@@ -125,7 +140,15 @@ struct PromptSessionView: View {
                                     )
                                 }
                             }
+
+                        // On a tabletop the controls sit in the middle of the
+                        // half that rests on the table.
+                        if foldLayout?.posture == .tabletop {
+                            Spacer(minLength: 0)
+                        }
                     }
+                    .frame(width: foldLayout?.controls.width, height: foldLayout?.controls.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .transition(.opacity)
                     .accessibilityHidden(isShowingMirrorSettings)
                     .zIndex(3)
@@ -152,34 +175,37 @@ struct PromptSessionView: View {
                         ),
                         canAdjustScrollSpeed: controller.canAdjustScrollSpeed,
                         isLandscape: isLandscape,
+                        // Half of a book is too narrow for two columns.
+                        usesColumns: isLandscape && foldLayout?.posture != .book,
                         showsSessionControls: $showsSessionControls,
                         onClose: {
                             withAnimation(.snappy) { isShowingMirrorSettings = false }
                         }
                     )
+                    // The panel opens from the top-trailing mirror button, so it
+                    // stays on that side of a fold: within the controls' half
+                    // of a book, and within the stage's half of a tabletop.
                     .frame(
                         width: min(
                             isLandscape ? 680 : 360,
                             max(
                                 280,
-                                geometry.size.width
-                                    - geometry.safeAreaInsets.leading
-                                    - geometry.safeAreaInsets.trailing
-                                    - 32
+                                (foldLayout?.posture == .book
+                                    ? controlsSize.width
+                                    : geometry.size.width) - 32
                             )
                         )
                     )
                     .frame(
                         maxHeight: max(
                             180,
-                            geometry.size.height
-                                - geometry.safeAreaInsets.top
-                                - geometry.safeAreaInsets.bottom
-                                - 76
+                            (foldLayout?.posture == .tabletop
+                                ? stageSize.height
+                                : geometry.size.height) - 76
                         )
                     )
-                    .padding(.top, max(58, geometry.safeAreaInsets.top + 48))
-                    .padding(.trailing, max(16, geometry.safeAreaInsets.trailing + 12))
+                    .padding(.top, max(0, closeControlMaxY) + 6)
+                    .padding(.trailing, 16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .transition(.scale(scale: 0.94, anchor: .topTrailing).combined(with: .opacity))
                     .zIndex(5)
@@ -191,12 +217,14 @@ struct PromptSessionView: View {
                         Spacer(minLength: 0)
                         if controller.configuration.sessionMode == .read {
                             mirrorSettingsButton(isMirrorActive: isMirrorActive)
+                        } else if isOuterDisplayAvailable {
+                            outerDisplayButton
                         }
                     }
                     .frame(height: 44)
                     .padding(.top, 8)
-                    .padding(.leading, max(24, geometry.safeAreaInsets.leading + 20))
-                    .padding(.trailing, max(16, geometry.safeAreaInsets.trailing + 14))
+                    .padding(.leading, 24)
+                    .padding(.trailing, 16)
                     .background {
                         GeometryReader { closeGeometry in
                             Color.clear.preference(
@@ -225,6 +253,23 @@ struct PromptSessionView: View {
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
+        .modifier(
+            OuterDisplayPromptAccessory(
+                isEnabled: Binding(
+                    get: {
+                        showsScriptOnOuterDisplay
+                            && controller.configuration.sessionMode == .record
+                    },
+                    set: { isEnabled in
+                        guard controller.configuration.sessionMode == .record else { return }
+                        showsScriptOnOuterDisplay = isEnabled
+                    }
+                ),
+                isAvailable: $isOuterDisplayAvailable
+            ) {
+                OuterDisplayPromptView(controller: controller, settings: displaySettings)
+            }
+        )
         .onChange(of: displaySettings) { _, settings in
             onDisplaySettingsChanged(settings)
         }
@@ -365,6 +410,44 @@ struct PromptSessionView: View {
         .accessibilityLabel("Mirror settings")
         .accessibilityValue(isMirrorActive ? "Mirror active" : "Mirror inactive")
         .accessibilityIdentifier("mirrorSessionSettingsButton")
+    }
+
+    /// Turns the script on iPhone Duo's outer display on or off. It appears only
+    /// while the system can show that display during capture.
+    private var outerDisplayButton: some View {
+        Button {
+            showsScriptOnOuterDisplay.toggle()
+        } label: {
+            Image(systemName: outerDisplaySymbolName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .glassEffect(
+                    .regular
+                        .tint(
+                            showsScriptOnOuterDisplay
+                                ? Color.indigo.opacity(0.32)
+                                : Color.black.opacity(0.12)
+                        )
+                        .interactive(),
+                    in: .circle
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Script on outer display")
+        .accessibilityValue(showsScriptOnOuterDisplay ? "On" : "Off")
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityIdentifier("outerDisplayScriptButton")
+    }
+
+    private var outerDisplaySymbolName: String {
+        if #available(iOS 27.2, *) {
+            "iphone.duo.rear.camera"
+        } else {
+            "iphone.rear.camera"
+        }
     }
 
     private func bottomControls(isLandscape: Bool) -> some View {
@@ -690,6 +773,7 @@ private struct MirrorSessionSettingsPanel: View {
     let scrollSpeed: Binding<Double>
     let canAdjustScrollSpeed: Bool
     let isLandscape: Bool
+    let usesColumns: Bool
     @Binding var showsSessionControls: Bool
     let onClose: () -> Void
 
@@ -698,7 +782,7 @@ private struct MirrorSessionSettingsPanel: View {
             VStack(alignment: .leading, spacing: 12) {
                 panelHeader
 
-                if isLandscape {
+                if usesColumns {
                     HStack(alignment: .top, spacing: 16) {
                         mirrorControls
                             .frame(maxWidth: .infinity, alignment: .topLeading)

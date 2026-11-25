@@ -16,6 +16,8 @@ struct TextreamiOSApp: App {
             } else if ProcessInfo.processInfo.arguments.contains("-TextreamPromptPreview") {
                 PromptSessionView(configuration: Self.promptPreviewConfiguration())
                     .preferredColorScheme(.dark)
+            } else if ProcessInfo.processInfo.arguments.contains("-TextreamOuterDisplayPreview") {
+                OuterDisplayPromptPreview(configuration: Self.promptPreviewConfiguration())
             } else {
                 RootView(model: model)
                     .preferredColorScheme(.dark)

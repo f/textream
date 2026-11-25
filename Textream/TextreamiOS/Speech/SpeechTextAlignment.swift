@@ -1,25 +1,6 @@
 import Foundation
 
 enum SpeechTextAlignment {
-    static func annotationFlags(for words: [String]) -> [Bool] {
-        var closingAtOrAfter = Array(repeating: false, count: words.count)
-        var hasClosing = false
-        for index in words.indices.reversed() {
-            if words[index].contains("]") { hasClosing = true }
-            closingAtOrAfter[index] = hasClosing
-        }
-
-        var flags: [Bool] = []
-        var isInsideAnnotation = false
-        for (index, word) in words.enumerated() {
-            let beginsAnnotation = word.hasPrefix("[") && closingAtOrAfter[index]
-            flags.append(isInsideAnnotation || beginsAnnotation)
-            if beginsAnnotation { isInsideAnnotation = true }
-            if isInsideAnnotation && word.contains("]") { isInsideAnnotation = false }
-        }
-        return flags
-    }
-
     static func annotationRanges(in text: String) -> [Range<Int>] {
         var ranges: [Range<Int>] = []
         var openingIndex: Int?

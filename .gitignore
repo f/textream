@@ -17,6 +17,10 @@ Textream/Textream.xcodeproj/project.xcworkspace/xcuserdata/
 # Local App Store metadata and assets
 /app-store/
 
+# fastlane run output
+fastlane/report.xml
+fastlane/Preview.html
+
 # macOS
 .DS_Store
 .AppleDouble

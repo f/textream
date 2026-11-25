@@ -382,6 +382,14 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 // MARK: - Settings View
 
 struct SettingsView: View {
+    /// Segmented controls grew on macOS 26+ (up to ~374pt for the overlay mode
+    /// picker). At 500pt the content column (~312pt) overflowed and SwiftUI
+    /// centered it, clipping both edges of the sheet. Older systems keep 500pt.
+    private static var sheetWidth: CGFloat {
+        if #available(macOS 26, *) { return 600 }
+        return 500
+    }
+
     @Bindable var settings: NotchSettings
     @Environment(\.dismiss) private var dismiss
     @State private var previewController = NotchPreviewController()
@@ -472,7 +480,7 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 560, height: 500)
+        .frame(width: Self.sheetWidth, height: 500)
         .background(.ultraThinMaterial)
         .sheet(item: $guidanceTestEngine) { engine in
             GuidanceTestSheet(engine: engine)

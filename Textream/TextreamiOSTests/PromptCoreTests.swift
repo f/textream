@@ -770,6 +770,29 @@ struct PromptCoreTests {
     }
 
     @Test
+    func tokenizerKeepsWhitespaceDelimitedHangulReadingUnitsWhole() {
+        let precomposed = PromptScript("안녕하세요 [웃으며 말하기] 안녕")
+        let decomposed = PromptScript("안녕")
+        let mixed = PromptScript("안녕世界")
+        let mixedWithJapanese = PromptScript("안녕こんにちは世界")
+
+        #expect(precomposed.words.map(\.text) == ["안녕하세요", "[웃으며", "말하기]", "안녕"])
+        #expect(precomposed.text == "안녕하세요 [웃으며 말하기] 안녕")
+        #expect(
+            precomposed.annotationRanges.map { String(Array(precomposed.text)[$0]) }
+                == ["[웃으며 말하기]"]
+        )
+        #expect(decomposed.words.map(\.text) == ["안녕"])
+        #expect(mixed.words.map(\.text) == ["안녕", "世", "界"])
+        #expect(
+            mixedWithJapanese.words.map(\.text)
+                == ["안녕", "こ", "ん", "に", "ち", "は", "世", "界"]
+        )
+        #expect(precomposed.characterOffset(forWordProgress: 1) == "안녕하세요".count + 1)
+        #expect(precomposed.wordProgress(forCharacterOffset: "안녕하세요".count + 1) == 1)
+    }
+
+    @Test
     func balancedCuesAreAnnotationsButUnmatchedOpeningBracketIsReadable() {
         let balanced = PromptScript("Hello [look at camera] world")
         #expect(balanced.words.filter(\.isAnnotation).map(\.text) == ["[look", "at", "camera]"])
@@ -798,6 +821,28 @@ struct PromptCoreTests {
                 == ["[pause]", "[one]", "[two]"]
         )
         #expect(prompt.annotationRanges.first == 5..<12)
+    }
+
+    @Test
+    func matcherDoesNotReadHangulAttachedToACueUntilItIsSpoken() {
+        let text = "먼저 [웃음]안녕하세요"
+        let prompt = PromptScript(text)
+        var matcher = PromptMatcher(source: prompt)
+
+        #expect(prompt.text == text)
+        #expect(prompt.words.filter(\.isAnnotation).map(\.text) == ["[웃음]"])
+        let nextWordStart = "먼저 [웃음]".count
+        #expect(matcher.match(transcript: "먼저") == nextWordStart)
+        #expect(prompt.activeWord(atCharacterOffset: nextWordStart)?.text == "안녕하세요")
+        #expect(matcher.match(transcript: "먼저 안녕하세요") == text.count)
+    }
+
+    @Test
+    func matcherKeepsUnspokenProseAfterAnEmbeddedCueUnread() {
+        let text = "안녕하세요[웃음 크게][박수]반갑습니다."
+        var matcher = PromptMatcher(source: PromptScript(text))
+        #expect(matcher.match(transcript: "안녕하세요") == "안녕하세요[웃음 크게][박수]".count)
+        #expect(matcher.match(transcript: "안녕하세요 반갑습니다") == text.count)
     }
 
     @Test
@@ -1943,6 +1988,108 @@ struct PromptCoreTests {
             RootFloatingActionLayout.contentBottomClearance(measuredOverlayHeight: 0)
                 == RootFloatingActionLayout.fallbackOverlayHeight
                     + RootFloatingActionLayout.clearanceGap
+        )
+    }
+
+    @Test
+    func tabletopFoldPutsTheStageAboveTheHingeAndTheControlsBelowIt() throws {
+        let layout = try #require(
+            PromptFoldLayout(
+                fold: CGRect(x: 0, y: 455, width: 669, height: 40),
+                containerSize: CGSize(width: 669, height: 951)
+            )
+        )
+
+        #expect(layout.posture == .tabletop)
+        #expect(layout.stage == CGRect(x: 0, y: 0, width: 669, height: 455))
+        #expect(layout.controls == CGRect(x: 0, y: 495, width: 669, height: 456))
+    }
+
+    @Test
+    func bookFoldPutsTheStageOnTheLeadingHalfAndTheControlsOnTheTrailingHalf() throws {
+        let layout = try #require(
+            PromptFoldLayout(
+                fold: CGRect(x: 455, y: 0, width: 40, height: 669),
+                containerSize: CGSize(width: 951, height: 669)
+            )
+        )
+
+        #expect(layout.posture == .book)
+        #expect(layout.stage == CGRect(x: 0, y: 0, width: 455, height: 669))
+        #expect(layout.controls == CGRect(x: 495, y: 0, width: 456, height: 669))
+    }
+
+    @Test
+    func foldLayoutClipsADivisionThatOverhangsTheContainer() throws {
+        let layout = try #require(
+            PromptFoldLayout(
+                fold: CGRect(x: -20, y: 455, width: 709, height: 40),
+                containerSize: CGSize(width: 669, height: 951)
+            )
+        )
+
+        #expect(layout.stage.width == 669)
+        #expect(layout.controls.width == 669)
+    }
+
+    @Test
+    func screensWithoutAUsableFoldKeepTheUnsplitLayout() {
+        let size = CGSize(width: 669, height: 951)
+
+        // Flat, closed, or a display that cannot fold.
+        #expect(PromptFoldLayout(fold: nil, containerSize: size) == nil)
+        // A division outside this container, such as one beside a sheet.
+        #expect(
+            PromptFoldLayout(
+                fold: CGRect(x: 0, y: 1_200, width: 669, height: 40),
+                containerSize: size
+            ) == nil
+        )
+        // A fold so close to an edge that one side cannot hold its content.
+        #expect(
+            PromptFoldLayout(
+                fold: CGRect(x: 0, y: 100, width: 669, height: 40),
+                containerSize: size
+            ) == nil
+        )
+        #expect(
+            PromptFoldLayout(
+                fold: CGRect(x: 0, y: 820, width: 669, height: 40),
+                containerSize: size
+            ) == nil
+        )
+    }
+
+    @Test
+    func cameraPreviewMirrorsOnlyACameraThatFacesTheViewer() {
+        let directions = CameraFacing(
+            forwardDeviceIDs: ["rear-wide"],
+            backwardDeviceIDs: ["virtual-front"]
+        )
+
+        // Folded around, iPhone Duo's rear camera faces the viewer and its
+        // front camera faces away, so position alone gets both wrong.
+        #expect(directions.previewIsMirrored(deviceID: "rear-wide", position: .back))
+        #expect(!directions.previewIsMirrored(deviceID: "virtual-front", position: .front))
+    }
+
+    @Test
+    func cameraPreviewFallsBackToThePositionWithoutADirectionReport() {
+        let unknown = CameraFacing()
+
+        #expect(unknown.previewIsMirrored(deviceID: "front", position: .front))
+        #expect(!unknown.previewIsMirrored(deviceID: "back", position: .back))
+        #expect(unknown.previewIsMirrored(deviceID: nil, position: .front))
+
+        let unrelated = CameraFacing(forwardDeviceIDs: ["other"], backwardDeviceIDs: [])
+        #expect(unrelated.previewIsMirrored(deviceID: "front", position: .front))
+    }
+
+    @Test
+    func cameraDiscoveryPrefersTheWideCameraAndStillFindsUltraWideOnes() {
+        #expect(
+            CaptureController.preferredCameraDeviceTypes
+                == [.builtInWideAngleCamera, .builtInUltraWideCamera]
         )
     }
 
