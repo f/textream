@@ -71,6 +71,24 @@ private final class FirstResponderTextViewSpy: UITextView {
 @Suite("Prompt core")
 struct PromptCoreTests {
     @MainActor
+
+@Test
+func microphoneSelectionPrefersExternalInputsAndFallsBackCleanly() {
+    // Port descriptions cannot be constructed in tests; exercise the pure
+    // persistence round-trip and the automatic default instead.
+    let defaults = UserDefaults(suiteName: "microphone-selection-test")!
+    defaults.removePersistentDomain(forName: "microphone-selection-test")
+
+    #expect(MicrophoneSelection.load(from: defaults) == .automatic)
+
+    MicrophoneSelection.port(uid: "usb-1").save(to: defaults)
+    #expect(MicrophoneSelection.load(from: defaults) == .port(uid: "usb-1"))
+
+    MicrophoneSelection.automatic.save(to: defaults)
+    #expect(MicrophoneSelection.load(from: defaults) == .automatic)
+    #expect(MicrophoneSelection.resolve(.automatic, among: []) == nil)
+}
+
     @Test
     func scriptEditorKeepsFocusAndSelectionAcrossEveryTypingBindingEcho() {
         let harness = EditorBindingHarness(text: "Start", isFocused: true)

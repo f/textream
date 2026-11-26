@@ -45,6 +45,13 @@ final class AppModel {
     var isShowingSession = false
     var isShowingSettings = false
 
+    /// Empty string means Automatic (external microphone first).
+    var microphoneUID: String {
+        didSet {
+            (microphoneUID.isEmpty ? MicrophoneSelection.automatic : .port(uid: microphoneUID)).save(to: defaults)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         script = defaults.string(forKey: Key.script) ?? Self.sampleScript
@@ -71,6 +78,7 @@ final class AppModel {
         cueBrightness = CueBrightness(rawValue: defaults.string(forKey: Key.cueBrightness) ?? "") ?? .dim
         let savedOpacity = defaults.double(forKey: Key.overlayOpacity)
         overlayOpacity = savedOpacity > 0 ? savedOpacity : 0.52
+        microphoneUID = defaults.string(forKey: MicrophoneSelection.defaultsKey) ?? ""
         if let savedLocale = defaults.string(forKey: Key.speechLocale), !savedLocale.isEmpty {
             speechLocaleIdentifier = savedLocale
         } else {
