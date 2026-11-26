@@ -14,6 +14,8 @@ class ExternalDisplayController {
     private var cancellables = Set<AnyCancellable>()
     let overlayContent = OverlayContent()
 
+    var isShowing: Bool { panel != nil }
+
     /// Find the target external screen based on saved screen ID, or first non-main screen
     func targetScreen() -> NSScreen? {
         let settings = NotchSettings.shared
@@ -123,8 +125,14 @@ struct ExternalDisplayView: View {
     private var hasNextPage: Bool { content.hasNextPage }
 
     // Timer-based scroll for classic & silence-paused modes
-    @State private var timerWordProgress: Double = 0
-    @State private var isUserScrolling: Bool = false
+    private var timerWordProgress: Double {
+        get { speechRecognizer.playback.wordProgress }
+        nonmutating set { speechRecognizer.playback.wordProgress = newValue }
+    }
+    private var isUserScrolling: Bool {
+        get { speechRecognizer.playback.isUserScrolling }
+        nonmutating set { speechRecognizer.playback.isUserScrolling = newValue }
+    }
     @State private var countdownRemaining: Int = 0
     @State private var countdownTimer: Timer? = nil
     private let scrollTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -179,7 +187,7 @@ struct ExternalDisplayView: View {
         case .wordTracking, .silencePaused:
             return speechRecognizer.isListening
         case .classic:
-            return true
+            return !speechRecognizer.playback.isPaused
         }
     }
 
@@ -216,7 +224,8 @@ struct ExternalDisplayView: View {
         }
         .onDisappear { cancelCountdown() }
         .onReceive(scrollTimer) { _ in
-            guard !isDone, !isUserScrolling else { return }
+            // Secondary displays observe the primary clock.
+            guard handlesAutoNextPage, !isDone, !isUserScrolling, !speechRecognizer.playback.isPaused else { return }
             let speed = NotchSettings.shared.scrollSpeed // words per second
             switch listeningMode {
             case .classic:
@@ -255,26 +264,30 @@ struct ExternalDisplayView: View {
                     onWordTap: { charOffset in
                         if listeningMode == .wordTracking {
                             speechRecognizer.jumpTo(charOffset: charOffset)
+                            speechRecognizer.playback.seek(to: wordProgressForCharOffset(charOffset))
                         } else {
-                            timerWordProgress = wordProgressForCharOffset(charOffset)
+                            speechRecognizer.playback.seek(to: wordProgressForCharOffset(charOffset))
                         }
                     },
                     onManualScroll: { scrolling, newProgress in
                         isUserScrolling = scrolling
                         if !scrolling {
-                            timerWordProgress = max(0, min(Double(words.count), newProgress))
+                            speechRecognizer.playback.seek(to: max(0, min(Double(words.count), newProgress)))
                         }
                     },
                     smoothScroll: listeningMode != .wordTracking,
                     smoothWordProgress: timerWordProgress,
                     isListening: isEffectivelyListening,
                     readingPosition: NotchSettings.shared.readingPosition,
-                paragraphBreakBeforeWordIndices: NotchSettings.shared.showParagraphDividers
-                    ? content.paragraphBreakBeforeWordIndices
-                    : []
-            )
-            .id(content.currentPageIndex)
-            .padding(.horizontal, hPad)
+                    centerSmoothScrolling: true,
+                    navigationRevision: speechRecognizer.playback.positionRevision,
+                    handlesNavigation: { !handlesAutoNextPage || !TextreamService.shared.externalDisplayController.isShowing },
+                    paragraphBreakBeforeWordIndices: NotchSettings.shared.showParagraphDividers
+                        ? content.paragraphBreakBeforeWordIndices
+                        : []
+                )
+                .id(content.currentPageIndex)
+                .padding(.horizontal, hPad)
 
                 Spacer().frame(height: 20)
 
@@ -298,6 +311,8 @@ struct ExternalDisplayView: View {
                     } else {
                         Spacer()
                     }
+
+                    PrompterNavigationControls(size: 40)
 
                     if listeningMode != .classic {
                         Button {

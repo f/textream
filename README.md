@@ -150,6 +150,22 @@ Let someone else control your teleprompter remotely. A director can write, edit,
 - **Save as .textream files** — Save your scripts as .textream files to reuse anytime. Keep your notes organized across presentations.
 - **Multi-page support** — Navigate between pages with automatic advance. In follow-cursor mode, pages auto-advance with a 3-second countdown.
 
+### Keyboard Navigation (macOS)
+
+While a reading window has keyboard focus:
+
+| Key | Action |
+|---|---|
+| **←** | Return to the start of the current sentence; press again for the previous sentence. |
+| **→** | Jump to the next sentence. |
+| **↑** | Move back one visible text area. |
+| **↓** | Move forward one visible text area. |
+| **⌘↑** | Return to the beginning of the script, including the first non-empty page. |
+
+Sentence and screen navigation stay within the current page and preserve pause state. When external output is active, screen navigation uses that display's text area, and both local windows share the same reading position. The reading window receives keyboard focus on start; editing shortcuts and other applications retain their normal arrow-key behavior.
+
+Fullscreen and external displays keep timed scrolling at the selected reading position, including a centered first line in **Centered** mode.
+
 ### Other
 
 - **Live waveform** — Visual voice activity indicator so you always know the mic is picking you up.
@@ -220,6 +236,24 @@ This installs a development-signed build directly from your Mac; it does not pub
 To try mirror mode, choose **Read**, enable **Mirror in landscape**, select an axis, and start the prompter. Rotate the device to landscape and use the small **↔** button at the top right to adjust mirror axis, reading position, text size, scroll speed, or hide the playback controls while the prompt is running.
 
 Run the iOS test suite with **Product → Test** or **⌘U**. Camera capture, microphone input, recording, and Photos saving should be verified on a physical device because Simulator doesn't provide the same hardware behavior.
+
+### macOS navigation tests
+
+Run the standalone navigation regression suite on a Mac with Xcode installed:
+
+```bash
+./Tests/run.sh
+```
+
+It covers sentence and screen navigation in both directions, page boundaries, keyboard bindings, pause preservation, and stale layout measurements after a jump.
+
+To also check that stopping an unused speech recognizer does not initialize or wait for a microphone device:
+
+```bash
+./Tests/run-audio-cleanup.sh
+```
+
+This smoke test compiles the production macOS types with a test entry point and runs cleanup twice under a ten-second timeout, without launching the app interface or requesting microphone access.
 
 ### Project structure
 

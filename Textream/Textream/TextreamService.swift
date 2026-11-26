@@ -161,6 +161,16 @@ class TextreamService: NSObject, ObservableObject {
         readCurrentPage()
     }
 
+    func navigatePrompter(_ command: PromptNavigationCommand) {
+        guard overlayController.isShowing else { return }
+        if command == .beginning,
+           let firstPage = pages.firstIndex(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+           currentPageIndex != firstPage {
+            jumpToPage(index: firstPage)
+        }
+        NotificationCenter.default.post(name: .navigatePrompter, object: command)
+    }
+
     func hideMainWindow() {
         DispatchQueue.main.async {
             for window in NSApp.windows where !(window is NSPanel) {

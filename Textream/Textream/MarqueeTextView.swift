@@ -138,6 +138,13 @@ struct WordYPreferenceKey: PreferenceKey {
     }
 }
 
+struct FullWordYPreferenceKey: PreferenceKey {
+    static var defaultValue: [Int: CGFloat] = [:]
+    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 // MARK: - Teleprompter
 
 struct SpeechScrollView: View {
@@ -159,12 +166,16 @@ struct SpeechScrollView: View {
 
     var isListening: Bool = true
     var readingPosition: ReadingPosition = .centered
+    var centerSmoothScrolling: Bool = false
+    var navigationRevision: Int = 0
+    var handlesNavigation: () -> Bool = { false }
     /// Optional preview-only transition. Live overlays keep their existing behavior.
     var readingPositionTransitionDuration: Double? = nil
     var paragraphBreakBeforeWordIndices: Set<Int> = []
     @State private var scrollOffset: CGFloat = 0
     @State private var manualOffset: CGFloat = 0
-    @State private var wordYPositions: [Int: CGFloat] = [:]
+    @State private var measuredWordYPositions: [Int: CGFloat] = [:]
+    @State private var fullWordYPositions: [Int: CGFloat] = [:]
     @State private var containerHeight: CGFloat = 0
     @State private var isUserScrolling: Bool = false
     @State private var stableTopLineCenter: CGFloat?
@@ -175,6 +186,12 @@ struct SpeechScrollView: View {
     @State private var anchoredParagraphBreakBeforeWordIndices: Set<Int> = []
     @State private var isAnimatingReadingPositionChange = false
     @State private var readingPositionAnimationGeneration = 0
+
+    private var wordYPositions: [Int: CGFloat] {
+        // Visible-row preferences can arrive one frame after an explicit jump.
+        // The complete layout is stable even while those measurements catch up.
+        PromptNavigation.positionsForTracking(layout: fullWordYPositions, measured: measuredWordYPositions)
+    }
 
     private var readingPositionTransitionAnimation: Animation? {
         guard let duration = readingPositionTransitionDuration, duration > 0 else {
@@ -219,8 +236,11 @@ struct SpeechScrollView: View {
                 scrollOffset: scrollOffset + manualOffset,
                 viewportHeight: geo.size.height
             )
+            .onPreferenceChange(FullWordYPreferenceKey.self) { positions in
+                fullWordYPositions = positions
+            }
             .onPreferenceChange(WordYPreferenceKey.self) { positions in
-                let wasEmpty = wordYPositions.isEmpty
+                let wasEmpty = measuredWordYPositions.isEmpty
                 let widthChanged = abs(anchoredLayoutWidth - geo.size.width) > 0.5
                 let paragraphLayoutChanged = anchoredParagraphBreakBeforeWordIndices
                     != paragraphBreakBeforeWordIndices
@@ -228,7 +248,7 @@ struct SpeechScrollView: View {
                     hasAppliedTrackingTarget = false
                 }
                 captureStableLineMetrics(from: positions)
-                wordYPositions = positions
+                measuredWordYPositions = positions
                 // Re-anchor after a page switch or any live layout reflow. Keep
                 // the stable vertical metrics during width changes: the visible
                 // preference values may be culled from the middle of the text.
@@ -257,6 +277,28 @@ struct SpeechScrollView: View {
                     recalculateTracking(containerHeight: containerHeight)
                 }
             }
+            .onChange(of: navigationRevision) { _, _ in
+                manualOffset = 0
+                isUserScrolling = false
+                allowsNextBackwardTrackingUpdate = true
+                recalculateTracking(containerHeight: containerHeight)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigatePrompter)) { notification in
+                guard handlesNavigation(),
+                      let command = notification.object as? PromptNavigationCommand else { return }
+                let current = min(max(0, words.count - 1), smoothScroll ? Int(smoothWordProgress) : activeWordIndex())
+                let target = PromptNavigation.targetWord(
+                    for: command, currentWord: current, viewportHeight: containerHeight,
+                    wordPositions: fullWordYPositions, words: words
+                )
+                var charOffset = 0
+                for word in words.prefix(target) { charOffset += word.count + 1 }
+                manualOffset = 0
+                isUserScrolling = false
+                allowsNextBackwardTrackingUpdate = true
+                onWordTap?(charOffset)
+                repositionTracking(toWordIndex: target)
+            }
             .onChange(of: smoothWordProgress) { _, _ in
                 if isListening && smoothScroll {
                     manualOffset = 0
@@ -272,7 +314,8 @@ struct SpeechScrollView: View {
             .onChange(of: words) { _, _ in
                 scrollOffset = initialScrollOffset(containerHeight: containerHeight)
                 manualOffset = 0
-                wordYPositions = [:]
+                measuredWordYPositions = [:]
+                fullWordYPositions = [:]
                 stableTopLineCenter = nil
                 stableLineAdvance = nil
                 allowsNextBackwardTrackingUpdate = false
@@ -398,8 +441,8 @@ struct SpeechScrollView: View {
     private func initialScrollOffset(containerHeight: CGFloat) -> CGFloat {
         switch readingPosition {
         case .centered:
-            let lineHeight = font.pointSize * 1.4
-            return containerHeight * 0.5 - lineHeight * 0.5
+            let lineHeight = ceil(font.ascender - font.descender + font.leading)
+            return PromptNavigation.centeredOffset(wordY: lineHeight * 0.5, viewportHeight: containerHeight)
         case .nearTop:
             return 0
         }
@@ -411,10 +454,8 @@ struct SpeechScrollView: View {
             return
         }
 
-        let center = containerHeight * 0.5
-
         if smoothScroll {
-            // Classic/silence-paused: anchor active word near the bottom, scrolling up
+            // Fullscreen and external displays keep the active line centered.
             let bottomAnchor = containerHeight - 20
             let wordIdx = Int(smoothWordProgress)
             let fraction = smoothWordProgress - Double(wordIdx)
@@ -422,12 +463,14 @@ struct SpeechScrollView: View {
             guard let wordY = wordYPositions[clampedIdx] else { return }
             let nextY = wordYPositions[clampedIdx + 1] ?? wordY
             let interpolatedY = wordY + (nextY - wordY) * CGFloat(fraction)
-            applyTrackingTarget(bottomAnchor - interpolatedY)
+            applyTrackingTarget(centerSmoothScrolling
+                ? PromptNavigation.centeredOffset(wordY: interpolatedY, viewportHeight: containerHeight)
+                : bottomAnchor - interpolatedY)
         } else {
             // Word-tracking/voice-activated: active word at vertical center
             let wordIdx = activeWordIndex()
             if let wordY = wordYPositions[wordIdx] {
-                let target = center - wordY
+                let target = PromptNavigation.centeredOffset(wordY: wordY, viewportHeight: containerHeight)
                 applyTrackingTarget(target)
             }
         }
@@ -457,7 +500,7 @@ struct SpeechScrollView: View {
         let target: CGFloat
         switch readingPosition {
         case .centered:
-            target = containerHeight * 0.5 - wordY
+            target = PromptNavigation.centeredOffset(wordY: wordY, viewportHeight: containerHeight)
         case .nearTop:
             target = min(wordY, topReadingAnchor) - wordY
         }
@@ -702,6 +745,12 @@ struct WordFlowLayout: View {
             return rowHeight + (beginsParagraph ? paragraphDividerExtraSpacing : 0)
         }
         let totalContentHeight = max(0, lineTop(totalLines) - lineSpacing)
+        let fullWordPositions = Dictionary(uniqueKeysWithValues: lines.enumerated().flatMap { lineIndex, line in
+            let beginsParagraph = paragraphPrefixCounts[lineIndex + 1] > paragraphPrefixCounts[lineIndex]
+            let center = lineTop(lineIndex) + rowHeight * 0.5
+                + (beginsParagraph ? paragraphDividerExtraSpacing : 0)
+            return line.map { ($0.id, center) }
+        })
 
         // Determine visible range of lines
         let canCull = viewportHeight > 0 && totalLines > 0
@@ -786,6 +835,7 @@ struct WordFlowLayout: View {
         }
         .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
         .coordinateSpace(name: "flowLayout")
+        .preference(key: FullWordYPreferenceKey.self, value: fullWordPositions)
     }
 
     private func wordView(for item: WordItem, isNextWord: Bool) -> some View {
