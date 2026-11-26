@@ -1358,6 +1358,11 @@ struct FloatingOverlayView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .top) {
+            if showsDragHandle {
+                windowDragHandle
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if NotchSettings.shared.showElapsedTime {
                 ElapsedTimeView(fontSize: 11)
@@ -1437,6 +1442,32 @@ struct FloatingOverlayView: View {
             timerWordProgress = 0
             isUserScrolling = false
         }
+    }
+
+    /// Explicit drag area along the top edge. `isMovableByWindowBackground`
+    /// alone no longer works reliably on macOS 26+, because the tappable words
+    /// cover almost the whole panel and swallow the mouse-down.
+    private var windowDragHandle: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(Color.white.opacity(0.25))
+            .frame(width: 36, height: 4)
+            .frame(width: 80, height: Self.dragHandleHeight)
+            .contentShape(Rectangle())
+            .gesture(WindowDragGesture())
+            .allowsWindowActivationEvents(true)
+            .pointerStyle(.grabIdle)
+    }
+
+    private static let dragHandleHeight: CGFloat = 12
+
+    /// Background dragging still works on older systems; keep them unchanged.
+    private var showsDragHandle: Bool {
+        guard #available(macOS 26, *) else { return false }
+        return !followingCursor
+    }
+
+    private var dragHandleInset: CGFloat {
+        showsDragHandle ? Self.dragHandleHeight : 0
     }
 
     private var floatingPrompterView: some View {
@@ -1676,6 +1707,8 @@ struct FloatingOverlayView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        // Keep scrolled rows out from under the drag handle.
+        .padding(.top, dragHandleInset)
         .transition(.opacity)
     }
 
