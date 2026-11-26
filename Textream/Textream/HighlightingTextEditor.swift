@@ -79,12 +79,12 @@ struct HighlightingTextEditor: NSViewRepresentable {
         updateWritingDirection(textView, text: text)
 
         // Apply bump highlight on newly dictated range
-        if let range = highlightRange, range.location + range.length <= textView.string.count {
+        if let range = highlightRange, range.location + range.length <= textView.string.utf16.count {
             context.coordinator.applyBumpHighlight(textView, range: range)
         }
 
         // Move caret to requested position (one-shot)
-        if let pos = caretPosition, pos <= textView.string.count {
+        if let pos = caretPosition, pos <= textView.string.utf16.count {
             let caretRange = NSRange(location: pos, length: 0)
             textView.setSelectedRange(caretRange)
             textView.scrollRangeToVisible(caretRange)

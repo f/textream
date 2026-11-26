@@ -170,7 +170,8 @@ Happy presenting! [wave]
 
     @State private var highlightClearTimer: Timer?
 
-    // Segment tracking: each recognition session is a "segment"
+    // Segment tracking: each recognition session is a "segment".
+    // Start and length are UTF-16 offsets, like the editor's NSRange caret.
     @State private var segmentStart: Int = 0
     @State private var segmentLength: Int = 0
     @State private var segmentNeedsSeparator: Bool = false
@@ -182,13 +183,13 @@ Happy presenting! [wave]
         let pageIndex = service.currentPageIndex
         guard pageIndex < service.pages.count else { return }
         let text = service.pages[pageIndex]
-        let caret = min(editorCaretPosition, text.count)
+        let caret = min(editorCaretPosition, text.utf16.count)
 
         // Skip everything already recognized up to this point
         spokenSkipOffset = lastRawSpokenLength
 
         // Check if we need a space before the new segment
-        let charBefore = caret > 0 ? text[text.index(text.startIndex, offsetBy: caret - 1)] : "\n"
+        let charBefore = caret > 0 ? text[text.index(before: String.Index(utf16Offset: caret, in: text))] : "\n"
         segmentNeedsSeparator = !(charBefore == " " || charBefore == "\n" || caret == 0)
         segmentStart = caret
         segmentLength = 0
@@ -223,19 +224,19 @@ Happy presenting! [wave]
             var text = service.pages[pageIndex]
 
             // Remove the old segment text
-            let safeStart = min(segmentStart, text.count)
-            let removeStart = text.index(text.startIndex, offsetBy: safeStart)
-            let safeLen = min(segmentLength, text.count - safeStart)
-            let removeEnd = text.index(removeStart, offsetBy: safeLen)
+            let safeStart = min(segmentStart, text.utf16.count)
+            let removeStart = String.Index(utf16Offset: safeStart, in: text)
+            let safeLen = min(segmentLength, text.utf16.count - safeStart)
+            let removeEnd = String.Index(utf16Offset: safeStart + safeLen, in: text)
             text.removeSubrange(removeStart..<removeEnd)
 
             // Build the new segment content
             let sep = segmentNeedsSeparator ? " " : ""
             let newSegment = sep + effectiveText
-            text.insert(contentsOf: newSegment, at: text.index(text.startIndex, offsetBy: min(segmentStart, text.count)))
+            text.insert(contentsOf: newSegment, at: String.Index(utf16Offset: min(segmentStart, text.utf16.count), in: text))
 
             let prevLen = segmentLength
-            segmentLength = newSegment.count
+            segmentLength = newSegment.utf16.count
             service.pages[pageIndex] = text
 
             // Highlight only the newly added characters
