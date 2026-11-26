@@ -690,6 +690,14 @@ struct NotchOverlayView: View {
     @State private var expansion: CGFloat = 0
     @State private var contentVisible = false
     @State private var dragStartHeight: CGFloat = -1
+    @State private var dragStartWidth: CGFloat = -1
+    /// Width the notch is drawn at. Eases toward the saved width so resizing feels smooth.
+    @State private var displayWidth: CGFloat = NotchSettings.shared.notchWidth
+    @State private var isDraggingWidth = false
+    @State private var hoveringHeightHandle = false
+    @State private var hoveringLeadingHandle = false
+    @State private var hoveringTrailingHandle = false
+    @State private var dragStartMouseX: CGFloat = 0
 
     // Timer-based scroll for classic & silence-paused modes
     @State private var timerWordProgress: Double = 0
@@ -768,7 +776,7 @@ struct NotchOverlayView: View {
         GeometryReader { geo in
             let targetHeight = menuBarHeight + NotchSettings.shared.textAreaHeight
             let currentHeight = notchHeight + (targetHeight - notchHeight) * expansion
-            let currentWidth = notchWidth + (geo.size.width - notchWidth) * expansion
+            let currentWidth = notchWidth + (min(displayWidth, geo.size.width) - notchWidth) * expansion
 
             ZStack(alignment: .top) {
                 // Container shape — solid black or transparent with blur
@@ -827,12 +835,20 @@ struct NotchOverlayView: View {
                 }
             }
             .frame(width: currentWidth, height: currentHeight, alignment: .top)
+            .overlay(alignment: .leading) {
+                if contentVisible { widthResizeHandle(edge: .leading) }
+            }
+            .overlay(alignment: .trailing) {
+                if contentVisible { widthResizeHandle(edge: .trailing) }
+            }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .onChange(of: NotchSettings.shared.textAreaHeight) { _, newHeight in
             frameTracker.visibleHeight = menuBarHeight + newHeight
         }
         .onChange(of: NotchSettings.shared.notchWidth) { _, newWidth in
+            // Resize directly, the same way the height drag does.
+            displayWidth = newWidth
             frameTracker.visibleWidth = newWidth
         }
         .onAppear {
@@ -1098,6 +1114,8 @@ struct NotchOverlayView: View {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.white.opacity(0.25))
                     .frame(width: 36, height: 4)
+                    .opacity(hoveringHeightHandle || dragStartHeight >= 0 ? 1 : 0)
+                    .animation(.easeOut(duration: 0.2), value: hoveringHeightHandle)
                 Spacer().frame(height: 4)
             }
             .frame(height: 10)
@@ -1120,6 +1138,7 @@ struct NotchOverlayView: View {
                     }
             )
             .onHover { hovering in
+                hoveringHeightHandle = hovering
                 if hovering {
                     NSCursor.resizeUpDown.push()
                 } else {
@@ -1129,6 +1148,58 @@ struct NotchOverlayView: View {
             }
             .transition(.opacity)
         }
+    }
+
+    /// Side grab bar that resizes the notch width. The panel stays centered,
+    /// so the width changes by twice the drag distance to keep the edge under the cursor.
+    private func widthResizeHandle(edge: HorizontalEdge) -> some View {
+        let hovering = edge == .leading ? hoveringLeadingHandle : hoveringTrailingHandle
+        return RoundedRectangle(cornerRadius: 2)
+            .fill(Color.white.opacity(0.25))
+            .frame(width: 4, height: 36)
+            .opacity(hovering || isDraggingWidth ? 1 : 0)
+            .animation(.easeOut(duration: 0.2), value: hovering || isDraggingWidth)
+            // The grab zone covers the flared corner and the text margin; the bar sits
+            // just inside the black body, clear of the words.
+            .padding(edge == .leading ? .trailing : .leading, 4)
+            .frame(width: 28, alignment: edge == .leading ? .trailing : .leading)
+            .frame(maxHeight: .infinity)
+            .padding(.top, menuBarHeight)
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { _ in
+                        // Measure in screen space: the panel re-centers as it resizes, so
+                        // window-relative translation would jump on the first move.
+                        // Use the screen position stored in the drag event itself.
+                        let mouseX = NSApp.currentEvent?.cgEvent?.location.x ?? NSEvent.mouseLocation.x
+                        if dragStartWidth < 0 {
+                            dragStartWidth = NotchSettings.shared.notchWidth
+                            dragStartMouseX = mouseX
+                            isDraggingWidth = true
+                        }
+                        let moved = mouseX - dragStartMouseX
+                        let delta = edge == .trailing ? moved : -moved
+                        // The notch stays centered, so both edges move: doubling keeps the
+                        // dragged edge exactly under the pointer, like the height drag.
+                        NotchSettings.shared.notchWidth = max(
+                            NotchSettings.minWidth,
+                            min(NotchSettings.maxWidth, dragStartWidth + delta * 2)
+                        )
+                    }
+                    .onEnded { _ in
+                        dragStartWidth = -1
+                        isDraggingWidth = false
+                    }
+            )
+            .onHover { inside in
+                if edge == .leading { hoveringLeadingHandle = inside } else { hoveringTrailingHandle = inside }
+                if inside {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
     }
 
     private var pagePickerView: some View {
