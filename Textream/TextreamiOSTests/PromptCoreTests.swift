@@ -2093,6 +2093,14 @@ struct PromptCoreTests {
         )
     }
 
+    @Test
+    func recordingsUseTheSmoothestStabilizationTheCameraSupports() {
+        #expect(CaptureController.videoStabilizationMode { _ in true } == .cinematicExtended)
+        #expect(CaptureController.videoStabilizationMode { $0 == .standard || $0 == .cinematic } == .cinematic)
+        #expect(CaptureController.videoStabilizationMode { $0 == .standard } == .standard)
+        #expect(CaptureController.videoStabilizationMode { _ in false } == nil)
+    }
+
     private func makeConfiguration(
         sessionMode: SessionMode,
         cameraEnabled: Bool,

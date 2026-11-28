@@ -676,6 +676,21 @@ final class CaptureController: NSObject, AVCaptureAudioDataOutputSampleBufferDel
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = false
         }
+        // A connection records without stabilization unless the app asks for it,
+        // unlike the Camera app. Only the file is stabilized, not the preview.
+        if connection.isVideoStabilizationSupported,
+           let format = videoInput?.device.activeFormat,
+           let mode = Self.videoStabilizationMode(isSupported: format.isVideoStabilizationModeSupported) {
+            connection.preferredVideoStabilizationMode = mode
+        }
+    }
+
+    /// The smoothest stabilization the camera's format supports. Each step
+    /// crops the frame a little more, which suits a hand-held recording.
+    nonisolated static func videoStabilizationMode(
+        isSupported: (AVCaptureVideoStabilizationMode) -> Bool
+    ) -> AVCaptureVideoStabilizationMode? {
+        [.cinematicExtended, .cinematic, .standard].first(where: isSupported)
     }
 
     // Photos invokes both handlers on an arbitrary serial queue. Keep this bridge
